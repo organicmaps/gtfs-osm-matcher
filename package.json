@@ -1,0 +1,23 @@
+{
+  "name": "webui",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "deploy": "./scripts/deploy.sh",
+    "serve-data": "http-server ../gtfs-parser/data/match -p 8801 --cors"
+  },
+  "dependencies": {
+    "maplibre-gl": "^5.10.0",
+    "preact": "^10.27.2"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.2",
+    "@types/node": "^24.6.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.7"
+  }
+}

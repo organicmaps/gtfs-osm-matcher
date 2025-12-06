@@ -1,0 +1,20 @@
+
+.match-dataset {
+    display: inline-block;
+    width: 8em;
+    margin-left: 0.5em;
+    margin-right: 0.5em;
+    white-space: nowrap;
+}
+.match-dataset-count {
+    padding-inline-start: 0.5em;
+}
+.match-report-meta label {
+    font-weight: bold;
+}
+.match-report-meta .section {
+    margin-top: 0.5em;
+}
+.match-report-meta .ts-value {
+    font-size: 0.8em;
+}
