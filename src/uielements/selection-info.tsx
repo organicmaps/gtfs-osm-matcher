@@ -76,7 +76,6 @@ function MatchInfo({ datasetName, properties, geometry, reportRegion }: MatchInf
     if (datasetName === "match-name") {
         info = (<i>Matched OSM stops by GTFS stop Name</i>);
     }
-
     return (<div>
         <p>{info}</p>
 
