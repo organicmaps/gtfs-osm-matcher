@@ -9,7 +9,7 @@ import { LocateMe } from "./locate-me";
 export type SelectionInfoProps = {
     selection: SelectionT | null
 }
-export function SelectionInfo({selection}: SelectionInfoProps) {
+export function SelectionInfo({ selection }: SelectionInfoProps) {
     const properties = selection?.feature.properties;
     const datasetName = selection?.datasetName;
     const reportRegion = selection?.reportRegion;
@@ -24,8 +24,8 @@ export function SelectionInfo({selection}: SelectionInfoProps) {
 
     return (<div id={"selection-info"}>
         <h2>{name}</h2>
-        { !isCluster && properties && reportRegion && <MatchInfo {...{datasetName, properties, geometry, reportRegion}}/> }
-        { isCluster && properties && reportRegion && <ClusterInfo {...{datasetName, properties, geometry, reportRegion}}/> }
+        {!isCluster && properties && reportRegion && <MatchInfo {...{ datasetName, properties, geometry, reportRegion }} />}
+        {isCluster && properties && reportRegion && <ClusterInfo {...{ datasetName, properties, geometry, reportRegion }} />}
     </div>)
 }
 
@@ -33,12 +33,12 @@ const ABC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 
 type MatchInfoProps = {
-    properties: {[k: string]: any}
+    properties: { [k: string]: any }
     geometry: GeoJSON.Geometry | undefined
     datasetName?: string
     reportRegion: string
 }
-function MatchInfo({datasetName, properties, geometry, reportRegion}: MatchInfoProps) {
+function MatchInfo({ datasetName, properties, geometry, reportRegion }: MatchInfoProps) {
     //@ts-ignore
     var ignore = reportRegion;
 
@@ -51,14 +51,14 @@ function MatchInfo({datasetName, properties, geometry, reportRegion}: MatchInfoP
         const idn = f.id.slice(1);
         const distanceInfo = lon && lat && <span> ({getDistance([lat, lon], [f.lat, f.lon]).toFixed(1)}m) </span>;
         return <li key={f.id}>
-            <b>{f.tags.name} </b> 
+            <b>{f.tags.name} </b>
             <div><a target="_blank" href={`https://osm.org/${type}/${idn}`}>{f.id}</a> {distanceInfo} <LocateMe lonlatFeature={f} /></div>
-            <TagsTable tags={f.tags}/>
+            <TagsTable tags={f.tags} />
         </li>
     });
 
-    const markersOsm = osmFeatures.map((f: any, i: number) => 
-        <HtmlMapMarker key={f.id} name={"osm " + letterCode(i)} lon={f.lon} lat={f.lat} /> );
+    const markersOsm = osmFeatures.map((f: any, i: number) =>
+        <HtmlMapMarker key={f.id} name={"osm " + letterCode(i)} lon={f.lon} lat={f.lat} />);
 
     var info = (<i>One day here will be info text for {datasetName}</i>);
     if (datasetName === "no-match") {
@@ -76,7 +76,7 @@ function MatchInfo({datasetName, properties, geometry, reportRegion}: MatchInfoP
     if (datasetName === "match-name") {
         info = (<i>Matched OSM stops by GTFS stop Name</i>);
     }
-    
+
     return (<div>
         <p>{info}</p>
 
@@ -84,9 +84,9 @@ function MatchInfo({datasetName, properties, geometry, reportRegion}: MatchInfoP
         <div>Gtfs route types: <b>{properties.gtfsRouteTypes}</b></div>
 
         <div>
-        <h4>OSM Feautures</h4>
+            <h4>OSM Feautures</h4>
             <ol type="A">
-            { osmLi }
+                {osmLi}
             </ol>
         </div>
 
@@ -96,21 +96,21 @@ function MatchInfo({datasetName, properties, geometry, reportRegion}: MatchInfoP
 
 
 type ClusterInfoProps = {
-    properties: {[k: string]: any}
+    properties: { [k: string]: any }
     geometry: GeoJSON.Geometry | undefined
     datasetName?: string
     reportRegion: string
 }
-function ClusterInfo({properties}: ClusterInfoProps) {
+function ClusterInfo({ properties }: ClusterInfoProps) {
 
     const gtfsFeatures = JSON.parse(properties['gtfsFeatures']);
     const osmFeatures = JSON.parse(properties['osmFeatures']);
 
     const gtfsLi = gtfsFeatures.map((f: any) => <li key={f.id}><span>{f.id}</span></li>);
-    const osmLi = osmFeatures.map((f: any) => 
+    const osmLi = osmFeatures.map((f: any) =>
         <li key={f.id}>
             <b>{f.tags.name} </b> ({f.id}) <LocateMe lonlatFeature={f} />
-            <TagsTable tags={f.tags}/>
+            <TagsTable tags={f.tags} />
         </li>
     );
 
@@ -122,16 +122,16 @@ function ClusterInfo({properties}: ClusterInfoProps) {
         <div>
             <h4>Gtfs Feautures</h4>
             <ol type="A">
-            { gtfsLi }
+                {gtfsLi}
             </ol>
-            <label>Gtfs route types: </label>{ parseJsonSafe(properties?.gtfs_types, []).join(", ") }
+            <label>Gtfs route types: </label>{parseJsonSafe(properties?.gtfs_types, []).join(", ")}
         </div>
 
-        
+
         <div>
-        <h4>OSM Feautures</h4>
+            <h4>OSM Feautures</h4>
             <ol type="A">
-            { osmLi }
+                {osmLi}
             </ol>
         </div>
 
@@ -147,7 +147,7 @@ type HtmlMapMarkerProps = {
     lat: number
     lon: number
 }
-function HtmlMapMarker({name, lat, lon}: HtmlMapMarkerProps) {
+function HtmlMapMarker({ name, lat, lon }: HtmlMapMarkerProps) {
 
     const map = useContext(MapContext)?.map;
 
@@ -175,7 +175,7 @@ type TagsTableProps = {
         [k: string]: string
     }
 }
-function TagsTable({tags}: TagsTableProps) {
+function TagsTable({ tags }: TagsTableProps) {
 
     const rows = Object.entries(tags).map(([k, v]) => <tr key={k}>
         <td>{k}</td>
@@ -184,7 +184,7 @@ function TagsTable({tags}: TagsTableProps) {
 
     return <table>
         <tbody>
-            { rows }
+            {rows}
         </tbody>
     </table>
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import type { SelectionT } from "../app";
 import { LocateMe } from "./locate-me";
+import type { FeedMetaT } from "../types";
 
 const SchedulesAPIBase = "http://localhost:4567/v1/schedule";
 const RTUpdatesAPIBase = "http://localhost:4567/v1/updates";
@@ -59,6 +60,11 @@ type StopOnRouteT = {
     sequence: number
 }
 
+type ScheduleApiResponseT = {
+    timetables: ScheduleT[]
+    feedMeta: { [region: string]: FeedMetaT }
+}
+
 export type SchedulePreviewProps = {
     selection: SelectionT | null
 }
@@ -74,7 +80,7 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
     useEffect(() => {
         setSchedule([]);
 
-        fetch(`${SchedulesAPIBase}/${id}`).then(r => r.json()).then(data => {
+        fetch(`${SchedulesAPIBase}/${id}`).then(r => r.json()).then((data: ScheduleApiResponseT) => {
             console.log('Schedule response', data);
             setSchedule(data.timetables);
         });
@@ -114,38 +120,76 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
 
         const sections = (filteredByPeriod.length > 0 ? filteredByPeriod : s.sections).filter(section => matchDate(section, i_date, dow));
 
-        const routeToMathedSections: { [k: string]: RouteStopTimesT[] } = {};
+        const routeToMathedSections: { [k: string]: { section: ScheduleSectionT, routeStopTimes: RouteStopTimesT }[] } = {};
         for (const section of sections) {
             for (const routeStopTimes of section.routeStopTimes) {
                 if (routeToMathedSections[routeStopTimes.route]) {
-                    routeToMathedSections[routeStopTimes.route].push(routeStopTimes);
+                    routeToMathedSections[routeStopTimes.route].push({ section, routeStopTimes });
                 }
                 else {
-                    routeToMathedSections[routeStopTimes.route] = [routeStopTimes];
+                    routeToMathedSections[routeStopTimes.route] = [{ section, routeStopTimes }];
                 }
             }
         }
 
-        const routes = Object.entries(routeToMathedSections).map(([rid, stopTimes]) => {
+        const routes = Object.entries(routeToMathedSections).map(([rid, calendarAndStopTimes]) => {
             const route = s.routes[rid];
 
-            let sectionTimes = [];
-            for (const times of stopTimes) {
-                showTheWholeDay ?
-                    sectionTimes.push(...times.arrivalTimes) :
-                    sectionTimes.push(...times.arrivalTimes.filter(t => t > i_time).slice(0, 3));
+            const routeTripsCalendarSections = calendarAndStopTimes.map(({ section, routeStopTimes }) => {
+                const trips = routeStopTimes.tripIds.map((tripId, inx) => {
+                    return {
+                        tripId,
+                        arrivalTime: routeStopTimes.arrivalTimes[inx],
+                        departureTime: routeStopTimes.departureTimes[inx],
+                    }
+                });
+
+                const { route, timezone, stopOnRoutePosition } = routeStopTimes;
+
+                return {
+                    calendar: section.calendar,
+                    trips,
+                    route,
+                    timezone,
+                    stopOnRoutePosition,
+                }
+            });
+
+            const trips = routeTripsCalendarSections.find(s => s.trips.length > 0)?.trips || [];
+            if (routeTripsCalendarSections.length > 1) {
+                // TODO: Merge sections, but it really should be just one
+                console.warn("More than one calendar section matched for the day and route: ", routeTripsCalendarSections);
             }
 
-            const lastStopName = stopTimes.find(st => st.stopOnRoutePosition.lastStopName)?.stopOnRoutePosition?.lastStopName;
+            const lastStopName = routeTripsCalendarSections[0].stopOnRoutePosition.lastStopName;
 
-            sectionTimes.sort();
-            if (!showTheWholeDay) {
-                sectionTimes = sectionTimes.slice(0, 3);
-            }
+            const uids = new Set();
+            const uniqueTrips: typeof trips = [];
+            trips.forEach(t => {
+                if (uids.has(t.tripId)) {
+                    console.warn('Duplicated trip id');
+                    return;
+                }
+                uids.add(t.tripId);
+                uniqueTrips.push(t);
+            });
 
-            const ts = sectionTimes.map(t => <span key={t}>{`${Math.floor(t / 3600)}:${Math.floor(t % 3600 / 60)} `}</span>)
+            const visibleTrips = !showTheWholeDay ? uniqueTrips.filter(t => t.arrivalTime > i_time).slice(0, 5) : uniqueTrips;
 
-            return <div key={rid}><b>{route.routeType} {route.shortName} </b>{lastStopName && <span> (to {lastStopName})</span>}: {ts}</div>
+            const stopTripUpdates = tripUpdates?.[s.stop.id]?.tripUpdates;
+            const updates = stopTripUpdates?.filter((tu: any) => tu.trip.routeId === rid);
+
+            const ts = visibleTrips.map(t => {
+                const update = updates?.find((u: any) => u.trip.tripId === t.tripId);
+                return <span key={t.tripId}>
+                    {`${Math.floor(t.arrivalTime / 3600)}:${Math.floor(t.arrivalTime % 3600 / 60)} `}
+                    {update && <span style={{ color: 'red' }}>{update.stopTimeUpdates?.[0].arrivalDelay} sec</span>}
+                </span>
+            });
+
+            const lastStopEl = (lastStopName && <div> to {lastStopName}</div>);
+
+            return <div key={rid}><div><b>{route.routeType} {route.shortName} </b>: {ts}</div>{lastStopEl}</div>
         });
 
         return <div>

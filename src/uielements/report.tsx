@@ -299,7 +299,7 @@ function DatasetMapLayer({ name, data, onClick }: DatasetMapLayerProps) {
         });
 
         mapLoadedPromise.then(async map => {
-            if (iconPromise) {
+            if (iconPromise && !map.hasImage(iconImageId)) {
                 const image = await iconPromise;
                 map.addImage(iconImageId, image);
             }
