@@ -1,0 +1,32 @@
+#selection-info {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    max-width: 20%;
+    max-height: 80%;
+
+    overflow-y: scroll;
+
+    z-index: 10;
+    background-color: white;
+
+    padding: 1em;
+
+    border-radius: 4px;
+}
+
+#selection-info ol {
+    margin-bottom: 0.5em;
+}
+
+#selection-info table {
+    font-size: 0.75em;
+    margin-bottom: 0.5em;
+}
+
+.locate-icon {
+    cursor: pointer;
+    width: 1.25em; 
+    height: 1.25em;
+    vertical-align: -0.2em;
+}
