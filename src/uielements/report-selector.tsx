@@ -150,7 +150,7 @@ export function MatchReportSelector() {
                             <tr>
                                 <th onClick={() => setSortColumn('region')}>Region</th>
                                 <th onClick={() => setSortColumn('gtfsDate')}>GTFS Date</th>
-                                <th onClick={() => setSortColumn('matched')}>Matched</th>
+                                <th onClick={() => setSortColumn('matchPercent')}>Match percent</th>
                                 <th onClick={() => setSortColumn('total')}>Total</th>
                                 <th onClick={() => setSortColumn('matched')}>Matched</th>
                                 <th onClick={() => setSortColumn('empty')}>Empty</th>
