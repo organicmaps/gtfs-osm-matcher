@@ -165,9 +165,12 @@ export function MatchReportSelector() {
                     </table>
                 </div>
                 <div className={"report-list-footer"}>
-                    To add a new GTFS feed, please write us a message to
+                    To add your city or country, or for any other inquiries, please write us at
                     <span> <a href="mailto:publictransport@organicmaps.app">
                         publictransport@organicmaps.app
+                    </a></span> or create an issue on
+                    <span> <a href="https://github.com/organicmaps/gtfs-osm-matcher/issues?q=label%3Anew-gtfs-source">
+                        GitHub
                     </a></span>
                 </div>
             </div>

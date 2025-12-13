@@ -58,9 +58,12 @@ export function ReportHelpOverlay({ onClose }: { onClose: () => void }) {
                     </ul>
                 </p>
                 <p>
-                    If you found a bug or have a suggestion, please write us a message to
+                    If you found a bug or have a suggestion, please write us at
                     <span> <a href="mailto:publictransport@organicmaps.app">
                         publictransport@organicmaps.app
+                    </a></span> or create an issue on
+                    <span> <a href="https://github.com/organicmaps/gtfs-osm-matcher/issues">
+                        GitHub
                     </a></span>
                 </p>
             </div>
