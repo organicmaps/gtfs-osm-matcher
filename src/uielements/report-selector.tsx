@@ -159,7 +159,7 @@ export function MatchReportSelector() {
                                 </ul>
                             </p>
                             <p>
-                                If you found a bug or have a suggestion, please write us a message to
+                                If you found a bug or have a suggestion, please write us at
                                 <span> <a href="mailto:publictransport@organicmaps.app">
                                     publictransport@organicmaps.app
                                 </a></span>
@@ -179,10 +179,10 @@ export function MatchReportSelector() {
                     {links}
                 </div>
                 <div className={"report-list-footer"}>
-                    To add a new GTFS feed, please write us a message to
+                    To add your city or country, or for any other inquiries, please write us at
                     <span> <a href="mailto:publictransport@organicmaps.app">
                         publictransport@organicmaps.app
-                    </a></span>
+                    </a></span>. <a href="https://organicmaps.app/">Organic Maps Project</a>
                 </div>
             </div>
         </div>
