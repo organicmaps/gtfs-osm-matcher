@@ -18,6 +18,11 @@ type UpdateReportItem = {
     }
 }
 
+const dateFormatter = new Intl.DateTimeFormat(navigator.language, { year: 'numeric', month: 'short', day: 'numeric' });
+function formatDate(date: Date | null | undefined) {
+    return date ? dateFormatter.format(date) : 'N/A';
+}
+
 export function MatchReportSelector() {
     const [showHelp, setShowHelp] = useState(false);
     const [reports, setReports] = useState<Report[]>([]);
@@ -37,7 +42,7 @@ export function MatchReportSelector() {
     const links = reports.map((report) => {
         const updateReport = updateReports.find(u => u.name === report.region);
         const region = report.region;
-        const gtfsDate = report.matchMeta?.gtfsTimeStamp ? new Date(report.matchMeta.gtfsTimeStamp).toLocaleDateString() : 'N/A';
+        const gtfsDate = report.matchMeta?.gtfsTimeStamp ? new Date(report.matchMeta.gtfsTimeStamp) : null;
 
         const matchStats = updateReport?.matchStats;
         const matched = matchStats && (matchStats.matchId + matchStats.nameMatch + matchStats.manyToOne + matchStats.transitHubs);
@@ -60,7 +65,7 @@ export function MatchReportSelector() {
                     <a href={`#/match-report/${region}`} >{region}</a>
                 </div>
                 <div className="report-stats">
-                    <div>GTFS Date: {gtfsDate}</div>
+                    <div>GTFS Date: {formatDate(gtfsDate)}</div>
                     {updateReport && (
                         <>
                             <div className={matchClass}>Matched: {matchPercent?.toFixed(0)}% ({matched} of {matchStats?.total})</div>
