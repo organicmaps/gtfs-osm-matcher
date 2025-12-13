@@ -30,7 +30,7 @@ export function MatchReportSelector() {
     const [updateReports, setUpdateReports] = useState<UpdateReportItem[]>([]);
     const reportRegion = parseUrlReportRegion(useHash());
 
-    const sortingColumns = ['region', 'gtfsDate', 'matched', 'total', 'empty', 'noMatch'] as const;
+    const sortingColumns = ['region', 'gtfsDate', 'matchPercent', 'total', 'matched', 'empty', 'noMatch'] as const;
     const [sortColumn, setSortColumn] = useState<typeof sortingColumns[number]>('region');
 
     useEffect(() => {
@@ -69,10 +69,12 @@ export function MatchReportSelector() {
                 return a.region.localeCompare(b.region);
             case 'gtfsDate':
                 return (b.gtfsDate?.getTime() || 0) - (a.gtfsDate?.getTime() || 0);
-            case 'matched':
-                return (b.matched || 0) - (a.matched || 0);
+            case 'matchPercent':
+                return (b.matchPercent || 0) - (a.matchPercent || 0);
             case 'total':
                 return (b.matchStats?.total || 0) - (a.matchStats?.total || 0);
+            case 'matched':
+                return (b.matched || 0) - (a.matched || 0);
             case 'empty':
                 return (b.matchStats?.empty || 0) - (a.matchStats?.empty || 0);
             case 'noMatch':
@@ -103,6 +105,7 @@ export function MatchReportSelector() {
                     {matchPercent ? `${matchPercent.toFixed(0)}% (${matched} of ${matchStats?.total})` : '-'}
                 </td>
                 <td>{matchStats?.total || '-'}</td>
+                <td>{matched || '-'}</td>
                 <td>{matchStats?.empty || '-'}</td>
                 <td>{matchStats?.noMatch || '-'}</td>
                 <td>{updateReport?.gtfsUpdate || '-'}</td>
@@ -149,6 +152,7 @@ export function MatchReportSelector() {
                                 <th onClick={() => setSortColumn('gtfsDate')}>GTFS Date</th>
                                 <th onClick={() => setSortColumn('matched')}>Matched</th>
                                 <th onClick={() => setSortColumn('total')}>Total</th>
+                                <th onClick={() => setSortColumn('matched')}>Matched</th>
                                 <th onClick={() => setSortColumn('empty')}>Empty</th>
                                 <th onClick={() => setSortColumn('noMatch')}>No Match</th>
                                 <th>GTFS Update</th>
