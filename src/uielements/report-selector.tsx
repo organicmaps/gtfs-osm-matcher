@@ -2,6 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import { parseUrlReportRegion, useHash } from "./routing";
 import { MatchReport, type Report } from "./report";
 import "./report-selector.css";
+import { ReportHelpOverlay } from "./report-help-overlay";
 
 type UpdateReportItem = {
     name: string;
@@ -25,21 +26,24 @@ function formatDate(date: Date | null | undefined) {
 
 export function MatchReportSelector() {
     const [showHelp, setShowHelp] = useState(false);
-    const [reports, setReports] = useState<Report[]>([]);
+    const [matchReports, setMatchReports] = useState<Report[]>([]);
     const [updateReports, setUpdateReports] = useState<UpdateReportItem[]>([]);
     const reportRegion = parseUrlReportRegion(useHash());
+
+    const sortingColumns = ['region', 'gtfsDate', 'matched', 'total', 'empty', 'noMatch'] as const;
+    const [sortColumn, setSortColumn] = useState<typeof sortingColumns[number]>('region');
 
     useEffect(() => {
         fetch('/data/match-report.json')
             .then(r => r.json())
-            .then(data => { setReports(data.matchedRegions); });
+            .then(data => { setMatchReports(data.matchedRegions); });
 
         fetch('/data/update-report.json')
             .then(r => r.json())
             .then(data => { setUpdateReports(data); });
-    }, [setReports, setUpdateReports]);
+    }, [setMatchReports, setUpdateReports]);
 
-    const links = reports.map((report) => {
+    const reports = matchReports.map((report) => {
         const updateReport = updateReports.find(u => u.name === report.region);
         const region = report.region;
         const gtfsDate = report.matchMeta?.gtfsTimeStamp ? new Date(report.matchMeta.gtfsTimeStamp) : null;
@@ -47,6 +51,38 @@ export function MatchReportSelector() {
         const matchStats = updateReport?.matchStats;
         const matched = matchStats && (matchStats.matchId + matchStats.nameMatch + matchStats.manyToOne + matchStats.transitHubs);
         const matchPercent = matched && matched / matchStats.total * 100;
+
+        return {
+            region,
+            gtfsDate,
+            matched,
+            matchPercent,
+            matchStats,
+            updateReport,
+        }
+    });
+
+    reports.sort((a, b) => {
+        // TODO:Use generic comparator
+        switch (sortColumn) {
+            case 'region':
+                return a.region.localeCompare(b.region);
+            case 'gtfsDate':
+                return (b.gtfsDate?.getTime() || 0) - (a.gtfsDate?.getTime() || 0);
+            case 'matched':
+                return (b.matched || 0) - (a.matched || 0);
+            case 'total':
+                return (b.matchStats?.total || 0) - (a.matchStats?.total || 0);
+            case 'empty':
+                return (b.matchStats?.empty || 0) - (a.matchStats?.empty || 0);
+            case 'noMatch':
+                return (b.matchStats?.noMatch || 0) - (a.matchStats?.noMatch || 0);
+        }
+    });
+
+    const reportRows = reports.map(report => {
+
+        const { region, gtfsDate, matched, matchPercent, matchStats, updateReport } = report;
 
         let matchClass = '';
         if (matchPercent) {
@@ -60,32 +96,23 @@ export function MatchReportSelector() {
         }
 
         return (
-            <div key={region} className="report-item">
-                <div className="report-header">
-                    <a href={`#/match-report/${region}`} >{region}</a>
-                </div>
-                <div className="report-stats">
-                    <div>GTFS Date: {formatDate(gtfsDate)}</div>
-                    {updateReport && (
-                        <>
-                            <div className={matchClass}>Matched: {matchPercent?.toFixed(0)}% ({matched} of {matchStats?.total})</div>
-
-                            <div>Total: {matchStats?.total}</div>
-
-                            <div>Empty: {matchStats?.empty}</div>
-                            <div>No Match: {matchStats?.noMatch}</div>
-
-                            <div>GTFS Update: {updateReport.gtfsUpdate}</div>
-                            <div>GTFS Parse: {updateReport.gtfsParse}</div>
-                        </>
-                    )}
-                </div>
-            </div>
+            <tr key={region}>
+                <td><a href={`#/match-report/${region}`}>{region}</a></td>
+                <td>{formatDate(gtfsDate)}</td>
+                <td className={matchClass}>
+                    {matchPercent ? `${matchPercent.toFixed(0)}% (${matched} of ${matchStats?.total})` : '-'}
+                </td>
+                <td>{matchStats?.total || '-'}</td>
+                <td>{matchStats?.empty || '-'}</td>
+                <td>{matchStats?.noMatch || '-'}</td>
+                <td>{updateReport?.gtfsUpdate || '-'}</td>
+                <td>{updateReport?.gtfsParse || '-'}</td>
+            </tr>
         );
-    })
+    });
 
-    const reportData = reportRegion && reports.find(r => r.region === reportRegion);
-    if (reports.length > 0 && !reportData) {
+    const reportData = reportRegion && matchReports.find(r => r.region === reportRegion);
+    if (matchReports.length > 0 && !reportData) {
         // Arm map bounds fly-to only when reposrts selector is open and links are loaded
         window.dispatchEvent(new CustomEvent('SelectingReports'));
     }
@@ -105,73 +132,7 @@ export function MatchReportSelector() {
                         reportRegion={reportRegion}
                         reportData={reportData} />
                 </div>
-                {showHelp && (
-                    <div className={"overlay"}>
-                        <div className={'overlay-content'}>
-                            <span className={'link-like'} onClick={() => setShowHelp(false)}>Close</span>
-                            <p>
-                                Main goal of this tool is to link GTFS stops to OSM stop.
-
-                                Otherwise map would be cluttered with stps from different sources.
-                            </p>
-                            <p>
-                                There are different ways how to establish that match with different level of confidence.
-                                Different sets shows different groups of matches or errors if tool can't match
-                                GTFS and OSM stop with enough confidence.
-                            </p>
-                            <p>
-                                <ul>
-                                    <li>match-id -
-                                        This stops were matched by GTFS stop ID or Code.
-                                        That means that one of the osm element tags have exact match
-                                        with GTFS stop ID or Code.
-
-                                        Usually this is some kind of a ref tag.
-                                    </li>
-                                    <li>match-name -
-                                        This stops were matched by name and type and didn't get into a cluster of matches.
-                                        Names are getting normalised: Special characters removed,
-                                        lowercase, diacritics removed, ß converted to ss etc.
-
-                                        Names are checked against *name* elemnt tags.
-
-                                        <p>
-                                            Cluster of matches in this context means that
-                                            more than one GTFS stop matched to the same OSM element.
-                                        </p>
-                                    </li>
-                                    <li>separated-clusters -
-                                        This dataset contains matches that were successfuly separated from clusters.
-
-                                        At this moment cluster separation is done by distance.
-                                    </li>
-                                    <li>transit-hub-clusters -
-                                        This are clusters which contains one and only one OSM element representing trunsport hub,
-                                        such as amenity=bus_station, railway=station, etc. and any number of stops or platforms.
-                                    </li>
-                                    <li>many-to-one -
-                                        This are clusters where multiple GTFS stops were matched to excatly one OSM element.
-                                    </li>
-                                    <li>clusters -
-                                        This are clusters which the tool was unable to separate.
-                                    </li>
-                                    <li>no-match -
-                                        This are GTFS stops that were not matched to any OSM element.
-                                    </li>
-                                    <li>no-osm-stops -
-                                        This are GTFS stops for which no OSM element of the appropiate type was found.
-                                    </li>
-                                </ul>
-                            </p>
-                            <p>
-                                If you found a bug or have a suggestion, please write us a message to
-                                <span> <a href="mailto:publictransport@organicmaps.app">
-                                    publictransport@organicmaps.app
-                                </a></span>
-                            </p>
-                        </div>
-                    </div>
-                )}
+                {showHelp && <ReportHelpOverlay onClose={() => setShowHelp(false)} />}
             </>
         )
     }
@@ -181,7 +142,23 @@ export function MatchReportSelector() {
             <div className={'overlay-content'}>
                 <h2>Available match reports</h2>
                 <div className={'reports'}>
-                    {links}
+                    <table className="report-table">
+                        <thead>
+                            <tr>
+                                <th onClick={() => setSortColumn('region')}>Region</th>
+                                <th onClick={() => setSortColumn('gtfsDate')}>GTFS Date</th>
+                                <th onClick={() => setSortColumn('matched')}>Matched</th>
+                                <th onClick={() => setSortColumn('total')}>Total</th>
+                                <th onClick={() => setSortColumn('empty')}>Empty</th>
+                                <th onClick={() => setSortColumn('noMatch')}>No Match</th>
+                                <th>GTFS Update</th>
+                                <th>GTFS Parse</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {reportRows}
+                        </tbody>
+                    </table>
                 </div>
                 <div className={"report-list-footer"}>
                     To add a new GTFS feed, please write us a message to
