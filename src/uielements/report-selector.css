@@ -26,9 +26,12 @@
 
 .right-top {
     position: absolute;
-    top: 10px;
+    top: 40px;
     right: 10px;
     z-index: 10;
+
+    width: 275px;
+
     background-color: white;
 
     padding: 1em;
@@ -56,10 +59,6 @@
 .report-table tr:hover {
     background-color: #f9f9f9;
 }
-
-
-
-
 
 .match-high {
     background-color: #d4edda !important;

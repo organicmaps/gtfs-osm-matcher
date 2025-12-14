@@ -61,6 +61,7 @@ export function App() {
   return (
     <>
       <div id="map-view"></div>
+      <button id="map-style-button">Map Style</button>
       <MapContext value={mapContextVal} >
         <SelectionContext value={[selection, updateSelection]} >
           <MatchReportSelector />

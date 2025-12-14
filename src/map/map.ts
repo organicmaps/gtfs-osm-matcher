@@ -27,11 +27,10 @@ export function createMap(containerId: string) {
         'satellite': satMapStyle
     });
 
-    const satb = document.getElementById('sat-button');
+    const satb = document.getElementById('map-style-button');
     if (satb) {
         satb.onclick = () => {
-            const nextStyle = layerControls.selectedStyleKey === 'cartographic' ? 'satellite' : 'cartographic';
-            layerControls.setBaseStyle(nextStyle);
+            layerControls.cycleBaseStyle();
         };
     }
 

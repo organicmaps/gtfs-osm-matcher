@@ -12,9 +12,20 @@
 #map-location {
   position: absolute;
   z-index: 10;
-  top: 0.5em;
-  width: 8em;
-  right: 25em;
+  top: 5px;
+  right: 10px;
+  width: calc(275px + 2em);
+}
+
+#map-location input {
+  margin-right: 1em;
+}
+
+#map-style-button {
+  position: absolute;
+  z-index: 10;
+  top: 5px;
+  right: calc(275px + 2em + 40px);
 }
 
 a.goto-button {
