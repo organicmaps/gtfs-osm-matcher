@@ -15,13 +15,14 @@ export type OverlaySpecification = {
 export class LayerControls {
     stylesResolved = false;
     overlays: OverlaySpecification[] = [];
-    selectedStyleKey: string | null = null;
+    selectedStyleKey: string;
     map: Map;
     baseLayerStyles: StyleMap;
 
-    constructor(map: Map, baseLayerStyles: StyleMap) {
+    constructor(map: Map, baseLayerStyles: StyleMap, selectedStyleKey?: string) {
         this.map = map;
         this.baseLayerStyles = baseLayerStyles;
+        this.selectedStyleKey = selectedStyleKey || Object.keys(baseLayerStyles)[0];
 
         this.resolveStyles().then(() => {
             this.stylesResolved = true;
@@ -69,13 +70,24 @@ export class LayerControls {
                 ...overlay.sources
             };
             fullStyle.layers = [
-                ...fullStyle.layers, 
+                ...fullStyle.layers,
                 ...overlay.layers
             ];
         }
 
         this.selectedStyleKey = styleKey;
         this.map.setStyle(fullStyle);
+    }
+
+    cycleBaseStyle() {
+        const keys = Object.keys(this.baseLayerStyles);
+        const inx = keys.indexOf(this.selectedStyleKey);
+
+        const nextKey = keys[(inx + 1) % keys.length];
+
+        this.setBaseStyle(nextKey);
+
+        return nextKey;
     }
 
     async resolveStyles() {
