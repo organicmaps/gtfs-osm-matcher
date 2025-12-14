@@ -1,7 +1,7 @@
 import { useCallback, useContext, useEffect, useState } from "preact/hooks";
 import { MapContext, SelectionContext } from "../app";
 import { loadSvgWithColors } from "../map/map";
-import type { GeoJSONFeature, Map, MapGeoJSONFeature, MapMouseEvent } from "maplibre-gl";
+import type { GeoJSONFeature, MapGeoJSONFeature, MapMouseEvent } from "maplibre-gl";
 
 import "./report.css"
 import { parseDsAndId, useHash } from "./routing";
