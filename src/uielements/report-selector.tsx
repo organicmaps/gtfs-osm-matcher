@@ -3,6 +3,7 @@ import { parseUrlReportRegion, useHash } from "./routing";
 import { MatchReport, type Report } from "./report";
 import "./report-selector.css";
 import { ReportHelpOverlay } from "./report-help-overlay";
+import { ReportTable } from "./report-table";
 
 type UpdateReportItem = {
     name: string;
@@ -19,19 +20,11 @@ type UpdateReportItem = {
     }
 }
 
-const dateFormatter = new Intl.DateTimeFormat(navigator.language, { year: 'numeric', month: 'short', day: 'numeric' });
-function formatDate(date: Date | null | undefined) {
-    return date ? dateFormatter.format(date) : 'N/A';
-}
-
 export function MatchReportSelector() {
     const [showHelp, setShowHelp] = useState(false);
     const [matchReports, setMatchReports] = useState<Report[]>([]);
     const [updateReports, setUpdateReports] = useState<UpdateReportItem[]>([]);
     const reportRegion = parseUrlReportRegion(useHash());
-
-    const sortingColumns = ['region', 'gtfsDate', 'matchPercent', 'total', 'matched', 'empty', 'noMatch'] as const;
-    const [sortColumn, setSortColumn] = useState<typeof sortingColumns[number]>('region');
 
     useEffect(() => {
         fetch('/data/match-report.json')
@@ -58,60 +51,7 @@ export function MatchReportSelector() {
             matched,
             matchPercent,
             matchStats,
-            updateReport,
         }
-    });
-
-    reports.sort((a, b) => {
-        // TODO:Use generic comparator
-        switch (sortColumn) {
-            case 'region':
-                return a.region.localeCompare(b.region);
-            case 'gtfsDate':
-                return (b.gtfsDate?.getTime() || 0) - (a.gtfsDate?.getTime() || 0);
-            case 'matchPercent':
-                return (b.matchPercent || 0) - (a.matchPercent || 0);
-            case 'total':
-                return (b.matchStats?.total || 0) - (a.matchStats?.total || 0);
-            case 'matched':
-                return (b.matched || 0) - (a.matched || 0);
-            case 'empty':
-                return (b.matchStats?.empty || 0) - (a.matchStats?.empty || 0);
-            case 'noMatch':
-                return (b.matchStats?.noMatch || 0) - (a.matchStats?.noMatch || 0);
-        }
-    });
-
-    const reportRows = reports.map(report => {
-
-        const { region, gtfsDate, matched, matchPercent, matchStats, updateReport } = report;
-
-        let matchClass = '';
-        if (matchPercent) {
-            if (matchPercent >= 85) {
-                matchClass = 'match-high';
-            } else if (matchPercent >= 75) {
-                matchClass = 'match-medium';
-            } else {
-                matchClass = 'match-low';
-            }
-        }
-
-        return (
-            <tr key={region}>
-                <td><a href={`#/match-report/${region}`}>{region}</a></td>
-                <td>{formatDate(gtfsDate)}</td>
-                <td className={matchClass}>
-                    {matchPercent ? `${matchPercent.toFixed(0)}% (${matched} of ${matchStats?.total})` : '-'}
-                </td>
-                <td>{matchStats?.total || '-'}</td>
-                <td>{matched || '-'}</td>
-                <td>{matchStats?.empty || '-'}</td>
-                <td>{matchStats?.noMatch || '-'}</td>
-                <td>{updateReport?.gtfsUpdate || '-'}</td>
-                <td>{updateReport?.gtfsParse || '-'}</td>
-            </tr>
-        );
     });
 
     const reportData = reportRegion && matchReports.find(r => r.region === reportRegion);
@@ -145,24 +85,7 @@ export function MatchReportSelector() {
             <div className={'overlay-content'}>
                 <h2>Available match reports</h2>
                 <div className={'reports'}>
-                    <table className="report-table">
-                        <thead>
-                            <tr>
-                                <th onClick={() => setSortColumn('region')}>Region</th>
-                                <th onClick={() => setSortColumn('gtfsDate')}>GTFS Date</th>
-                                <th onClick={() => setSortColumn('matchPercent')}>Match percent</th>
-                                <th onClick={() => setSortColumn('total')}>Total</th>
-                                <th onClick={() => setSortColumn('matched')}>Matched</th>
-                                <th onClick={() => setSortColumn('empty')}>Empty</th>
-                                <th onClick={() => setSortColumn('noMatch')}>No Match</th>
-                                <th>GTFS Update</th>
-                                <th>GTFS Parse</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {reportRows}
-                        </tbody>
-                    </table>
+                    <ReportTable reports={reports} />
                 </div>
                 <div className={"report-list-footer"}>
                     To add your city or country, or for any other inquiries, please write us at

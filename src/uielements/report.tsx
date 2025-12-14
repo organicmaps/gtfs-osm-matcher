@@ -288,9 +288,10 @@ function DatasetMapLayer({ name, data, onClick }: DatasetMapLayerProps) {
             promiseFulfiled: false
         };
 
-        const iconPromise = map.hasImage(iconImageId) ? null : loadSvgWithColors("/stop-var.svg", imageColors);
+        const iconPromise = map.hasImage(iconImageId) ? null :
+            loadSvgWithColors("/stop-var.svg", imageColors);
 
-        mapLoaded.then(async map => {
+        mapLoaded?.then(async map => {
             console.log('Map loaded', name);
 
             if (iconPromise && !map.hasImage(iconImageId)) {
