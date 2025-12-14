@@ -12,6 +12,7 @@ import { SchedulePreview } from './uielements/schedule-preview';
 
 export type MapContextT = {
   map: Map,
+  loaded: Promise<Map>,
   layerControls: LayerControls
 }
 

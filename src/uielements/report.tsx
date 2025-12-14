@@ -237,6 +237,7 @@ function DatasetMapLayer({ name, data, onClick }: DatasetMapLayerProps) {
 
     const mapContext = useContext(MapContext);
     const map = mapContext?.map;
+    const mapLoaded = mapContext?.loaded;
     const stylingControls = mapContext?.layerControls;
 
     console.log('Render dataset layer', name);
@@ -289,28 +290,27 @@ function DatasetMapLayer({ name, data, onClick }: DatasetMapLayerProps) {
 
         const iconPromise = map.hasImage(iconImageId) ? null : loadSvgWithColors("/stop-var.svg", imageColors);
 
-        const mapLoadedPromise = new Promise<Map>(resolve => {
-            if (map.loaded()) {
-                resolve(map);
-            }
-            else {
-                map.once('load', () => resolve(map));
-            }
-        });
+        mapLoaded.then(async map => {
+            console.log('Map loaded', name);
 
-        mapLoadedPromise.then(async map => {
             if (iconPromise && !map.hasImage(iconImageId)) {
                 const image = await iconPromise;
-                map.addImage(iconImageId, image);
+                if (!map.hasImage(iconImageId)) {
+                    map.addImage(iconImageId, image);
+                }
             }
 
             subscription.promiseFulfiled = true;
             if (!subscription.canceled) {
+                console.log('Add stylingControls overlay', name);
                 // @ts-ignore
                 stylingControls.addOverlayImmediate(stopsStyle);
                 if (onClick) {
                     map.on('click', layerId, handleClick);
                 }
+            }
+            else {
+                console.log('Skipping adding map layer', name);
             }
         });
 

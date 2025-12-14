@@ -18,6 +18,10 @@ export function createMap(containerId: string) {
         zoom: initialLocation.zoom
     });
 
+    const loadedPromise = new Promise<Map>(resolve => {
+        map.once('load', () => resolve(map));
+    });
+
     const layerControls = new LayerControls(map, {
         'cartographic': 'https://tiles.openfreemap.org/styles/bright',
         'satellite': satMapStyle
@@ -66,7 +70,7 @@ export function createMap(containerId: string) {
     (window as any).map = map;
     (window as any).layerControls = layerControls;
 
-    return { map, layerControls };
+    return { map, loaded: loadedPromise, layerControls };
 }
 
 export function mapHashString(map: Map) {
