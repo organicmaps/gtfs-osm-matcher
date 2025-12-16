@@ -64,7 +64,16 @@ const matchDatasetOrderComparator = (a: MatchDataset, b: MatchDataset) => {
 
 export type Report = {
     region: string;
-    matchDatasets: MatchDataset[]
+    matchDatasets: MatchDataset[];
+    matchStats: {
+        total: number;
+        matchId: number;
+        nameMatch: number;
+        manyToOne: number;
+        transitHubs: number;
+        noMatch: number;
+        empty: number;
+    };
     matchMeta: {
         coveredPbfSources: {
             path: string,
