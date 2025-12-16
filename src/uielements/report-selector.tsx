@@ -5,43 +5,23 @@ import "./report-selector.css";
 import { ReportHelpOverlay } from "./report-help-overlay";
 import { ReportTable } from "./report-table";
 
-type UpdateReportItem = {
-    name: string;
-    gtfsUpdate: string;
-    gtfsParse: string;
-    matchStats: {
-        total: number;
-        matchId: number;
-        nameMatch: number;
-        manyToOne: number;
-        transitHubs: number;
-        noMatch: number;
-        empty: number;
-    }
-}
 
 export function MatchReportSelector() {
     const [showHelp, setShowHelp] = useState(false);
     const [matchReports, setMatchReports] = useState<Report[]>([]);
-    const [updateReports, setUpdateReports] = useState<UpdateReportItem[]>([]);
     const reportRegion = parseUrlReportRegion(useHash());
 
     useEffect(() => {
         fetch('/data/match-report.json')
             .then(r => r.json())
             .then(data => { setMatchReports(data.matchedRegions); });
-
-        fetch('/data/update-report.json')
-            .then(r => r.json())
-            .then(data => { setUpdateReports(data); });
-    }, [setMatchReports, setUpdateReports]);
+    }, [setMatchReports]);
 
     const reports = matchReports.map((report) => {
-        const updateReport = updateReports.find(u => u.name === report.region);
         const region = report.region;
         const gtfsDate = report.matchMeta?.gtfsTimeStamp ? new Date(report.matchMeta.gtfsTimeStamp) : null;
 
-        const matchStats = updateReport?.matchStats;
+        const matchStats = report?.matchStats;
         const matched = matchStats && (matchStats.matchId + matchStats.nameMatch + matchStats.manyToOne + matchStats.transitHubs);
         const matchPercent = matched && matched / matchStats.total * 100;
 
