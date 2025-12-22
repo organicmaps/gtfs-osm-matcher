@@ -1,0 +1,25 @@
+.tag-actions span.material-icons {
+    font-size: 1em;
+    color: lightgrey;
+}
+
+.tag-actions span.material-icons:hover {
+    color: inherit;
+    cursor: pointer;
+}
+
+.osm-tags-table input {
+    border: 1px solid #666;
+}
+
+.protected input {
+    background-color: #ddd;
+}
+
+.invalid input {
+    background-color: #dc9e9e;
+}
+
+.osm-tag-delete span:hover {
+    color: red;
+}

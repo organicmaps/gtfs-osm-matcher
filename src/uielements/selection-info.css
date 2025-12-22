@@ -30,3 +30,8 @@
     height: 1.25em;
     vertical-align: -0.2em;
 }
+
+.warning span {
+    color: red;
+    font-weight: bolder;
+}

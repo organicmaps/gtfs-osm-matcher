@@ -1,15 +1,23 @@
-import { useContext, useEffect } from "preact/hooks";
+import { useContext, useEffect, useState } from "preact/hooks";
 import { MapContext, type SelectionT } from "../app";
 
 import { Marker } from "maplibre-gl";
-import "./selection-info.css";
 import { getDistance } from "../map/distance";
 import { LocateMe } from "./locate-me";
+import { TagEditor } from "./osm-tags";
+
+const FEATURE_ENABLE_EDIT = import.meta.env.MODE === 'development';
+
+import "./selection-info.css";
+import { Routes } from "./routes";
 
 export type SelectionInfoProps = {
     selection: SelectionT | null
 }
 export function SelectionInfo({ selection }: SelectionInfoProps) {
+
+    const [edit, setEdit] = useState(false);
+
     const properties = selection?.feature.properties;
     const datasetName = selection?.datasetName;
     const reportRegion = selection?.reportRegion;
@@ -18,14 +26,18 @@ export function SelectionInfo({ selection }: SelectionInfoProps) {
 
     console.log('selection info render, selection:', selection);
 
+    const geometry = selection?.feature.geometry;
     const isCluster = ["clusters", "many-to-one", "transit-hub-clusters"].includes(datasetName || '');
 
-    const geometry = selection?.feature.geometry;
 
     return (<div id={"selection-info"}>
         <h2>{name}</h2>
-        {!isCluster && properties && reportRegion && <MatchInfo {...{ datasetName, properties, geometry, reportRegion }} />}
-        {isCluster && properties && reportRegion && <ClusterInfo {...{ datasetName, properties, geometry, reportRegion }} />}
+        {!isCluster && properties && reportRegion &&
+            <MatchInfo edit={edit} setEdit={setEdit}
+                {...{ datasetName, properties, geometry, reportRegion }} />}
+        {isCluster && properties && reportRegion &&
+            <ClusterInfo edit={edit} setEdit={setEdit}
+                {...{ datasetName, properties, geometry, reportRegion }} />}
     </div>)
 }
 
@@ -35,52 +47,38 @@ const ABC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 type MatchInfoProps = {
     properties: { [k: string]: any }
     geometry: GeoJSON.Geometry | undefined
-    datasetName?: string
     reportRegion: string
+    datasetName?: string
+    edit: boolean
+    setEdit: (edit: boolean) => void
 }
-function MatchInfo({ datasetName, properties, geometry, reportRegion }: MatchInfoProps) {
-    //@ts-ignore
-    var ignore = reportRegion;
+function MatchInfo({ edit, setEdit, datasetName, properties, geometry }: MatchInfoProps) {
 
     const osmFeatures = parseJsonSafe(properties['osmFeatures'], []);
+    const routes = parseJsonSafe(properties['gtfsRoutes'], null);
+
     //@ts-ignore
     const [lon, lat] = geometry?.coordinates || [];
 
-    const osmLi = osmFeatures.map((f: any) => {
-        const type = f.id[0] === 'n' ? 'node' : 'way';
-        const idn = f.id.slice(1);
-        const distanceInfo = lon && lat && <span> ({getDistance([lat, lon], [f.lat, f.lon]).toFixed(1)}m) </span>;
-        return <li key={f.id}>
-            <b>{f.tags.name} </b>
-            <div><a target="_blank" href={`https://osm.org/${type}/${idn}`}>{f.id}</a> {distanceInfo} <LocateMe lonlatFeature={f} /></div>
-            <TagsTable tags={f.tags} />
-        </li>
-    });
+    const osmLi = osmFeatures.map((f: any) =>
+        <OsmListElement f={f} parentLonLat={[lon, lat]} edit={edit} />
+    );
 
     const markersOsm = osmFeatures.map((f: any, i: number) =>
         <HtmlMapMarker key={f.id} name={"osm " + letterCode(i)} lon={f.lon} lat={f.lat} />);
 
-    var info = (<i>One day here will be info text for {datasetName}</i>);
-    if (datasetName === "no-match") {
-        info = (<i>None of the OSM stops matched GTFS stop by Id, Name or Code</i>);
-    }
-
-    if (datasetName === "no-osm-stops") {
-        info = (<i>Can't find any OSM element recognized as a Public transport stop in vicinity</i>);
-    }
-
-    if (datasetName === "match-id") {
-        info = (<i>Matched OSM stops by GTFS Id or Code</i>);
-    }
-
-    if (datasetName === "match-name") {
-        info = (<i>Matched OSM stops by GTFS stop Name</i>);
-    }
     return (<div>
-        <p>{info}</p>
+        <DatasetHelp datasetName={datasetName} />
 
         <div>Gtfs stop Id: <b>{properties.gtfsStopId}</b></div>
-        <div>Gtfs route types: <b>{properties.gtfsRouteTypes}</b></div>
+
+        {properties.gtfsStopCode && <div>Gtfs stop Code: <b>{properties.gtfsStopCode}</b></div>}
+        <Routes routes={routes} gtfsRouteTypes={properties.gtfsRouteTypes} stopLonLat={[lon, lat]} />
+
+        {FEATURE_ENABLE_EDIT && <div>
+            <label>Edit:</label> <input type="checkbox" checked={edit}
+                onChange={(e: Event) => setEdit((e.target as HTMLInputElement).checked)} />
+        </div>}
 
         <div>
             <h4>OSM Feautures</h4>
@@ -99,26 +97,33 @@ type ClusterInfoProps = {
     geometry: GeoJSON.Geometry | undefined
     datasetName?: string
     reportRegion: string
+    edit: boolean
+    setEdit: (edit: boolean) => void
 }
-function ClusterInfo({ properties }: ClusterInfoProps) {
+function ClusterInfo({ edit, setEdit, properties, geometry, datasetName }: ClusterInfoProps) {
 
     const gtfsFeatures = JSON.parse(properties['gtfsFeatures']);
     const osmFeatures = JSON.parse(properties['osmFeatures']);
 
-    const gtfsLi = gtfsFeatures.map((f: any) => <li key={f.id}><span>{f.id}</span></li>);
-    const osmLi = osmFeatures.map((f: any) =>
-        <li key={f.id}>
-            <b>{f.tags.name} </b> ({f.id}) <LocateMe lonlatFeature={f} />
-            <TagsTable tags={f.tags} />
-        </li>
-    );
+    //@ts-ignore
+    const [lon, lat] = geometry?.coordinates || [];
 
-    const markersOsm = osmFeatures.map((f: any, i: number) => <HtmlMapMarker key={f.id} name={"osm " + letterCode(i)} lon={f.lon} lat={f.lat} />);
-    const markersGtfs = gtfsFeatures.map((f: any, i: number) => <HtmlMapMarker key={f.id} name={"gtfs " + letterCode(i)} lon={f.lon} lat={f.lat} />);
+    const gtfsLi = gtfsFeatures.map((f: any) => <li key={f.id}><span>{f.id}</span>{f.code && <span> code: {f.code}</span>}</li>);
+    const osmLi = osmFeatures.map((f: any) => <OsmListElement f={f} parentLonLat={[lon, lat]} edit={edit} />);
+
+    const markersOsm = osmFeatures.map((f: any, i: number) =>
+        <HtmlMapMarker key={f.id} name={"osm " + letterCode(i)} lon={f.lon} lat={f.lat} />);
+
+    const markersGtfs = gtfsFeatures.map((f: any, i: number) =>
+        <HtmlMapMarker key={f.id} name={"gtfs " + letterCode(i)} lon={f.lon} lat={f.lat} />);
 
     return (<div>
-        <i>Multiple gtfs stops matched by name to the same group of OSM features.</i>
+        <DatasetHelp datasetName={datasetName} />
         <div>
+            <div><label>Edit:</label> <input type="checkbox" checked={edit}
+                onChange={(e: Event) => setEdit((e.target as HTMLInputElement).checked)} />
+            </div>
+
             <h4>Gtfs Feautures</h4>
             <ol type="A">
                 {gtfsLi}
@@ -165,8 +170,73 @@ function HtmlMapMarker({ name, lat, lon }: HtmlMapMarkerProps) {
     return <></>
 }
 
+type OsmListElementProps = {
+    f: any;
+    edit: boolean
+    parentLonLat: number[];
+};
+
+function OsmListElement({ f, edit, parentLonLat }: OsmListElementProps) {
+    const type = f.id[0] === 'n' ? 'node' : 'way';
+    const idn = f.id.slice(1);
+
+    const [lon, lat] = parentLonLat;
+
+    const name = f.tags.name;
+
+    const osmUrl = `https://osm.org/${type}/${idn}`;
+    const osmHref = <a target="_blank" href={osmUrl}>{f.id}</a>;
+
+    const matchSet = f.matchSet;
+
+    const alreadyMatchWarning = matchSet && matchSet !== 'no-match' &&
+        <div className={'warning'}>
+            <span>&#9888;</span>This OSM Element is already matched as {matchSet}
+        </div>;
+
+    const distanceInfo = lon && lat &&
+        <span>
+            ({getDistance([lat, lon], [f.lat, f.lon]).toFixed(1)}m)
+        </span>;
+
+    return <li key={f.id}>
+        <b>{name} </b>
+        <div>{osmHref} {distanceInfo} <LocateMe lonlatFeature={f} /></div>
+        {alreadyMatchWarning}
+
+        {
+            edit ? <TagEditor tags={f.tags} /> : <TagsTable tags={f.tags} />
+        }
+    </li>
+}
 
 
+function DatasetHelp({ datasetName }: { datasetName?: string }) {
+
+    var info = (<i>One day here will be info text for {datasetName}</i>);
+
+    if (datasetName === "no-match") {
+        info = (<i>None of the OSM stops matched GTFS stop by Id, Name or Code</i>);
+    }
+
+    if (datasetName === "no-osm-stops") {
+        info = (<i>Can't find any OSM element recognized as a Public transport stop in vicinity</i>);
+    }
+
+    if (datasetName === "match-id") {
+        info = (<i>Matched OSM stops by GTFS Id or Code</i>);
+    }
+
+    if (datasetName === "match-name") {
+        info = (<i>Matched OSM stops by GTFS stop Name</i>);
+    }
+
+    if (["clusters", "many-to-one", "transit-hub-clusters"].includes(datasetName || "")) {
+        info = (<i>Multiple gtfs stops matched by name to the same group of OSM features.</i>);
+    }
+
+    return <p>{info}</p>
+}
 
 
 type TagsTableProps = {
