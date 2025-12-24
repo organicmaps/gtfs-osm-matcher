@@ -3,8 +3,12 @@ import type { SelectionT } from "../app";
 import { LocateMe } from "./locate-me";
 import type { FeedMetaT } from "../types";
 
-const SchedulesAPIBase = (window as any).SchedulesAPIBase || "http://localhost:4567/v1/schedule";
-const RTUpdatesAPIBase = (window as any).RTUpdatesAPIBase || "http://localhost:4567/v1/updates";
+const SchedulesAPIBase = import.meta.env.DEV ?
+    "http://localhost:4567/v1/schedule" :
+    "https://pt.organicmaps.app/api/v1/schedule";
+const RTUpdatesAPIBase = import.meta.env.DEV ?
+    "http://localhost:4567/v1/updates" :
+    "https://pt.organicmaps.app/api/v1/updates";
 
 type ScheduleT = {
     stop: {

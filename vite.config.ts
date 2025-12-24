@@ -6,9 +6,6 @@ export default defineConfig(({ mode }) => {
   console.log("Build mode", mode);
   const devBuild = mode === 'development';
 
-  const SchedulesAPIBase = devBuild ? "http://localhost:4567/v1/schedule" : "https://pt.organicmaps.app/api/v1/schedule";
-  const RTUpdatesAPIBase = devBuild ? "http://localhost:4567/v1/updates" : "https://pt.organicmaps.app/api/v1/updates";
-
   return {
     plugins: [preact()],
     build: {
@@ -21,10 +18,6 @@ export default defineConfig(({ mode }) => {
           }
         }
       }
-    },
-    define: {
-      "SchedulesAPIBase": JSON.stringify(SchedulesAPIBase),
-      "RTUpdatesAPIBase": JSON.stringify(RTUpdatesAPIBase),
     },
     server: {
       proxy: {
