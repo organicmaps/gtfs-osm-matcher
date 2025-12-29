@@ -54,11 +54,16 @@ type MatchInfoProps = {
 }
 function MatchInfo({ edit, setEdit, datasetName, properties, geometry }: MatchInfoProps) {
 
+    //@ts-ignore
+    const [lon, lat] = geometry?.coordinates || [];
+
     const osmFeatures = parseJsonSafe(properties['osmFeatures'], []);
     const routes = parseJsonSafe(properties['gtfsRoutes'], null);
 
-    //@ts-ignore
-    const [lon, lat] = geometry?.coordinates || [];
+    if (lon && lat) {
+        osmFeatures.sort((a: any, b: any) =>
+            getDistance([lon, lat], [a.lon, a.lat]) - getDistance([lon, lat], [b.lon, b.lat]));
+    }
 
     const osmLi = osmFeatures.map((f: any) =>
         <OsmListElement f={f} parentLonLat={[lon, lat]} edit={edit} />
@@ -102,11 +107,16 @@ type ClusterInfoProps = {
 }
 function ClusterInfo({ edit, setEdit, properties, geometry, datasetName }: ClusterInfoProps) {
 
+    //@ts-ignore
+    const [lon, lat] = geometry?.coordinates || [];
+
     const gtfsFeatures = JSON.parse(properties['gtfsFeatures']);
     const osmFeatures = JSON.parse(properties['osmFeatures']);
 
-    //@ts-ignore
-    const [lon, lat] = geometry?.coordinates || [];
+    if (lon && lat) {
+        osmFeatures.sort((a: any, b: any) =>
+            getDistance([lon, lat], [a.lon, a.lat]) - getDistance([lon, lat], [b.lon, b.lat]));
+    }
 
     const gtfsLi = gtfsFeatures.map((f: any) => <li key={f.id}><span>{f.id}</span>{f.code && <span> code: {f.code}</span>}</li>);
     const osmLi = osmFeatures.map((f: any) => <OsmListElement f={f} parentLonLat={[lon, lat]} edit={edit} />);
