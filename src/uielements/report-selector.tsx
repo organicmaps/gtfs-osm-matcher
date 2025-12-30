@@ -5,8 +5,10 @@ import "./report-selector.css";
 import { ReportHelpOverlay } from "./report-help-overlay";
 import { ReportTable } from "./report-table";
 
-
-export function MatchReportSelector() {
+type MatchReportSelectorProps = {
+    updateReportData?: (report: Report | null) => void
+};
+export function MatchReportSelector({ updateReportData }: MatchReportSelectorProps) {
     const [showHelp, setShowHelp] = useState(false);
     const [matchReports, setMatchReports] = useState<Report[]>([]);
     const reportRegion = parseUrlReportRegion(useHash());
@@ -35,6 +37,8 @@ export function MatchReportSelector() {
     });
 
     const reportData = reportRegion && matchReports.find(r => r.region === reportRegion);
+    updateReportData?.(reportData as Report);
+
     if (matchReports.length > 0 && !reportData) {
         // Arm map bounds fly-to only when reposrts selector is open and links are loaded
         window.dispatchEvent(new CustomEvent('SelectingReports'));

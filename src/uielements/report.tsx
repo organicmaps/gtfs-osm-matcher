@@ -64,7 +64,13 @@ const matchDatasetOrderComparator = (a: MatchDataset, b: MatchDataset) => {
 
 export type Report = {
     region: string;
+
     matchDatasets: MatchDataset[];
+
+    idTags: {
+        [key: string]: number
+    };
+
     matchStats: {
         total: number;
         matchId: number;
@@ -74,6 +80,7 @@ export type Report = {
         noMatch: number;
         empty: number;
     };
+
     matchMeta: {
         coveredPbfSources: {
             path: string,
@@ -87,7 +94,8 @@ export type Report = {
             top: number
             bottom: number
         }
-    }
+    };
+
 }
 
 type GeojsonDataT = {

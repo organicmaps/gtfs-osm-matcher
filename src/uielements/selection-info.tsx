@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from "preact/hooks";
-import { MapContext, type SelectionT } from "../app";
+import { MapContext, MatchReportContext, type SelectionT } from "../app";
 
 import { Marker } from "maplibre-gl";
 import { getDistance } from "../map/distance";
@@ -54,9 +54,10 @@ type MatchInfoProps = {
 }
 function MatchInfo({ edit, setEdit, datasetName, properties, geometry }: MatchInfoProps) {
 
+    const idTagsStatistics = useContext(MatchReportContext)?.idTags;
+
     //@ts-ignore
     const [lon, lat] = geometry?.coordinates || [];
-
     const osmFeatures = parseJsonSafe(properties['osmFeatures'], []);
     const routes = parseJsonSafe(properties['gtfsRoutes'], null);
 
@@ -76,8 +77,13 @@ function MatchInfo({ edit, setEdit, datasetName, properties, geometry }: MatchIn
         <DatasetHelp datasetName={datasetName} />
 
         <div>Gtfs stop Id: <b>{properties.gtfsStopId}</b></div>
-
         {properties.gtfsStopCode && <div>Gtfs stop Code: <b>{properties.gtfsStopCode}</b></div>}
+
+        {
+            <div>Id or Code osm tags: {idTagsStatistics && Object.entries(idTagsStatistics)
+                .map(([tag, count]) => <span key={tag}><b>{tag}</b> ({count}) </span>)}</div>
+        }
+
         <Routes routes={routes} gtfsRouteTypes={properties.gtfsRouteTypes} stopLonLat={[lon, lat]} />
 
         {FEATURE_ENABLE_EDIT && <div>

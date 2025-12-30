@@ -1,4 +1,4 @@
-import { OSMElement } from "./OSMData.types";
+import type { OSMElement } from "./OSMData.types";
 
 const BASE = 'http://localhost:8111'
 

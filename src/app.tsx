@@ -5,10 +5,11 @@ import type { LayerControls } from './map/layers-controls';
 
 import './app.css'
 import { createMap } from './map/map';
-import { useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useState } from 'preact/hooks';
 import { MatchReportSelector } from './uielements/report-selector';
 import { SelectionInfo } from './uielements/selection-info';
 import { SchedulePreview } from './uielements/schedule-preview';
+import type { Report } from './uielements/report';
 
 export type MapContextT = {
   map: Map,
@@ -27,10 +28,13 @@ export type SelectionT = {
 
 export const SelectionContext = createContext<[selection: SelectionT | null, updateSelection: (newSelection: SelectionT) => void]>([null, () => { }]);
 
+export const MatchReportContext = createContext<Report | null>(null);
+
 export function App() {
 
   const [mapContextVal, setMapContextVal] = useState<MapContextT>();
   const [selection, updateSelection] = useState<SelectionT | null>(null);
+  const [reportData, updateReportData] = useState<Report | null>(null);
 
   useEffect(() => {
     setMapContextVal(createMap("map-view"));
@@ -56,6 +60,16 @@ export function App() {
     }
   }, [selection]);
 
+  useEffect(() => {
+    window.addEventListener('SelectingReports',
+      () => updateSelection(null)
+    );
+  }, [updateSelection]);
+
+  const handleReportChange = useCallback((report: Report | null) => {
+    updateReportData(report);
+  }, [updateReportData]);
+
   const preview = selection?.datasetName === 'preview';
 
   return (
@@ -64,11 +78,15 @@ export function App() {
       <button id="map-style-button">Map Style</button>
       <MapContext value={mapContextVal} >
         <SelectionContext value={[selection, updateSelection]} >
-          <MatchReportSelector />
-          {preview ?
-            <SchedulePreview selection={selection} /> :
-            <SelectionInfo selection={selection} />
-          }
+          <MatchReportContext value={reportData} >
+
+            <MatchReportSelector updateReportData={handleReportChange} />
+            {preview ?
+              <SchedulePreview selection={selection} /> :
+              <SelectionInfo selection={selection} />
+            }
+
+          </MatchReportContext>
         </SelectionContext>
       </MapContext>
     </>

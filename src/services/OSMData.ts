@@ -1,4 +1,3 @@
-import { ROUTE_TYPES } from "./Matcher";
 import type { LonLatTuple, OSMElement, OSMElementTags, OSMNode, OSMRelation, OSMWay } from "./OSMData.types";
 
 const stopsQ: string = `
@@ -24,6 +23,7 @@ out meta;
 out meta qt;
 `;
 
+const ROUTE_TYPES = ['bus', 'ferry', 'train', 'railway', 'tram', 'trolleybus', 'aerialway'];
 const routesQ: string = `
 [out:json][timeout:900];
 (
@@ -77,14 +77,14 @@ async function queryOverpass(query: string) {
     return await response.json();
 }
 
-export function getElementLonLat(e: OSMElement) {
+export function getElementLonLat(e: OSMElement, osmData: OSMData) {
     if (e.type === 'node') {
         return [e.lon, e.lat] as LonLatTuple;
     }
 
     if (e.type === 'way') {
         const nodes = e.nodes
-            .map(nid => instance.getNodeById(nid))
+            .map(nid => osmData.getNodeById(nid))
             .filter(n => n !== undefined);
 
         if (nodes.length === 0) {
@@ -147,10 +147,6 @@ export default class OSMData {
 
         this.elements = [];
         this.idMap = new Map<string, OSMElement>();
-    }
-
-    static getInstance() {
-        return instance;
     }
 
     calculateTagStatistics(filter: OsmElementFilter) {
@@ -309,6 +305,3 @@ function createElementCopy(element: OSMElement) {
 function isBlank(str: string) {
     return str === undefined || str === null || /^\s*$/.test(str);
 }
-
-// OSM Data is a Singleton
-const instance = new OSMData();

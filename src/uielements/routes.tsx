@@ -35,8 +35,23 @@ export function Routes({ routes, stopLonLat, gtfsRouteTypes }: RoutesProps) {
                 },
                 paint: {
                     'line-color': 'red',
-                    'line-width': 2,
-                    'line-dasharray': [8, 3, 2, 6]
+                    'line-width': 1,
+                }
+            });
+
+            map.addLayer({
+                id: 'routes-arrow',
+                type: 'symbol',
+                source: 'routes',
+                layout: {
+                    'symbol-placement': 'line',
+                    'symbol-spacing': 30,
+                    'icon-allow-overlap': true,
+                    'icon-image': 'arrow',
+                    'icon-size': 2,
+                },
+                paint: {
+                    'icon-color': '#ff0000ff',
                 }
             });
 
@@ -140,8 +155,8 @@ export function Routes({ routes, stopLonLat, gtfsRouteTypes }: RoutesProps) {
 
     return <div>
         Gtfs route types: <b>{gtfsRouteTypes}</b>
-        {routes && <div>
-            {Object.entries(routes).map(([routeId, route]) =>
+        {routes && <div><b>Routes: </b>
+            {Object.entries(routes).map(([routeId, _route]) =>
                 <span key={routeId}>{routeId} </span>
             )}
         </div>}
