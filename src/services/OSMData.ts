@@ -23,6 +23,15 @@ out meta;
 out meta qt;
 `;
 
+export function queryForId(id: number, type: 'node' | 'way') {
+    return `
+[out:json][timeout:900];
+${type}(${id});
+out meta qt;
+`;
+
+}
+
 const ROUTE_TYPES = ['bus', 'ferry', 'train', 'railway', 'tram', 'trolleybus', 'aerialway'];
 const routesQ: string = `
 [out:json][timeout:900];
@@ -63,7 +72,7 @@ function getBBOXString(bbox: BBOX) {
     return `${bbox.miny},${bbox.minx},${bbox.maxy},${bbox.maxx}`;
 }
 
-async function queryOverpass(query: string) {
+export async function queryOverpass(query: string) {
     const response = await fetch(endpoint, {
         method: "POST",
         mode: "cors",
@@ -197,10 +206,9 @@ export default class OSMData {
 
         this.addElement(element);
 
-        this.changes.push({
+        this.commitAction({
             'element': element,
-            original: createElementCopy(element),
-            action: ['create']
+            action: 'create'
         });
 
         return element;

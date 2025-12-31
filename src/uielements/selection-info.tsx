@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "preact/hooks";
+import { useCallback, useContext, useEffect, useState } from "preact/hooks";
 import { MapContext, MatchReportContext, type SelectionT } from "../app";
 
 import { Marker } from "maplibre-gl";
@@ -8,8 +8,11 @@ import { TagEditor } from "./osm-tags";
 
 const FEATURE_ENABLE_EDIT = import.meta.env.MODE === 'development';
 
+const OSM_DATA = new OSMData();
+
 import "./selection-info.css";
 import { Routes } from "./routes";
+import OSMData from "../services/OSMData";
 
 export type SelectionInfoProps = {
     selection: SelectionT | null
@@ -28,7 +31,6 @@ export function SelectionInfo({ selection }: SelectionInfoProps) {
 
     const geometry = selection?.feature.geometry;
     const isCluster = ["clusters", "many-to-one", "transit-hub-clusters"].includes(datasetName || '');
-
 
     return (<div id={"selection-info"}>
         <h2>{name}</h2>
@@ -58,20 +60,9 @@ function MatchInfo({ edit, setEdit, datasetName, properties, geometry }: MatchIn
 
     //@ts-ignore
     const [lon, lat] = geometry?.coordinates || [];
+
     const osmFeatures = parseJsonSafe(properties['osmFeatures'], []);
     const routes = parseJsonSafe(properties['gtfsRoutes'], null);
-
-    if (lon && lat) {
-        osmFeatures.sort((a: any, b: any) =>
-            getDistance([lon, lat], [a.lon, a.lat]) - getDistance([lon, lat], [b.lon, b.lat]));
-    }
-
-    const osmLi = osmFeatures.map((f: any) =>
-        <OsmListElement f={f} parentLonLat={[lon, lat]} edit={edit} />
-    );
-
-    const markersOsm = osmFeatures.map((f: any, i: number) =>
-        <HtmlMapMarker key={f.id} name={"osm " + letterCode(i)} lon={f.lon} lat={f.lat} />);
 
     return (<div>
         <DatasetHelp datasetName={datasetName} />
@@ -91,14 +82,8 @@ function MatchInfo({ edit, setEdit, datasetName, properties, geometry }: MatchIn
                 onChange={(e: Event) => setEdit((e.target as HTMLInputElement).checked)} />
         </div>}
 
-        <div>
-            <h4>OSM Feautures</h4>
-            <ol type="A">
-                {osmLi}
-            </ol>
-        </div>
+        <OsmElements edit={edit} osmFeatures={osmFeatures} parentLonLat={[lon, lat]} />
 
-        {markersOsm}
     </div>)
 }
 
@@ -118,17 +103,9 @@ function ClusterInfo({ edit, setEdit, properties, geometry, datasetName }: Clust
 
     const gtfsFeatures = JSON.parse(properties['gtfsFeatures']);
     const osmFeatures = JSON.parse(properties['osmFeatures']);
-
-    if (lon && lat) {
-        osmFeatures.sort((a: any, b: any) =>
-            getDistance([lon, lat], [a.lon, a.lat]) - getDistance([lon, lat], [b.lon, b.lat]));
-    }
+    const routes = parseJsonSafe(properties['gtfsRoutes'], null);
 
     const gtfsLi = gtfsFeatures.map((f: any) => <li key={f.id}><span>{f.id}</span>{f.code && <span> code: {f.code}</span>}</li>);
-    const osmLi = osmFeatures.map((f: any) => <OsmListElement f={f} parentLonLat={[lon, lat]} edit={edit} />);
-
-    const markersOsm = osmFeatures.map((f: any, i: number) =>
-        <HtmlMapMarker key={f.id} name={"osm " + letterCode(i)} lon={f.lon} lat={f.lat} />);
 
     const markersGtfs = gtfsFeatures.map((f: any, i: number) =>
         <HtmlMapMarker key={f.id} name={"gtfs " + letterCode(i)} lon={f.lon} lat={f.lat} />);
@@ -136,27 +113,22 @@ function ClusterInfo({ edit, setEdit, properties, geometry, datasetName }: Clust
     return (<div>
         <DatasetHelp datasetName={datasetName} />
         <div>
-            <div><label>Edit:</label> <input type="checkbox" checked={edit}
-                onChange={(e: Event) => setEdit((e.target as HTMLInputElement).checked)} />
-            </div>
-
             <h4>Gtfs Feautures</h4>
             <ol type="A">
                 {gtfsLi}
             </ol>
             <label>Gtfs route types: </label>{parseJsonSafe(properties?.gtfs_types, []).join(", ")}
+
+            {markersGtfs}
         </div>
 
+        <Routes routes={routes} gtfsRouteTypes={properties.gtfsRouteTypes} stopLonLat={[lon, lat]} />
 
-        <div>
-            <h4>OSM Feautures</h4>
-            <ol type="A">
-                {osmLi}
-            </ol>
-        </div>
+        {FEATURE_ENABLE_EDIT && <div><label>Edit:</label> <input type="checkbox" checked={edit}
+            onChange={(e: Event) => setEdit((e.target as HTMLInputElement).checked)} />
+        </div>}
 
-        {markersOsm}
-        {markersGtfs}
+        <OsmElements edit={edit} osmFeatures={osmFeatures} parentLonLat={[lon, lat]} />
 
     </div>)
 }
@@ -184,6 +156,52 @@ function HtmlMapMarker({ name, lat, lon }: HtmlMapMarkerProps) {
     }, [map, name, lat, lon]);
 
     return <></>
+}
+
+interface OsmElementsProps {
+    edit: boolean;
+    osmFeatures: any[];
+    parentLonLat: number[];
+}
+function OsmElements({ edit, osmFeatures, parentLonLat }: OsmElementsProps) {
+
+    useEffect(() => {
+        if (edit && osmFeatures) {
+            const nodes = osmFeatures.filter(f => f.id[0] === 'n').map(f => f.id.substring(1));
+            const ways = osmFeatures.filter(f => f.id[0] === 'w').map(f => f.id.substring(1));
+
+            fetch('https://api.openstreetmap.org/api/0.6/nodes.json?nodes=' + nodes.join(','))
+                .then(response => response.json())
+                .then(data => {
+                    console.log('osm nodes data', data);
+                    OSM_DATA.updateOverpassData(data);
+                });
+
+            fetch('https://api.openstreetmap.org/api/0.6/ways.json?ways=' + ways.join(','))
+                .then(response => response.json())
+                .then(data => {
+                    console.log('osm ways data', data);
+                    OSM_DATA.updateOverpassData(data);
+                });
+        }
+    }, [edit, osmFeatures]);
+
+    const markersOsm = osmFeatures.map((f: any, i: number) =>
+        <HtmlMapMarker key={f.id} name={"osm " + letterCode(i)} lon={f.lon} lat={f.lat} />);
+
+    const osmLi = osmFeatures.map((f: any) =>
+        <OsmListElement f={f} {...{ edit, parentLonLat }} />
+    );
+
+    return (
+        <div>
+            <h4>OSM Feautures</h4>
+            <ol type="A">
+                {osmLi}
+            </ol>
+            {markersOsm}
+        </div>
+    )
 }
 
 type OsmListElementProps = {
