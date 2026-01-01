@@ -14,6 +14,13 @@ export function Routes({ routes, stopLonLat, gtfsRouteTypes }: RoutesProps) {
     useEffect(() => {
         if (!map) return;
 
+        const img = new Image();
+        img.onload = function () {
+            map.addImage('route-arrow', img);
+        }
+        img.src = 'arrow.svg';
+
+
         console.log('Create routes map styles')
 
         map.once('load', () => {
@@ -45,10 +52,10 @@ export function Routes({ routes, stopLonLat, gtfsRouteTypes }: RoutesProps) {
                 source: 'routes',
                 layout: {
                     'symbol-placement': 'line',
-                    'symbol-spacing': 30,
+                    'symbol-spacing': 45,
                     'icon-allow-overlap': true,
-                    'icon-image': 'arrow',
-                    'icon-size': 2,
+                    'icon-image': 'route-arrow',
+                    'icon-size': 0.6,
                 },
                 paint: {
                     'icon-color': '#ff0000ff',
@@ -62,9 +69,9 @@ export function Routes({ routes, stopLonLat, gtfsRouteTypes }: RoutesProps) {
                 layout: {
                     'text-field': ['get', 'name'],
                     "symbol-placement": "line",
-                    "symbol-spacing": 75,
+                    "symbol-spacing": 95,
                     "text-font": ["Noto Sans Regular"],
-                    'text-size': 12,
+                    'text-size': 10,
                 },
                 paint: {
                     'text-color': 'black',
@@ -77,6 +84,8 @@ export function Routes({ routes, stopLonLat, gtfsRouteTypes }: RoutesProps) {
         return () => {
             map.removeLayer('routes');
             map.removeLayer('route-names');
+            map.removeLayer('routes-arrow');
+
             if (map.getSource('routes')) {
                 map.removeSource('routes');
             }

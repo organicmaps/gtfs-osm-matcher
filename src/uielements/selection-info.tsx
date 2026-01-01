@@ -25,14 +25,9 @@ export function SelectionInfo({ selection }: SelectionInfoProps) {
     const datasetName = selection?.datasetName;
     const reportRegion = selection?.reportRegion;
 
-    const name = properties?.['gtfsStopName'] || properties?.['name'];
-
-    console.log('selection info render, selection:', selection);
-
     const geometry = selection?.feature.geometry;
 
     return (<div id={"selection-info"}>
-        <h2>{name}</h2>
         {properties && reportRegion &&
             <MatchInfo {...{ datasetName, properties, geometry, reportRegion }} />}
     </div>)
@@ -48,6 +43,8 @@ type MatchInfoProps = {
 function MatchInfo({ datasetName, properties, geometry }: MatchInfoProps) {
     const [edit, setEdit] = useState(false);
 
+    const name = properties?.['gtfsStopName'] || properties?.['name'];
+
     const idTagsStatistics = useContext(MatchReportContext)?.idTags;
 
     //@ts-ignore
@@ -57,12 +54,26 @@ function MatchInfo({ datasetName, properties, geometry }: MatchInfoProps) {
     const osmFeatures = parseJsonSafe(properties['osmFeatures'], []);
     const routes = parseJsonSafe(properties['gtfsRoutes'], null);
 
+    if (import.meta.env.DEV) {
+        console.log('render selection', {
+            name,
+            lonLat: [lon, lat],
+            idTagsStatistics,
+            gtfsFeatures,
+            osmFeatures,
+            routes,
+            propertyKeys: Object.keys(properties)
+        });
+    }
+
     const gtfsLi = gtfsFeatures.map((f: any) => <li key={f.id}><span>{f.id}</span>{f.code && <span> code: {f.code}</span>}</li>);
 
     const markersGtfs = gtfsFeatures.map((f: any, i: number) =>
         <HtmlMapMarker key={f.id} name={"gtfs " + letterCode(i)} lon={f.lon} lat={f.lat} />);
 
     return (<div>
+        <h2>{name}</h2>
+
         <DatasetHelp datasetName={datasetName} />
 
         {gtfsFeatures.length === 1 && <div>
