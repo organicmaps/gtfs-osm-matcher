@@ -1,4 +1,4 @@
-import { useContext, useEffect } from "preact/hooks";
+import { useContext, useEffect, useState } from "preact/hooks";
 import { MapContext } from "../app";
 import type { GeoJSONSource } from "maplibre-gl";
 
@@ -9,7 +9,59 @@ type RoutesProps = {
 }
 export function Routes({ routes, stopLonLat, gtfsRouteTypes }: RoutesProps) {
 
+    if (import.meta.env.DEV) {
+        console.log('Render routes', routes);
+    }
+
     const map = useContext(MapContext)?.map;
+
+    const [mapStylesReady, setMapStylesReady] = useState<boolean>(!!map?.getSource('routes'));
+
+    const features = Object.entries(routes).map(([routeKey, route]) => {
+
+        const { nextStopLonLat, prevStopLonLat } = route;
+
+        const features = [];
+
+        if (nextStopLonLat) {
+            features.push({
+                type: 'Feature',
+                geometry: {
+                    type: 'LineString',
+                    coordinates: [
+                        [...stopLonLat],
+                        [...nextStopLonLat]
+                    ]
+                },
+                properties: {
+                    name: routeKey,
+                    color: 'red'
+                }
+            });
+        }
+
+        if (prevStopLonLat) {
+            // const m = new Marker().setLngLat({ lat: prevStopLonLat[1], lng: prevStopLonLat[0] }).addTo(map);
+            // m.getElement().innerText = 'prev';
+
+            features.push({
+                type: 'Feature',
+                geometry: {
+                    type: 'LineString',
+                    coordinates: [
+                        [...prevStopLonLat],
+                        [...stopLonLat],
+                    ]
+                },
+                properties: {
+                    name: routeKey,
+                    color: 'blue'
+                }
+            });
+        }
+
+        return features;
+    });
 
     useEffect(() => {
         if (!map) return;
@@ -20,128 +72,93 @@ export function Routes({ routes, stopLonLat, gtfsRouteTypes }: RoutesProps) {
         }
         img.src = 'arrow.svg';
 
+        const createRouteLayers = () => {
+            console.log('Create routes map styles')
 
-        console.log('Create routes map styles')
-
-        map.once('load', () => {
-            map.addSource('routes', {
-                type: 'geojson',
-                data: {
-                    type: 'FeatureCollection',
-                    features: []
-                }
-            });
-
-            map.addLayer({
-                id: 'routes',
-                type: 'line',
-                source: 'routes',
-                layout: {
-                    'line-join': 'round',
-                    'line-cap': 'round',
-                },
-                paint: {
-                    'line-color': 'red',
-                    'line-width': 1,
-                }
-            });
-
-            map.addLayer({
-                id: 'routes-arrow',
-                type: 'symbol',
-                source: 'routes',
-                layout: {
-                    'symbol-placement': 'line',
-                    'symbol-spacing': 45,
-                    'icon-allow-overlap': true,
-                    'icon-image': 'route-arrow',
-                    'icon-size': 0.6,
-                },
-                paint: {
-                    'icon-color': '#ff0000ff',
-                }
-            });
-
-            map.addLayer({
-                id: 'route-names',
-                type: 'symbol',
-                source: 'routes',
-                layout: {
-                    'text-field': ['get', 'name'],
-                    "symbol-placement": "line",
-                    "symbol-spacing": 95,
-                    "text-font": ["Noto Sans Regular"],
-                    'text-size': 10,
-                },
-                paint: {
-                    'text-color': 'black',
-                    'text-halo-color': 'white',
-                    'text-halo-width': 5,
-                }
-            });
-        });
-
-        return () => {
-            map.removeLayer('routes');
-            map.removeLayer('route-names');
-            map.removeLayer('routes-arrow');
-
-            if (map.getSource('routes')) {
-                map.removeSource('routes');
+            if (!map.getSource('routes')) {
+                map.addSource('routes', {
+                    type: 'geojson',
+                    data: {
+                        type: 'FeatureCollection',
+                        features: []
+                    }
+                });
             }
+
+            if (!map.getLayer('routes')) {
+                map.addLayer({
+                    id: 'routes',
+                    type: 'line',
+                    source: 'routes',
+                    layout: {
+                        'line-join': 'round',
+                        'line-cap': 'round',
+                    },
+                    paint: {
+                        'line-color': 'red',
+                        'line-width': 1,
+                    }
+                });
+            }
+
+            if (!map.getLayer('routes-arrow')) {
+                map.addLayer({
+                    id: 'routes-arrow',
+                    type: 'symbol',
+                    source: 'routes',
+                    layout: {
+                        'symbol-placement': 'line',
+                        'symbol-spacing': 45,
+                        'icon-allow-overlap': true,
+                        'icon-image': 'route-arrow',
+                        'icon-size': 0.6,
+                    }
+                });
+            }
+
+            if (!map.getLayer('route-names')) {
+                map.addLayer({
+                    id: 'route-names',
+                    type: 'symbol',
+                    source: 'routes',
+                    layout: {
+                        'text-field': ['get', 'name'],
+                        "symbol-placement": "line",
+                        "symbol-spacing": 95,
+                        "text-font": ["Noto Sans Regular"],
+                        'text-size': 10,
+                    },
+                    paint: {
+                        'text-color': 'black',
+                        'text-halo-color': 'white',
+                        'text-halo-width': 5,
+                    }
+                });
+            }
+
+            setMapStylesReady(true);
         };
-    }, [map]);
+
+        if (map.loaded()) {
+            createRouteLayers();
+        }
+        else {
+            map.once('load', createRouteLayers);
+        }
+
+    }, [map, setMapStylesReady]);
 
     useEffect(() => {
-        if (!map) return;
-        if (!routes) return;
+        if (!mapStylesReady) {
+            return;
+        }
 
-        const features = Object.entries(routes).map(([routeKey, route]) => {
+        if (!map || !routes) {
+            import.meta.env.DEV &&
+                console.warn('Routes: map or routes is not ready');
 
-            const { nextStopLonLat, prevStopLonLat } = route;
-
-            const features = [];
-
-            if (nextStopLonLat) {
-                features.push({
-                    type: 'Feature',
-                    geometry: {
-                        type: 'LineString',
-                        coordinates: [
-                            [...stopLonLat],
-                            [...nextStopLonLat]
-                        ]
-                    },
-                    properties: {
-                        name: routeKey,
-                        color: 'red'
-                    }
-                });
-            }
-
-            if (prevStopLonLat) {
-                // const m = new Marker().setLngLat({ lat: prevStopLonLat[1], lng: prevStopLonLat[0] }).addTo(map);
-                // m.getElement().innerText = 'prev';
-
-                features.push({
-                    type: 'Feature',
-                    geometry: {
-                        type: 'LineString',
-                        coordinates: [
-                            [...prevStopLonLat],
-                            [...stopLonLat],
-                        ]
-                    },
-                    properties: {
-                        name: routeKey,
-                        color: 'blue'
-                    }
-                });
-            }
-
-            return features;
-
-        });
+            return;
+        }
 
         if (map.getSource('routes')) {
             (map.getSource('routes') as GeoJSONSource).setData({
@@ -149,6 +166,9 @@ export function Routes({ routes, stopLonLat, gtfsRouteTypes }: RoutesProps) {
                 // @ts-ignore
                 features: features.flat()
             });
+        }
+        else {
+            console.warn('Map source routes not ready');
         }
 
         return () => {
@@ -160,7 +180,7 @@ export function Routes({ routes, stopLonLat, gtfsRouteTypes }: RoutesProps) {
             }
         };
 
-    }, [map, routes, stopLonLat]);
+    }, [map, features, mapStylesReady]);
 
     return <div>
         Gtfs route types: <b>{gtfsRouteTypes}</b>
