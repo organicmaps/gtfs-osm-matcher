@@ -14,12 +14,12 @@ import "./selection-info.css";
 import { Routes } from "./routes";
 import OSMData from "../services/OSMData";
 
+const ABC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
 export type SelectionInfoProps = {
     selection: SelectionT | null
 }
 export function SelectionInfo({ selection }: SelectionInfoProps) {
-
-    const [edit, setEdit] = useState(false);
 
     const properties = selection?.feature.properties;
     const datasetName = selection?.datasetName;
@@ -30,20 +30,13 @@ export function SelectionInfo({ selection }: SelectionInfoProps) {
     console.log('selection info render, selection:', selection);
 
     const geometry = selection?.feature.geometry;
-    const isCluster = ["clusters", "many-to-one", "transit-hub-clusters"].includes(datasetName || '');
 
     return (<div id={"selection-info"}>
         <h2>{name}</h2>
-        {!isCluster && properties && reportRegion &&
-            <MatchInfo edit={edit} setEdit={setEdit}
-                {...{ datasetName, properties, geometry, reportRegion }} />}
-        {isCluster && properties && reportRegion &&
-            <ClusterInfo edit={edit} setEdit={setEdit}
-                {...{ datasetName, properties, geometry, reportRegion }} />}
+        {properties && reportRegion &&
+            <MatchInfo {...{ datasetName, properties, geometry, reportRegion }} />}
     </div>)
 }
-
-const ABC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 
 type MatchInfoProps = {
@@ -51,58 +44,17 @@ type MatchInfoProps = {
     geometry: GeoJSON.Geometry | undefined
     reportRegion: string
     datasetName?: string
-    edit: boolean
-    setEdit: (edit: boolean) => void
 }
-function MatchInfo({ edit, setEdit, datasetName, properties, geometry }: MatchInfoProps) {
+function MatchInfo({ datasetName, properties, geometry }: MatchInfoProps) {
+    const [edit, setEdit] = useState(false);
 
     const idTagsStatistics = useContext(MatchReportContext)?.idTags;
 
     //@ts-ignore
     const [lon, lat] = geometry?.coordinates || [];
 
+    const gtfsFeatures = getGtfsFeatures(properties);
     const osmFeatures = parseJsonSafe(properties['osmFeatures'], []);
-    const routes = parseJsonSafe(properties['gtfsRoutes'], null);
-
-    return (<div>
-        <DatasetHelp datasetName={datasetName} />
-
-        <div>Gtfs stop Id: <b>{properties.gtfsStopId}</b></div>
-        {properties.gtfsStopCode && <div>Gtfs stop Code: <b>{properties.gtfsStopCode}</b></div>}
-
-        {
-            <div>Id or Code osm tags: {idTagsStatistics && Object.entries(idTagsStatistics)
-                .map(([tag, count]) => <span key={tag}><b>{tag}</b> ({count}) </span>)}</div>
-        }
-
-        <Routes routes={routes} gtfsRouteTypes={properties.gtfsRouteTypes} stopLonLat={[lon, lat]} />
-
-        {FEATURE_ENABLE_EDIT && <div>
-            <label>Edit:</label> <input type="checkbox" checked={edit}
-                onChange={(e: Event) => setEdit((e.target as HTMLInputElement).checked)} />
-        </div>}
-
-        <OsmElements edit={edit} osmFeatures={osmFeatures} parentLonLat={[lon, lat]} />
-
-    </div>)
-}
-
-
-type ClusterInfoProps = {
-    properties: { [k: string]: any }
-    geometry: GeoJSON.Geometry | undefined
-    datasetName?: string
-    reportRegion: string
-    edit: boolean
-    setEdit: (edit: boolean) => void
-}
-function ClusterInfo({ edit, setEdit, properties, geometry, datasetName }: ClusterInfoProps) {
-
-    //@ts-ignore
-    const [lon, lat] = geometry?.coordinates || [];
-
-    const gtfsFeatures = JSON.parse(properties['gtfsFeatures']);
-    const osmFeatures = JSON.parse(properties['osmFeatures']);
     const routes = parseJsonSafe(properties['gtfsRoutes'], null);
 
     const gtfsLi = gtfsFeatures.map((f: any) => <li key={f.id}><span>{f.id}</span>{f.code && <span> code: {f.code}</span>}</li>);
@@ -112,25 +64,53 @@ function ClusterInfo({ edit, setEdit, properties, geometry, datasetName }: Clust
 
     return (<div>
         <DatasetHelp datasetName={datasetName} />
-        <div>
+
+        {gtfsFeatures.length === 1 && <div>
+            <div>Gtfs stop Id: <b>{properties.gtfsStopId}</b></div>
+            <div>Gtfs stop Code: {properties.gtfsStopCode ? <b>{properties.gtfsStopCode}</b> : <i>N/A</i>}</div>
+        </div>}
+
+        {idTagsStatistics &&
+            <div>Id or Code osm tags: {Object.entries(idTagsStatistics)
+                .map(([tag, count]) => <span key={tag}><b>{tag}</b> ({count}) </span>)}</div>
+        }
+
+        {gtfsFeatures.length > 1 && <div>
             <h4>Gtfs Feautures</h4>
             <ol type="A">
                 {gtfsLi}
             </ol>
-            <label>Gtfs route types: </label>{parseJsonSafe(properties?.gtfs_types, []).join(", ")}
-
             {markersGtfs}
+        </div>}
+
+        <div>
+            <label>Gtfs route types: </label>{parseJsonSafe(properties?.gtfs_types, []).join(", ")}
         </div>
 
         <Routes routes={routes} gtfsRouteTypes={properties.gtfsRouteTypes} stopLonLat={[lon, lat]} />
 
-        {FEATURE_ENABLE_EDIT && <div><label>Edit:</label> <input type="checkbox" checked={edit}
-            onChange={(e: Event) => setEdit((e.target as HTMLInputElement).checked)} />
-        </div>}
+        {FEATURE_ENABLE_EDIT &&
+            <div className={"edit-actions"}>
+                <label>Edit:</label> <input type="checkbox" checked={edit}
+                    onChange={(e: Event) => setEdit((e.target as HTMLInputElement).checked)} />
+            </div>}
 
         <OsmElements edit={edit} osmFeatures={osmFeatures} parentLonLat={[lon, lat]} />
 
     </div>)
+}
+
+function getGtfsFeatures(properties: { [k: string]: any }) {
+    if (properties.gtfsFeatures) {
+        return parseJsonSafe(properties.gtfsFeatures, []);
+    }
+
+    return [{
+        id: properties.gtfsStopId,
+        code: properties.gtfsStopCode,
+        lon: properties.lon,
+        lat: properties.lat
+    }];
 }
 
 
