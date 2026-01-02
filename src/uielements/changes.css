@@ -1,0 +1,21 @@
+.osm-changes-list {
+    max-height: 150px;
+    overflow-y: auto;
+}
+.osm-change span {
+    margin-left: 0.25em;
+    margin-right: 0.25em;
+    font-size: 1em;
+}
+
+.change-element-id {
+    width: 7em;
+    display: inline-block;
+}
+.change-element-type {
+    width: 3em;
+    display: inline-block;
+}
+.changes-tab button + button {
+    margin-left: 0.5em;
+}

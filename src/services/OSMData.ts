@@ -174,6 +174,19 @@ export default class OSMData {
         return stats;
     }
 
+    listChanges() {
+        return this.changes.filter(change => {
+
+            // If we only have changed tags, 
+            // check that tags actually do not match original version
+            if (change.action.every(a => a === 'change_tags')) {
+                return !shallowCompare(change.element.tags, change.original.tags);
+            }
+
+            return true;
+        });
+    }
+
     updateOverpassData(overpassData: OSMData) {
         overpassData.elements.forEach(e => {
             this.updateElement(e);
@@ -283,6 +296,11 @@ export default class OSMData {
         return this.idMap.get(key);
     }
 
+}
+
+function shallowCompare(obj1: OSMElementTags, obj2: OSMElementTags) {
+    return Object.keys(obj1).length === Object.keys(obj2).length &&
+        Object.keys(obj1).every(key => obj1[key] === obj2[key]);
 }
 
 function createElementCopy(element: OSMElement) {

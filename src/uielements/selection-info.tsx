@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useState } from "preact/hooks";
-import { MapContext, MatchReportContext, type SelectionT } from "../app";
+import { MapContext, type SelectionT } from "../app";
 
 import { Marker } from "maplibre-gl";
 import { getDistance } from "../map/distance";
@@ -13,6 +13,7 @@ const OSM_DATA = new OSMData();
 import "./selection-info.css";
 import { Routes } from "./routes";
 import OSMData from "../services/OSMData";
+import { Changes } from "./changes";
 
 const ABC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -21,16 +22,28 @@ export type SelectionInfoProps = {
 }
 export function SelectionInfo({ selection }: SelectionInfoProps) {
 
+    const [showChanges, setShowChanges] = useState(false);
+
     const properties = selection?.feature.properties;
     const datasetName = selection?.datasetName;
     const reportRegion = selection?.reportRegion;
+    const idTags = selection?.idTags;
 
     const geometry = selection?.feature.geometry;
 
-    return (<div id={"selection-info"}>
-        {properties && reportRegion &&
-            <MatchInfo {...{ datasetName, properties, geometry, reportRegion }} />}
-    </div>)
+    return (<>
+        <div id={"selection-info"}>
+            <div>
+                <label>Show OSM changes</label>
+                <input type="checkbox" checked={showChanges}
+                    onChange={(e: Event) => setShowChanges((e.target as HTMLInputElement).checked)} />
+            </div>
+            {showChanges && <Changes osmData={OSM_DATA} />}
+            {properties && reportRegion &&
+                <MatchInfo {...{ datasetName, properties, geometry, reportRegion, idTags }} />}
+        </div>
+    </>
+    )
 }
 
 
@@ -39,13 +52,14 @@ type MatchInfoProps = {
     geometry: GeoJSON.Geometry | undefined
     reportRegion: string
     datasetName?: string
+    idTags?: { [k: string]: number }
 }
-function MatchInfo({ datasetName, properties, geometry }: MatchInfoProps) {
+function MatchInfo({ datasetName, properties, geometry, idTags }: MatchInfoProps) {
     const [edit, setEdit] = useState(false);
 
     const name = properties?.['gtfsStopName'] || properties?.['name'];
 
-    const idTagsStatistics = useContext(MatchReportContext)?.idTags;
+    const idTagsStatistics = idTags || {};
 
     //@ts-ignore
     const [lon, lat] = geometry?.coordinates || [];
@@ -64,6 +78,19 @@ function MatchInfo({ datasetName, properties, geometry }: MatchInfoProps) {
             routes,
             propertyKeys: Object.keys(properties)
         });
+    }
+
+    const tagActions: TagActionsT = {
+        setName: ['name', name] as [string, string]
+    };
+
+    const gtfsIdTag = Object.entries(idTagsStatistics || {}).map(([k, _cnt]) => k)[0] || 'ref:gtfs';
+    if (properties.gtfsStopId) {
+        tagActions.setId = [gtfsIdTag, properties.gtfsStopId] as [string, string];
+    }
+
+    if (properties.gtfsStopCode) {
+        tagActions.setCode = [gtfsIdTag, properties.gtfsStopCode] as [string, string];
     }
 
     const gtfsLi = gtfsFeatures.map((f: any) => <li key={f.id}><span>{f.id}</span>{f.code && <span> code: {f.code}</span>}</li>);
@@ -94,19 +121,17 @@ function MatchInfo({ datasetName, properties, geometry }: MatchInfoProps) {
             {markersGtfs}
         </div>}
 
-        <div>
-            <label>Gtfs route types: </label>{parseJsonSafe(properties?.gtfs_types, []).join(", ")}
-        </div>
-
         <Routes routes={routes} gtfsRouteTypes={properties.gtfsRouteTypes} stopLonLat={[lon, lat]} />
 
         {FEATURE_ENABLE_EDIT &&
             <div className={"edit-actions"}>
                 <label>Edit:</label> <input type="checkbox" checked={edit}
                     onChange={(e: Event) => setEdit((e.target as HTMLInputElement).checked)} />
+
+                <AddOsmStopController id={properties.gtfsStopId} code={properties.gtfsStopCode} {...{ edit, name, idTags }} />
             </div>}
 
-        <OsmElements edit={edit} osmFeatures={osmFeatures} parentLonLat={[lon, lat]} />
+        <OsmElements edit={edit} osmFeatures={osmFeatures} tagActions={tagActions} parentLonLat={[lon, lat]} />
 
     </div>)
 }
@@ -149,31 +174,42 @@ function HtmlMapMarker({ name, lat, lon }: HtmlMapMarkerProps) {
     return <></>
 }
 
+type TagActionsT = {
+    setName: [string, string];
+    setId?: [string, string];
+    setCode?: [string, string];
+}
+
 interface OsmElementsProps {
     edit: boolean;
     osmFeatures: any[];
     parentLonLat: number[];
+    tagActions?: TagActionsT;
 }
-function OsmElements({ edit, osmFeatures, parentLonLat }: OsmElementsProps) {
+function OsmElements({ edit, osmFeatures, parentLonLat, tagActions }: OsmElementsProps) {
 
     useEffect(() => {
         if (edit && osmFeatures) {
             const nodes = osmFeatures.filter(f => f.id[0] === 'n').map(f => f.id.substring(1));
             const ways = osmFeatures.filter(f => f.id[0] === 'w').map(f => f.id.substring(1));
 
-            fetch('https://api.openstreetmap.org/api/0.6/nodes.json?nodes=' + nodes.join(','))
-                .then(response => response.json())
-                .then(data => {
-                    console.log('osm nodes data', data);
-                    OSM_DATA.updateOverpassData(data);
-                });
+            if (nodes.length > 0) {
+                fetch('https://api.openstreetmap.org/api/0.6/nodes.json?nodes=' + nodes.join(','))
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('osm nodes data', data);
+                        OSM_DATA.updateOverpassData(data);
+                    });
+            }
 
-            fetch('https://api.openstreetmap.org/api/0.6/ways.json?ways=' + ways.join(','))
-                .then(response => response.json())
-                .then(data => {
-                    console.log('osm ways data', data);
-                    OSM_DATA.updateOverpassData(data);
-                });
+            if (ways.length > 0) {
+                fetch('https://api.openstreetmap.org/api/0.6/ways.json?ways=' + ways.join(','))
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('osm ways data', data);
+                        OSM_DATA.updateOverpassData(data);
+                    });
+            }
         }
     }, [edit, osmFeatures]);
 
@@ -181,7 +217,7 @@ function OsmElements({ edit, osmFeatures, parentLonLat }: OsmElementsProps) {
         <HtmlMapMarker key={f.id} name={"osm " + letterCode(i)} lon={f.lon} lat={f.lat} />);
 
     const osmLi = osmFeatures.map((f: any) =>
-        <OsmListElement f={f} {...{ edit, parentLonLat }} />
+        <OsmListElement f={f} {...{ edit, parentLonLat, tagActions }} />
     );
 
     return (
@@ -197,11 +233,12 @@ function OsmElements({ edit, osmFeatures, parentLonLat }: OsmElementsProps) {
 
 type OsmListElementProps = {
     f: any;
-    edit: boolean
+    edit: boolean;
     parentLonLat: number[];
+    tagActions?: TagActionsT
 };
 
-function OsmListElement({ f, edit, parentLonLat }: OsmListElementProps) {
+function OsmListElement({ f, edit, parentLonLat, tagActions }: OsmListElementProps) {
     const type = f.id[0] === 'n' ? 'node' : 'way';
     const idn = f.id.slice(1);
 
@@ -213,6 +250,38 @@ function OsmListElement({ f, edit, parentLonLat }: OsmListElementProps) {
     const osmHref = <a target="_blank" href={osmUrl}>{f.id}</a>;
 
     const matchSet = f.matchSet;
+
+    const osmFeature = OSM_DATA.getByTypeAndId(type, idn);
+    const tags = osmFeature?.tags || f.tags;
+    const [tHash, setTHash] = useState<number>(tagsHash(tags) || 0);
+
+    const handleTagsChange = useCallback((tags: { [k: string]: string }) => {
+
+        if (import.meta.env.DEV) {
+            console.log('Edit tags for osm feature ', osmFeature, tags);
+        }
+
+        if (!osmFeature) {
+            return;
+        }
+
+        OSM_DATA.setElementTags(tags, osmFeature);
+
+        setTHash(tagsHash(tags));
+
+    }, [osmFeature, tagsHash, setTHash]);
+
+    const handleSetName = useCallback(() => {
+        handleTagsChange({ ...tags, name: tagActions?.setName[1] });
+    }, [handleTagsChange, tags, tagActions]);
+
+    const handleSetId = useCallback(() => {
+        tagActions?.setId && handleTagsChange({ ...tags, [tagActions.setId[0]]: tagActions.setId[1] });
+    }, [handleTagsChange, tags, tagActions]);
+
+    const handleSetCode = useCallback(() => {
+        tagActions?.setCode && handleTagsChange({ ...tags, [tagActions.setCode[0]]: tagActions.setCode[1] });
+    }, [handleTagsChange, tags, tagActions]);
 
     const alreadyMatchWarning = matchSet && matchSet !== 'no-match' &&
         <div className={'warning'}>
@@ -230,9 +299,68 @@ function OsmListElement({ f, edit, parentLonLat }: OsmListElementProps) {
         {alreadyMatchWarning}
 
         {
-            edit ? <TagEditor tags={f.tags} /> : <TagsTable tags={f.tags} />
+            !(edit && osmFeature) ?
+                <TagsTable tags={f.tags} /> :
+                <TagEditor key={'tags_' + tHash} tags={tags} tagsOriginal={f.tags} onChange={handleTagsChange} >
+                    <div className={"tag-edit-actions"}>
+                        {tagActions?.setName && <button onClick={handleSetName}>Set Name</button>}
+                        {tagActions?.setId && <button onClick={handleSetId}>Set Id</button>}
+                        {tagActions?.setCode && <button onClick={handleSetCode}>Set Code</button>}
+                    </div>
+                </TagEditor>
         }
     </li>
+}
+
+type AddOsmStopControllerProps = {
+    edit: boolean;
+    name: string;
+    id: string;
+    code?: string;
+    idTags?: { [tag: string]: number };
+}
+function AddOsmStopController({ edit, name, id, code, idTags }: AddOsmStopControllerProps) {
+    const map = useContext(MapContext)?.map;
+    const [active, setActive] = useState(false);
+
+    useEffect(() => {
+        if (!map) {
+            return;
+        }
+
+        if (edit && active) {
+            const sub = map.on('click', (e) => {
+                const m = new Marker().setLngLat([e.lngLat.lng, e.lngLat.lat]).addTo(map);
+                m.getElement().innerText = name;
+
+                const gtfsIdTag = Object.entries(idTags || {}).map(([k, _cnt]) => k)[0] || 'ref:gtfs';
+                const tags = {
+                    name,
+                    [gtfsIdTag]: code || id,
+                };
+
+                OSM_DATA.createNewNode(e.lngLat, tags);
+
+                setActive(false);
+            });
+
+            return () => {
+                sub.unsubscribe();
+            }
+        }
+
+    }, [map, edit, active, setActive, name, id, code, idTags]);
+
+    return (
+        <>
+            {active ?
+                <span>
+                    <span>Click on map to add OSM Stop</span>
+                    <button onClick={() => setActive(false)}>Cancel</button>
+                </span> :
+                <button onClick={() => setActive(true)}>Add OSM Stop</button>}
+        </>
+    )
 }
 
 
@@ -299,4 +427,20 @@ function parseJsonSafe(json: string | undefined, defValue: any) {
 
 function letterCode(i: number) {
     return (ABC[i / ABC.length - 1] || '') + ABC[i % ABC.length];
+}
+
+function tagsHash(tags: { [key: string]: string }): number {
+    let hash = 0;
+    const keys = Object.keys(tags).sort();
+
+    for (const key of keys) {
+        const str = key + ':' + tags[key];
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash |= 0;
+        }
+    }
+
+    return hash;
 }

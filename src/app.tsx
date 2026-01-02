@@ -5,11 +5,10 @@ import type { LayerControls } from './map/layers-controls';
 
 import './app.css'
 import { createMap } from './map/map';
-import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { MatchReportSelector } from './uielements/report-selector';
 import { SelectionInfo } from './uielements/selection-info';
 import { SchedulePreview } from './uielements/schedule-preview';
-import type { Report } from './uielements/report';
 
 export type MapContextT = {
   map: Map,
@@ -23,18 +22,35 @@ export type SelectionT = {
   feature: MapGeoJSONFeature,
   datasetName?: string,
   reportRegion?: string,
+  idTags?: { [k: string]: number },
   [k: string]: any
 }
 
-export const SelectionContext = createContext<[selection: SelectionT | null, updateSelection: (newSelection: SelectionT) => void]>([null, () => { }]);
+export type SelectionContextT = {
+  selection: SelectionT | null;
+  updateSelection: (newSelection: SelectionT) => void;
+  onReportSelect: (reportRegion: string | null) => void;
+};
 
-export const MatchReportContext = createContext<Report | null>(null);
+export const SelectionContext = createContext<SelectionContextT>({
+  selection: null,
+  onReportSelect: () => { },
+  updateSelection: () => { }
+});
 
 export function App() {
 
   const [mapContextVal, setMapContextVal] = useState<MapContextT>();
   const [selection, updateSelection] = useState<SelectionT | null>(null);
-  const [reportData, updateReportData] = useState<Report | null>(null);
+
+  const selectionContext: SelectionContextT = {
+    selection,
+    updateSelection,
+    onReportSelect: (_r: string | null) => {
+      updateSelection(null);
+      window.dispatchEvent(new Event('ShouldUpdateBounds'));
+    }
+  }
 
   useEffect(() => {
     setMapContextVal(createMap("map-view"));
@@ -60,15 +76,6 @@ export function App() {
     }
   }, [selection]);
 
-  useEffect(() => {
-    window.addEventListener('SelectingReports',
-      () => updateSelection(null)
-    );
-  }, [updateSelection]);
-
-  const handleReportChange = useCallback((report: Report | null) => {
-    updateReportData(report);
-  }, [updateReportData]);
 
   const preview = selection?.datasetName === 'preview';
 
@@ -77,16 +84,14 @@ export function App() {
       <div id="map-view"></div>
       <button id="map-style-button">Map Style</button>
       <MapContext value={mapContextVal} >
-        <SelectionContext value={[selection, updateSelection]} >
-          <MatchReportContext value={reportData} >
+        <SelectionContext value={selectionContext} >
 
-            <MatchReportSelector updateReportData={handleReportChange} />
-            {preview ?
-              <SchedulePreview selection={selection} /> :
-              <SelectionInfo selection={selection} />
-            }
+          <MatchReportSelector onSelectReport={selectionContext.onReportSelect} />
+          {preview ?
+            <SchedulePreview selection={selection} /> :
+            <SelectionInfo selection={selection} />
+          }
 
-          </MatchReportContext>
         </SelectionContext>
       </MapContext>
     </>

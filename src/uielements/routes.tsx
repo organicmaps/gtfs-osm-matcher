@@ -14,10 +14,11 @@ export function Routes({ routes, stopLonLat, gtfsRouteTypes }: RoutesProps) {
     }
 
     const map = useContext(MapContext)?.map;
+    const layerControls = useContext(MapContext)?.layerControls;
 
     const [mapStylesReady, setMapStylesReady] = useState<boolean>(!!map?.getSource('routes'));
 
-    const features = Object.entries(routes).map(([routeKey, route]) => {
+    const features = Object.entries(routes || {}).map(([routeKey, route]) => {
 
         const { nextStopLonLat, prevStopLonLat } = route;
 
@@ -66,75 +67,106 @@ export function Routes({ routes, stopLonLat, gtfsRouteTypes }: RoutesProps) {
     useEffect(() => {
         if (!map) return;
 
-        const img = new Image();
-        img.onload = function () {
-            map.addImage('route-arrow', img);
+        if (!map.hasImage('route-arrow')) {
+            const img = new Image();
+            img.onload = function () {
+                map.addImage('route-arrow', img);
+            }
+            img.src = 'arrow.svg';
         }
-        img.src = 'arrow.svg';
 
         const createRouteLayers = () => {
-            console.log('Create routes map styles')
+            console.log('Create routes map styles');
+
 
             if (!map.getSource('routes')) {
-                map.addSource('routes', {
-                    type: 'geojson',
-                    data: {
-                        type: 'FeatureCollection',
-                        features: []
-                    }
-                });
-            }
-
-            if (!map.getLayer('routes')) {
-                map.addLayer({
-                    id: 'routes',
-                    type: 'line',
-                    source: 'routes',
-                    layout: {
-                        'line-join': 'round',
-                        'line-cap': 'round',
+                layerControls?.addOverlayImmediate({
+                    sources: {
+                        "routes": {
+                            type: 'geojson',
+                            data: {
+                                type: 'FeatureCollection',
+                                features: []
+                            }
+                        }
                     },
-                    paint: {
-                        'line-color': 'red',
-                        'line-width': 1,
-                    }
+                    layers: [{
+                        id: 'routes',
+                        type: 'line',
+                        source: 'routes',
+                        layout: {
+                            'line-join': 'round',
+                            'line-cap': 'round',
+                        },
+                        paint: {
+                            'line-color': 'red',
+                            'line-width': 1,
+                        }
+                    }, {
+                        id: 'routes-arrow',
+                        type: 'symbol',
+                        source: 'routes',
+                        layout: {
+                            'symbol-placement': 'line',
+                            'symbol-spacing': 45,
+                            'icon-allow-overlap': true,
+                            'icon-image': 'route-arrow',
+                            'icon-size': 0.6,
+                        }
+                    }, {
+                        id: 'route-names',
+                        type: 'symbol',
+                        source: 'routes',
+                        layout: {
+                            'text-field': ['get', 'name'],
+                            "symbol-placement": "line",
+                            "symbol-spacing": 95,
+                            "text-font": ["Noto Sans Regular"],
+                            'text-size': 10,
+                        },
+                        paint: {
+                            'text-color': 'black',
+                            'text-halo-color': 'white',
+                            'text-halo-width': 5,
+                        }
+                    }]
                 });
             }
 
-            if (!map.getLayer('routes-arrow')) {
-                map.addLayer({
-                    id: 'routes-arrow',
-                    type: 'symbol',
-                    source: 'routes',
-                    layout: {
-                        'symbol-placement': 'line',
-                        'symbol-spacing': 45,
-                        'icon-allow-overlap': true,
-                        'icon-image': 'route-arrow',
-                        'icon-size': 0.6,
-                    }
-                });
-            }
+            // if (!map.getLayer('routes-arrow')) {
+            //     map.addLayer({
+            //         id: 'routes-arrow',
+            //         type: 'symbol',
+            //         source: 'routes',
+            //         layout: {
+            //             'symbol-placement': 'line',
+            //             'symbol-spacing': 45,
+            //             'icon-allow-overlap': true,
+            //             'icon-image': 'route-arrow',
+            //             'icon-size': 0.6,
+            //         }
+            //     });
+            // }
 
-            if (!map.getLayer('route-names')) {
-                map.addLayer({
-                    id: 'route-names',
-                    type: 'symbol',
-                    source: 'routes',
-                    layout: {
-                        'text-field': ['get', 'name'],
-                        "symbol-placement": "line",
-                        "symbol-spacing": 95,
-                        "text-font": ["Noto Sans Regular"],
-                        'text-size': 10,
-                    },
-                    paint: {
-                        'text-color': 'black',
-                        'text-halo-color': 'white',
-                        'text-halo-width': 5,
-                    }
-                });
-            }
+            // if (!map.getLayer('route-names')) {
+            //     map.addLayer({
+            //         id: 'route-names',
+            //         type: 'symbol',
+            //         source: 'routes',
+            //         layout: {
+            //             'text-field': ['get', 'name'],
+            //             "symbol-placement": "line",
+            //             "symbol-spacing": 95,
+            //             "text-font": ["Noto Sans Regular"],
+            //             'text-size': 10,
+            //         },
+            //         paint: {
+            //             'text-color': 'black',
+            //             'text-halo-color': 'white',
+            //             'text-halo-width': 5,
+            //         }
+            //     });
+            // }
 
             setMapStylesReady(true);
         };
@@ -146,7 +178,7 @@ export function Routes({ routes, stopLonLat, gtfsRouteTypes }: RoutesProps) {
             map.once('load', createRouteLayers);
         }
 
-    }, [map, setMapStylesReady]);
+    }, [map, layerControls, setMapStylesReady]);
 
     useEffect(() => {
         if (!mapStylesReady) {
@@ -185,7 +217,7 @@ export function Routes({ routes, stopLonLat, gtfsRouteTypes }: RoutesProps) {
     return <div>
         Gtfs route types: <b>{gtfsRouteTypes}</b>
         {routes && <div><b>Routes: </b>
-            {Object.entries(routes).map(([routeId, _route]) =>
+            {Object.entries(routes || {}).map(([routeId, _route]) =>
                 <span key={routeId}>{routeId} </span>
             )}
         </div>}

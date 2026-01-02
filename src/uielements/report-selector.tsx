@@ -1,17 +1,18 @@
 import { useEffect, useState } from "preact/hooks";
-import { parseUrlReportRegion, useHash } from "./routing";
+import { parseUrlReportRegion, useHashRoute } from "./routing";
 import { MatchReport, type Report } from "./report";
 import "./report-selector.css";
 import { ReportHelpOverlay } from "./report-help-overlay";
 import { ReportTable } from "./report-table";
 
 type MatchReportSelectorProps = {
-    updateReportData?: (report: Report | null) => void
+    onSelectReport?: (reportRegion: string | null) => void;
 };
-export function MatchReportSelector({ updateReportData }: MatchReportSelectorProps) {
+export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps) {
     const [showHelp, setShowHelp] = useState(false);
     const [matchReports, setMatchReports] = useState<Report[]>([]);
-    const reportRegion = parseUrlReportRegion(useHash());
+
+    const reportRegion = useHashRoute(parseUrlReportRegion);
 
     useEffect(() => {
         fetch('/data/match-report.json')
@@ -37,19 +38,13 @@ export function MatchReportSelector({ updateReportData }: MatchReportSelectorPro
     });
 
     const reportData = reportRegion && matchReports.find(r => r.region === reportRegion);
-    updateReportData?.(reportData as Report);
-
-    if (matchReports.length > 0 && !reportData) {
-        // Arm map bounds fly-to only when reposrts selector is open and links are loaded
-        window.dispatchEvent(new CustomEvent('SelectingReports'));
-    }
 
     if (reportData) {
         return (
             <>
                 <div className={'right-top'}>
                     <div>
-                        <a href="#/">Back to reports</a>
+                        <a onClick={() => onSelectReport?.(null)} href="#/">Back to reports</a>
                         <span className={'float-right'}>
                             <span className={'link-like'} onClick={() => setShowHelp(!showHelp)}>Help</span>
                         </span>
@@ -69,7 +64,7 @@ export function MatchReportSelector({ updateReportData }: MatchReportSelectorPro
             <div className={'overlay-content'}>
                 <h2>Available match reports</h2>
                 <div className={'reports'}>
-                    <ReportTable reports={reports} />
+                    <ReportTable reports={reports} onSelectReport={onSelectReport} />
                 </div>
                 <div className={"report-list-footer"}>
                     To add your city or country, or for any other inquiries, please write us at

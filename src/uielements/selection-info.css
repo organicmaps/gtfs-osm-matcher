@@ -2,7 +2,7 @@
     position: absolute;
     top: 10px;
     left: 10px;
-    max-width: 20%;
+    max-width: 30%;
     max-height: 80%;
 
     overflow-y: scroll;
@@ -34,4 +34,11 @@
 .warning span {
     color: red;
     font-weight: bolder;
+}
+
+.tag-edit-actions button {
+    margin-left: 0.5em;
+    font-size: 0.75em;
+    font-weight: bold;
+    cursor: pointer;
 }

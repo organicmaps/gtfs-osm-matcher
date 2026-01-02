@@ -5,6 +5,11 @@ export function useHash() {
     return useSyncExternalStore(subscribe, () => window.location.hash);
 }
 
+export function useHashRoute<T>(parser: (hashString: string) => T) {
+    const hash = useHash();
+    return parser(hash);
+}
+
 function subscribe(callback: () => void) {
     window.addEventListener("hashchange", callback);
     return () => {

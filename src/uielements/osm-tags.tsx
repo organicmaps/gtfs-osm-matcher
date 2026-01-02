@@ -2,58 +2,27 @@
 // import { useCallback, useState } from 'react';
 
 // import OSMData from '../services/OSMData';
+import "./osm-tags.css";
 
 import type { OSMElementTags } from '../services/OSMData.types';
-import "./osm-tags.css";
 import { cls } from './cls';
-import { useCallback } from 'preact/hooks';
-
-/*
-export type tagsEditCB = (tags: OSMElementTags) => void;
-
-export type OSMElementTagsProps = {
-    osmElement: OSMElement
-    osmData: OSMData
-};
-export default function OSMElementTagsEditor({ osmElement, osmData }: OSMElementTagsProps) {
-    const tags = osmElement?.tags;
-
-    // @ts-ignore ignore redraw is never read
-    const [redraw, setRedraw] = useState({});
-
-    const handleEdit: tagsEditCB = useCallback(newTags => {
-        osmData.setElementTags(newTags, osmElement);
-        setRedraw({});
-    }, [tags, osmElement, setRedraw]);
-
-    return <TagEditor tags={tags} onChange={handleEdit} ></TagEditor>
-}
-*/
-
-
-/* TODO:
- * replace TagEditorProps tags with TagEditorElement[]
- * save them to a local state,
- * compose and decompose osmElement.element tags
- */
-
-// @ts-ignore
-type TagEditorElement = {
-    key: string
-    value: string
-    error?: string
-}
+import { useCallback, useRef } from 'preact/hooks';
+import type { ComponentChildren } from 'preact';
 
 type handleInputCB = (key: string, evnt: Event) => void;
 type stringCB = (key: string) => void;
 
 export type TagEditorProps = {
-    tags: OSMElementTags
-    onChange?: (newTags: OSMElementTags) => void
-    protectedKeys?: string[]
-    invalidKeys?: string[]
+    tags: OSMElementTags;
+    tagsOriginal?: OSMElementTags;
+    onChange?: (newTags: OSMElementTags) => void;
+    protectedKeys?: string[];
+    invalidKeys?: string[];
+    children?: ComponentChildren
 };
-export function TagEditor({ tags, onChange, protectedKeys, invalidKeys }: TagEditorProps) {
+export function TagEditor({ tags, tagsOriginal, onChange, children, protectedKeys, invalidKeys }: TagEditorProps) {
+
+    const onChangeDebounce = useDebounce<OSMElementTags>(onChange, 1000);
 
     const handleKeyEdit: handleInputCB = (key, evnt) => {
         const entries = Object.entries(tags);
@@ -69,7 +38,7 @@ export function TagEditor({ tags, onChange, protectedKeys, invalidKeys }: TagEdi
         const index = entries.findIndex(([k, _v]) => k === key);
         entries.splice(index, 1, [newKey, value]);
 
-        onChange && onChange(Object.fromEntries(entries));
+        onChangeDebounce(Object.fromEntries(entries));
     };
 
     // There is no reason to use useCallback
@@ -78,7 +47,7 @@ export function TagEditor({ tags, onChange, protectedKeys, invalidKeys }: TagEdi
     const handleValueEdit: handleInputCB = (key, evnt) => {
         const value = (evnt.target as HTMLInputElement).value;
 
-        onChange && onChange({
+        onChangeDebounce({
             ...tags,
             [key]: value
         });
@@ -86,7 +55,7 @@ export function TagEditor({ tags, onChange, protectedKeys, invalidKeys }: TagEdi
 
     const handleAddTag = () => {
         const newKey = 'key'
-        onChange && onChange({
+        onChange?.({
             ...tags,
             [newKey]: 'value'
         });
@@ -94,34 +63,67 @@ export function TagEditor({ tags, onChange, protectedKeys, invalidKeys }: TagEdi
 
     const handleDelete: stringCB = useCallback(tagKey => {
         const { [tagKey]: oldValue, ...newTags } = tags;
-        onChange && onChange(newTags);
+        onChange?.(newTags);
     }, [tags, onChange]);
 
-    const rows = Object.entries(tags || {}).map(([key, value], i) => {
+    const handleRestore: stringCB = useCallback(tagKey => {
+        const newTags = {
+            ...tags,
+            [tagKey]: tagsOriginal![tagKey]
+        };
+        onChange?.(newTags);
+    }, [tags, tagsOriginal, onChange]);
+
+    var tagEntries = Object.entries(tagsOriginal || {});
+
+    // Update default values with current values
+    Object.entries(tags || {}).forEach(([key, value]) => {
+        if (!Object.keys(tagsOriginal || {}).includes(key)) {
+            tagEntries.push([key, value]);
+        } else {
+            tagEntries = tagEntries.map(([exkey, exvalue]) => {
+                return [exkey, exkey === key ? value : exvalue];
+            });
+        }
+    });
+
+    if (import.meta.env.DEV) {
+        console.log('tagEntries', tagEntries);
+    }
+
+    const rows = tagEntries.map(([key, value], i) => {
         const readonly = protectedKeys?.includes(key);
         const invalid = invalidKeys?.includes(key);
+
+        const current = tags[key];
+        const original = tagsOriginal?.[key];
+
         return (
             <tr key={i}>
                 <td className={'tag-actions'}>
-                    {!readonly && <span
+                    {!readonly && current !== undefined && <span
                         onClick={handleDelete.bind(undefined, key)}
                         className={'osm-tag-delete'}
                     >
                         &#x2718;
                     </span>}
+                    {current !== original && original !== undefined &&
+                        <span className={'osm-tag-restore'} onClick={handleRestore.bind(undefined, key)}>
+                            &#x27F3;
+                        </span>}
                 </td>
 
-                <td className={cls('osm-tag-key', invalid && 'invalid', readonly && 'protected')}>
+                <td className={cls('osm-tag-key', invalid && 'invalid', readonly && 'protected', current === undefined && 'deleted')}>
                     <input
                         value={key}
-                        readOnly={readonly}
+                        readOnly={readonly || current === undefined}
                         onChange={handleKeyEdit.bind(undefined, key)} />
                 </td>
 
-                <td className={cls('osm-tag-value', invalid && 'invalid', readonly && 'protected')}>
+                <td className={cls('osm-tag-value', invalid && 'invalid', readonly && 'protected', current === undefined && 'deleted')}>
                     <input
                         value={value}
-                        readOnly={readonly}
+                        readOnly={readonly || current === undefined}
                         onChange={handleValueEdit.bind(undefined, key)} />
                 </td>
             </tr>
@@ -140,7 +142,24 @@ export function TagEditor({ tags, onChange, protectedKeys, invalidKeys }: TagEdi
                     <td></td>
                 </tr>
             </tbody>
-        </table>
-    }</>);
+        </table>}
+        {children}
+    </>);
 
+}
+
+function useDebounce<T>(cb?: (val: T) => void, delay?: number) {
+    const timerRef = useRef<any>();
+    const valueRef = useRef<T>();
+
+    return useCallback((val: T) => {
+        clearTimeout(timerRef.current);
+
+        timerRef.current = setTimeout(
+            () => cb?.(valueRef.current!),
+            delay || 500
+        );
+
+        valueRef.current = val;
+    }, [cb, timerRef, delay]);
 }
