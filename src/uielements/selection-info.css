@@ -42,3 +42,25 @@
     font-weight: bold;
     cursor: pointer;
 }
+
+.icon-button {
+    vertical-align: middle;
+    text-align: center;
+    line-height: 1em;
+    font-size: 0.8em;
+    padding: 0.1em 0.5em;
+}
+
+span.loading-indicator {
+    display: inline-block;
+}
+
+.spin {
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+

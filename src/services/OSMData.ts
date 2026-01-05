@@ -1,4 +1,5 @@
 import type { LonLatTuple, OSMElement, OSMElementTags, OSMNode, OSMRelation, OSMWay } from "./OSMData.types";
+import type { BBox } from "./tile-utils";
 
 const stopsQ: string = `
 [out:json][timeout:900];
@@ -13,6 +14,9 @@ const stopsQ: string = `
 
   node["amenity"="bus_station"]({{bbox}});
   way["amenity"="bus_station"]({{bbox}});
+  
+  node["amenity"="ferry_terminal"]({{bbox}});
+  way["amenity"="ferry_terminal"]({{bbox}});
   
   node["railway"="tram_stop"]({{bbox}});
   node["railway"="platform"]({{bbox}});
@@ -44,32 +48,25 @@ out meta;
 out meta qt;
 `;
 
-export type BBOX = {
-    minx: number;
-    miny: number;
-    maxx: number;
-    maxy: number;
-}
-
 const endpoint = 'https://overpass-api.de/api/interpreter';
 
-export async function queryStops(bbox: BBOX) {
+export async function queryStops(bbox: BBox) {
     const bboxString = getBBOXString(bbox);
     const query = stopsQ.replaceAll('{{bbox}}', bboxString);
 
     return queryOverpass(query);
 }
 
-export async function queryRoutes(bbox: BBOX) {
+export async function queryRoutes(bbox: BBox) {
     const bboxString = getBBOXString(bbox);
     const query = routesQ.replaceAll('{{bbox}}', bboxString);
 
     return queryOverpass(query);
 }
 
-function getBBOXString(bbox: BBOX) {
-    // min_lat, min_lon, max_lat, max_lon
-    return `${bbox.miny},${bbox.minx},${bbox.maxy},${bbox.maxx}`;
+function getBBOXString(bbox: BBox) {
+    // south, west, north, east
+    return `${bbox.south},${bbox.west},${bbox.north},${bbox.east}`;
 }
 
 export async function queryOverpass(query: string) {
@@ -150,28 +147,16 @@ export default class OSMData {
     elements: OSMElement[]
     changes: OSMDataChange[]
 
+    dataUpdated: () => void;
+
     constructor() {
         this.newIdCounter = -1;
         this.changes = [];
 
+        this.dataUpdated = () => { };
+
         this.elements = [];
         this.idMap = new Map<string, OSMElement>();
-    }
-
-    calculateTagStatistics(filter: OsmElementFilter) {
-        const stats = new Map<string, number>();
-
-        const elements = filter ? this.elements.filter(filter) : this.elements;
-
-        elements.forEach(element => {
-            element.tags && Object.keys(element.tags).forEach(key => {
-                // @ts-ignore
-                const occurances = stats.has(key) ? stats.get(key) + 1 : 1;
-                stats.set(key, occurances);
-            });
-        });
-
-        return stats;
     }
 
     listChanges() {
@@ -191,6 +176,8 @@ export default class OSMData {
         overpassData.elements.forEach(e => {
             this.updateElement(e);
         });
+
+        this.dataUpdated();
     }
 
     updateElement(element: OSMElement) {
@@ -277,6 +264,8 @@ export default class OSMData {
                 action: [action]
             });
         }
+
+        this.dataUpdated();
     }
 
     getNodeById(id: number) {
@@ -289,6 +278,12 @@ export default class OSMData {
 
     getRelationById(id: number) {
         return this.getByTypeAndId('relation', id) as OSMRelation;
+    }
+
+    getByNWRId(nwrid: string) {
+        const type = nwrid[0] === 'n' ? 'node' : nwrid[0] === 'w' ? 'way' : 'relation';
+        const id = parseInt(nwrid.substring(1));
+        return this.getByTypeAndId(type, id);
     }
 
     getByTypeAndId(type: string, id: number) {

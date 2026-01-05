@@ -10,6 +10,11 @@
 .deleted input {
     background-color: #ccc;
     pointer-events: none;
+    text-decoration: line-through;
+}
+
+.important input {
+    font-weight: bold;
 }
 
 .invalid input {

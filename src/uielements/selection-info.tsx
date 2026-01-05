@@ -12,8 +12,15 @@ const OSM_DATA = new OSMData();
 
 import "./selection-info.css";
 import { Routes } from "./routes";
-import OSMData from "../services/OSMData";
+import OSMData, { queryStops } from "../services/OSMData";
 import { Changes } from "./changes";
+import { useSyncExternalStore } from "preact/compat";
+import { getTileBBox, getTileXYZ } from "../services/tile-utils";
+import { HtmlMapMarker } from "./map-marker";
+import { cls } from "./cls";
+
+
+const importantTagsRg = /(name|ref|gtfs|bus|train|tram|ferry|station|platform|public_transport)/;
 
 const ABC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -23,6 +30,8 @@ export type SelectionInfoProps = {
 export function SelectionInfo({ selection }: SelectionInfoProps) {
 
     const [showChanges, setShowChanges] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [edit, setEdit] = useState(false);
 
     const properties = selection?.feature.properties;
     const datasetName = selection?.datasetName;
@@ -37,10 +46,19 @@ export function SelectionInfo({ selection }: SelectionInfoProps) {
                 <label>Show OSM changes</label>
                 <input type="checkbox" checked={showChanges}
                     onChange={(e: Event) => setShowChanges((e.target as HTMLInputElement).checked)} />
+
+                <label>Edit OSM data:</label>
+                <input type="checkbox" checked={edit}
+                    onChange={(e: Event) => setEdit((e.target as HTMLInputElement).checked)} />
+
+                <div>
+                    <label>Loading osm data: </label> <span className={cls("loading-indicator", loading && "spin")}>&#x1F5D8;</span>
+                </div>
+
             </div>
             {showChanges && <Changes osmData={OSM_DATA} />}
             {properties && reportRegion &&
-                <MatchInfo {...{ datasetName, properties, geometry, reportRegion, idTags }} />}
+                <MatchInfo {...{ datasetName, properties, geometry, reportRegion, idTags, edit, setLoading }} />}
         </div>
     </>
     )
@@ -51,11 +69,12 @@ type MatchInfoProps = {
     properties: { [k: string]: any }
     geometry: GeoJSON.Geometry | undefined
     reportRegion: string
+    edit: boolean
+    setLoading?: (loading: boolean) => void
     datasetName?: string
     idTags?: { [k: string]: number }
 }
-function MatchInfo({ datasetName, properties, geometry, idTags }: MatchInfoProps) {
-    const [edit, setEdit] = useState(false);
+function MatchInfo({ datasetName, properties, geometry, idTags, edit, setLoading }: MatchInfoProps) {
 
     const name = properties?.['gtfsStopName'] || properties?.['name'];
 
@@ -84,7 +103,8 @@ function MatchInfo({ datasetName, properties, geometry, idTags }: MatchInfoProps
         setName: ['name', name] as [string, string]
     };
 
-    const gtfsIdTag = Object.entries(idTagsStatistics || {}).map(([k, _cnt]) => k)[0] || 'ref:gtfs';
+    const gtfsIdTag = Object.entries(idTagsStatistics || {}).map(([k, _cnt]) => k).filter(k => k !== 'name')[0] || 'ref:gtfs';
+
     if (properties.gtfsStopId) {
         tagActions.setId = [gtfsIdTag, properties.gtfsStopId] as [string, string];
     }
@@ -125,15 +145,21 @@ function MatchInfo({ datasetName, properties, geometry, idTags }: MatchInfoProps
 
         {FEATURE_ENABLE_EDIT &&
             <div className={"edit-actions"}>
-                <label>Edit:</label> <input type="checkbox" checked={edit}
-                    onChange={(e: Event) => setEdit((e.target as HTMLInputElement).checked)} />
-
                 <AddOsmStopController id={properties.gtfsStopId} code={properties.gtfsStopCode} {...{ edit, name, idTags }} />
             </div>}
 
-        <OsmElements edit={edit} osmFeatures={osmFeatures} tagActions={tagActions} parentLonLat={[lon, lat]} />
+        <OsmElements edit={edit} setLoading={setLoading} osmFeatures={osmFeatures} tagActions={tagActions} parentLonLat={[lon, lat]} />
 
     </div>)
+}
+
+function useOsmFeatures() {
+    return useSyncExternalStore((sub) => {
+        OSM_DATA.dataUpdated = sub;
+        return () => {
+            OSM_DATA.dataUpdated = () => { };
+        }
+    }, () => OSM_DATA.elements);
 }
 
 function getGtfsFeatures(properties: { [k: string]: any }) {
@@ -149,31 +175,6 @@ function getGtfsFeatures(properties: { [k: string]: any }) {
     }];
 }
 
-
-type HtmlMapMarkerProps = {
-    name: string
-    lat: number
-    lon: number
-}
-function HtmlMapMarker({ name, lat, lon }: HtmlMapMarkerProps) {
-
-    const map = useContext(MapContext)?.map;
-
-    useEffect(() => {
-        if (!map) return;
-
-        const m = new Marker().setLngLat([lon, lat]).addTo(map);
-        m.getElement().innerText = name;
-
-        return () => {
-            m.remove();
-        }
-
-    }, [map, name, lat, lon]);
-
-    return <></>
-}
-
 type TagActionsT = {
     setName: [string, string];
     setId?: [string, string];
@@ -185,33 +186,60 @@ interface OsmElementsProps {
     osmFeatures: any[];
     parentLonLat: number[];
     tagActions?: TagActionsT;
+    loading?: boolean;
+    setLoading?: (loading: boolean) => void;
 }
-function OsmElements({ edit, osmFeatures, parentLonLat, tagActions }: OsmElementsProps) {
+function OsmElements({ edit, osmFeatures, parentLonLat, tagActions, setLoading }: OsmElementsProps) {
+
+    const missingOsmFeatures = osmFeatures.filter(f => !OSM_DATA.getByNWRId(f.id));
 
     useEffect(() => {
-        if (edit && osmFeatures) {
-            const nodes = osmFeatures.filter(f => f.id[0] === 'n').map(f => f.id.substring(1));
-            const ways = osmFeatures.filter(f => f.id[0] === 'w').map(f => f.id.substring(1));
+        if (missingOsmFeatures) {
+            const nodes = missingOsmFeatures.filter(f => f.id[0] === 'n').map(f => f.id.substring(1));
+            const ways = missingOsmFeatures.filter(f => f.id[0] === 'w').map(f => f.id.substring(1));
 
-            if (nodes.length > 0) {
-                fetch('https://api.openstreetmap.org/api/0.6/nodes.json?nodes=' + nodes.join(','))
-                    .then(response => response.json())
-                    .then(data => {
-                        console.log('osm nodes data', data);
-                        OSM_DATA.updateOverpassData(data);
-                    });
-            }
+            (async () => {
+                setLoading?.(true);
+                if (nodes.length > 0) {
+                    await fetch('https://api.openstreetmap.org/api/0.6/nodes.json?nodes=' + nodes.join(','))
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log('osm nodes data', data);
+                            OSM_DATA.updateOverpassData(data);
+                        });
+                }
 
-            if (ways.length > 0) {
-                fetch('https://api.openstreetmap.org/api/0.6/ways.json?ways=' + ways.join(','))
-                    .then(response => response.json())
-                    .then(data => {
-                        console.log('osm ways data', data);
-                        OSM_DATA.updateOverpassData(data);
-                    });
-            }
+                if (ways.length > 0) {
+                    await fetch('https://api.openstreetmap.org/api/0.6/ways.json?ways=' + ways.join(','))
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log('osm ways data', data);
+                            OSM_DATA.updateOverpassData(data);
+                        });
+                }
+
+                const tiles = missingOsmFeatures
+                    .map(f => getTileXYZ(f.lat, f.lon, 16))
+                    .filter((f, inx, arr) => arr.findIndex(t => t.x === f.x && t.y === f.y) === inx);
+
+                for (const t of tiles) {
+                    const overpass = await queryStops(getTileBBox(t));
+                    OSM_DATA.updateOverpassData(overpass);
+                }
+
+                setLoading?.(false);
+            })();
         }
-    }, [edit, osmFeatures]);
+    }, [missingOsmFeatures, setLoading]);
+
+    const overpassElements = useOsmFeatures()
+        .filter(e => e.tags && Object.keys(e.tags).length > 0)
+        .filter(ovp =>
+            !osmFeatures.some(f => f.id === `${ovp.type[0]}${ovp.id}`));
+
+    const osmMapElements = overpassElements.map((f: any) =>
+        <HtmlMapMarker key={f.id} name={f.id} lon={f.lon} lat={f.lat} />
+    );
 
     const markersOsm = osmFeatures.map((f: any, i: number) =>
         <HtmlMapMarker key={f.id} name={"osm " + letterCode(i)} lon={f.lon} lat={f.lat} />);
@@ -227,6 +255,7 @@ function OsmElements({ edit, osmFeatures, parentLonLat, tagActions }: OsmElement
                 {osmLi}
             </ol>
             {markersOsm}
+            {osmMapElements}
         </div>
     )
 }
@@ -272,15 +301,21 @@ function OsmListElement({ f, edit, parentLonLat, tagActions }: OsmListElementPro
     }, [osmFeature, tagsHash, setTHash]);
 
     const handleSetName = useCallback(() => {
-        handleTagsChange({ ...tags, name: tagActions?.setName[1] });
+        const [key, value] = tagActions?.setName || [];
+        import.meta.env.DEV && console.log('SetName', key, value);
+        tagActions?.setName && handleTagsChange({ ...tags, [key!]: value });
     }, [handleTagsChange, tags, tagActions]);
 
     const handleSetId = useCallback(() => {
-        tagActions?.setId && handleTagsChange({ ...tags, [tagActions.setId[0]]: tagActions.setId[1] });
+        const [key, value] = tagActions?.setId || [];
+        import.meta.env.DEV && console.log('SetId', key, value);
+        tagActions?.setId && handleTagsChange({ ...tags, [key!]: value });
     }, [handleTagsChange, tags, tagActions]);
 
     const handleSetCode = useCallback(() => {
-        tagActions?.setCode && handleTagsChange({ ...tags, [tagActions.setCode[0]]: tagActions.setCode[1] });
+        const [key, value] = tagActions?.setCode || [];
+        import.meta.env.DEV && console.log('SetCode', key, value);
+        tagActions?.setCode && handleTagsChange({ ...tags, [key!]: value });
     }, [handleTagsChange, tags, tagActions]);
 
     const alreadyMatchWarning = matchSet && matchSet !== 'no-match' &&
@@ -301,7 +336,11 @@ function OsmListElement({ f, edit, parentLonLat, tagActions }: OsmListElementPro
         {
             !(edit && osmFeature) ?
                 <TagsTable tags={f.tags} /> :
-                <TagEditor key={'tags_' + tHash} tags={tags} tagsOriginal={f.tags} onChange={handleTagsChange} >
+                <TagEditor key={'tags_' + tHash} tags={tags}
+                    tagsOriginal={f.tags} onChange={handleTagsChange}
+                    importantTagKeysRegex={importantTagsRg}
+                    importantTagValuesRegex={importantTagsRg} >
+
                     <div className={"tag-edit-actions"}>
                         {tagActions?.setName && <button onClick={handleSetName}>Set Name</button>}
                         {tagActions?.setId && <button onClick={handleSetId}>Set Id</button>}
