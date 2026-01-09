@@ -6,8 +6,6 @@ import { getDistance } from "../map/distance";
 import { LocateMe } from "./locate-me";
 import { TagEditor } from "./editor/osm-tags";
 
-const FEATURE_ENABLE_EDIT = import.meta.env.MODE === 'development';
-
 const OSM_DATA = new OSMData();
 
 import "./selection-info.css";
