@@ -2,7 +2,7 @@ import { useCallback, useContext, useEffect, useState } from "preact/hooks";
 import { MapContext, type SelectionT } from "../app";
 
 import { Marker } from "maplibre-gl";
-import { getDistance } from "../map/distance";
+import { getDistanceLonLat } from "../map/distance";
 import { LocateMe } from "./locate-me";
 import { TagEditor } from "./editor/osm-tags";
 
@@ -238,6 +238,7 @@ function OsmElements({ edit, osmFeatures, parentLonLat, tagActions, setLoading }
 
     const overpassElements = useOsmFeatures()
         .filter(e => e.tags && Object.keys(e.tags).length > 0)
+        .filter(e => getDistanceLonLat(OSM_DATA.getLonLat(e)!, parentLonLat as [number, number]) < 500)
         .filter(ovp =>
             !osmFeatures.some(f => f.id === `${ovp.type[0]}${ovp.id}`));
 
@@ -260,7 +261,7 @@ function OsmElements({ edit, osmFeatures, parentLonLat, tagActions, setLoading }
         />
     );
 
-    const overpassLi = overpassElements.map((f: any) => {
+    const overpassLi = overpassElements.filter((f: any) => f.id > 0).map((f: any) => {
         const id = f.type[0] + f.id;
         return <OsmListElement key={id} f={{ ...f, id }}
             mouseEvents={{ onHoverUpdate: handleHover.bind(undefined, id) }}
@@ -268,8 +269,24 @@ function OsmElements({ edit, osmFeatures, parentLonLat, tagActions, setLoading }
         />
     });
 
+    const newOverpassLi = overpassElements.filter((f: any) => f.id < 0).map((f: any) => {
+        const id = f.type[0] + f.id;
+        return <OsmListElement key={id} f={{ ...f, id }} edit={true}
+            mouseEvents={{ onHoverUpdate: handleHover.bind(undefined, id) }}
+            {...{ parentLonLat, tagActions }}
+        />
+    });
+
     return (
         <div>
+            {newOverpassLi.length > 0 && <>
+                <h4>New OSM Feautures</h4>
+                <div><i>This features were just created</i></div>
+                <ul>
+                    {newOverpassLi}
+                </ul>
+            </>}
+
             <h4>OSM Feautures</h4>
             <ol type="A">
                 {osmLi}
@@ -386,7 +403,7 @@ function OsmListElement({ f, edit, parentLonLat, tagActions, mouseEvents }: OsmL
 
     const distanceInfo = lon && lat &&
         <span>
-            ({getDistance([lat, lon], [f.lat, f.lon]).toFixed(1)}m)
+            ({getDistanceLonLat([lon, lat], [f.lon, f.lat]).toFixed(1)}m)
         </span>;
 
     return <li key={f.id} className="osm-list-item" {...mouseEventsHandler}>

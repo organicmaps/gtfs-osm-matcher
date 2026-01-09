@@ -281,6 +281,10 @@ export default class OSMData {
         this.dataUpdated();
     }
 
+    getLonLat(element: OSMElement) {
+        return getElementLonLat(element, this);
+    }
+
     getNodeById(id: number) {
         return this.getByTypeAndId('node', id) as OSMNode;
     }
