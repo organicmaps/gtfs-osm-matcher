@@ -1,6 +1,6 @@
 
-import type { OSMElementTags } from '../services/OSMData.types';
-import { cls } from './cls';
+import type { OSMElementTags } from '../../services/OSMData.types';
+import { cls } from '../cls';
 import { useCallback, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 

@@ -1,0 +1,11 @@
+
+@keyframes marker-flash {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.map-marker.highlight {
+    font-weight: bold;
+    font-size: 1.5em;
+    animation: marker-flash 0.25s 3;
+}

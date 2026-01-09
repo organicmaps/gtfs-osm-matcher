@@ -4,7 +4,7 @@ import { MapContext, type SelectionT } from "../app";
 import { Marker } from "maplibre-gl";
 import { getDistance } from "../map/distance";
 import { LocateMe } from "./locate-me";
-import { TagEditor } from "./osm-tags";
+import { TagEditor } from "./editor/osm-tags";
 
 const FEATURE_ENABLE_EDIT = import.meta.env.MODE === 'development';
 
@@ -13,10 +13,10 @@ const OSM_DATA = new OSMData();
 import "./selection-info.css";
 import { Routes } from "./routes";
 import OSMData, { queryStops } from "../services/OSMData";
-import { Changes } from "./changes";
+import { Changes } from "./editor/changes";
 import { useSyncExternalStore } from "preact/compat";
 import { getTileBBox, getTileXYZ } from "../services/tile-utils";
-import { HtmlMapMarker } from "./map-marker";
+import { HtmlMapMarker } from "./editor/map-marker";
 import { cls } from "./cls";
 
 
@@ -143,10 +143,9 @@ function MatchInfo({ datasetName, properties, geometry, idTags, edit, setLoading
 
         <Routes routes={routes} gtfsRouteTypes={properties.gtfsRouteTypes} stopLonLat={[lon, lat]} />
 
-        {FEATURE_ENABLE_EDIT &&
-            <div className={"edit-actions"}>
-                <AddOsmStopController id={properties.gtfsStopId} code={properties.gtfsStopCode} {...{ edit, name, idTags }} />
-            </div>}
+        <div className={"edit-actions"}>
+            <AddOsmStopController id={properties.gtfsStopId} code={properties.gtfsStopCode} {...{ edit, name, idTags }} />
+        </div>
 
         <OsmElements edit={edit} setLoading={setLoading} osmFeatures={osmFeatures} tagActions={tagActions} parentLonLat={[lon, lat]} />
 
@@ -190,6 +189,13 @@ interface OsmElementsProps {
     setLoading?: (loading: boolean) => void;
 }
 function OsmElements({ edit, osmFeatures, parentLonLat, tagActions, setLoading }: OsmElementsProps) {
+
+    const [highlightId, setHighlightId] = useState<string | null>(null);
+
+    const handleHover = useCallback((id: string, hover: boolean) => {
+        // Clear only our own highlight id
+        setHighlightId((activeHl) => hover ? id : (activeHl === id ? null : activeHl));
+    }, [setHighlightId]);
 
     const missingOsmFeatures = osmFeatures.filter(f => !OSM_DATA.getByNWRId(f.id));
 
@@ -237,16 +243,32 @@ function OsmElements({ edit, osmFeatures, parentLonLat, tagActions, setLoading }
         .filter(ovp =>
             !osmFeatures.some(f => f.id === `${ovp.type[0]}${ovp.id}`));
 
-    const osmMapElements = overpassElements.map((f: any) =>
-        <HtmlMapMarker key={f.id} name={f.id} lon={f.lon} lat={f.lat} />
-    );
+    const osmMapElements = overpassElements.map((f: any) => {
+        return <HtmlMapMarker key={f.id}
+            className={cls(highlightId === `${f.type[0]}${f.id}` && 'highlight')}
+            name={f.id} lon={f.lon} lat={f.lat} />
+    });
 
-    const markersOsm = osmFeatures.map((f: any, i: number) =>
-        <HtmlMapMarker key={f.id} name={"osm " + letterCode(i)} lon={f.lon} lat={f.lat} />);
+    const markersOsm = osmFeatures.map((f: any, i: number) => {
+        return <HtmlMapMarker key={f.id} name={"osm " + letterCode(i)} lon={f.lon} lat={f.lat}
+            className={cls(highlightId === f.id && 'highlight')}
+        />
+    });
 
     const osmLi = osmFeatures.map((f: any) =>
-        <OsmListElement f={f} {...{ edit, parentLonLat, tagActions }} />
+        <OsmListElement key={f.id} f={f}
+            mouseEvents={{ onHoverUpdate: handleHover.bind(undefined, f.id) }}
+            {...{ edit, parentLonLat, tagActions }}
+        />
     );
+
+    const overpassLi = overpassElements.map((f: any) => {
+        const id = f.type[0] + f.id;
+        return <OsmListElement key={id} f={{ ...f, id }}
+            mouseEvents={{ onHoverUpdate: handleHover.bind(undefined, id) }}
+            {...{ edit, parentLonLat, tagActions }}
+        />
+    });
 
     return (
         <div>
@@ -254,22 +276,55 @@ function OsmElements({ edit, osmFeatures, parentLonLat, tagActions, setLoading }
             <ol type="A">
                 {osmLi}
             </ol>
+
+            {overpassElements.length > 0 && <>
+                <h4>Surrounding OSM Feautures</h4>
+                <div><i>This features were not considered as match candidates during server matching</i></div>
+                <ul>
+                    {overpassLi}
+                </ul>
+            </>}
+
             {markersOsm}
             {osmMapElements}
         </div>
     )
 }
 
+export type HtmlMouseEventsHandlers = {
+    onClick?: () => void;
+    onMouseEnter?: () => void;
+    onMouseLeave?: () => void;
+};
+
+export type MouseEventsHandlers = {
+    onClick?: () => void;
+    onHoverUpdate?: (hover: boolean) => void;
+}
+
 type OsmListElementProps = {
     f: any;
     edit: boolean;
     parentLonLat: number[];
-    tagActions?: TagActionsT
+    tagActions?: TagActionsT;
+    mouseEvents?: MouseEventsHandlers
 };
 
-function OsmListElement({ f, edit, parentLonLat, tagActions }: OsmListElementProps) {
+function OsmListElement({ f, edit, parentLonLat, tagActions, mouseEvents }: OsmListElementProps) {
     const type = f.id[0] === 'n' ? 'node' : 'way';
     const idn = f.id.slice(1);
+
+    const { onClick, onHoverUpdate } = mouseEvents || {};
+    const mouseEventsHandler: HtmlMouseEventsHandlers = {};
+
+    if (onClick) {
+        mouseEventsHandler.onClick = () => onClick?.();
+    }
+
+    if (onHoverUpdate) {
+        mouseEventsHandler.onMouseEnter = () => onHoverUpdate?.(true);
+        mouseEventsHandler.onMouseLeave = () => onHoverUpdate?.(false);
+    }
 
     const [lon, lat] = parentLonLat;
 
@@ -328,7 +383,7 @@ function OsmListElement({ f, edit, parentLonLat, tagActions }: OsmListElementPro
             ({getDistance([lat, lon], [f.lat, f.lon]).toFixed(1)}m)
         </span>;
 
-    return <li key={f.id}>
+    return <li key={f.id} className="osm-list-item" {...mouseEventsHandler}>
         <b>{name} </b>
         <div>{osmHref} {distanceInfo} <LocateMe lonlatFeature={f} /></div>
         {alreadyMatchWarning}
@@ -358,7 +413,7 @@ type AddOsmStopControllerProps = {
     code?: string;
     idTags?: { [tag: string]: number };
 }
-function AddOsmStopController({ edit, name, id, code, idTags }: AddOsmStopControllerProps) {
+function AddOsmStopController({ name, id, code, idTags }: AddOsmStopControllerProps) {
     const map = useContext(MapContext)?.map;
     const [active, setActive] = useState(false);
 
@@ -367,7 +422,7 @@ function AddOsmStopController({ edit, name, id, code, idTags }: AddOsmStopContro
             return;
         }
 
-        if (edit && active) {
+        if (active) {
             const sub = map.on('click', (e) => {
                 const m = new Marker().setLngLat([e.lngLat.lng, e.lngLat.lat]).addTo(map);
                 m.getElement().innerText = name;
@@ -388,13 +443,13 @@ function AddOsmStopController({ edit, name, id, code, idTags }: AddOsmStopContro
             }
         }
 
-    }, [map, edit, active, setActive, name, id, code, idTags]);
+    }, [map, active, setActive, name, id, code, idTags]);
 
     return (
         <>
             {active ?
                 <span>
-                    <span>Click on map to add OSM Stop</span>
+                    <span>Click on map to add OSM Stop </span>
                     <button onClick={() => setActive(false)}>Cancel</button>
                 </span> :
                 <button onClick={() => setActive(true)}>Add OSM Stop</button>}

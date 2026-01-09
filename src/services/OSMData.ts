@@ -2,7 +2,7 @@ import type { LonLatTuple, OSMElement, OSMElementTags, OSMNode, OSMRelation, OSM
 import type { BBox } from "./tile-utils";
 
 const stopsQ: string = `
-[out:json][timeout:900];
+[out:json][timeout:1800];
 (
   node["public_transport"="platform"]({{bbox}});
   way["public_transport"="platform"]({{bbox}});
@@ -48,11 +48,24 @@ out meta;
 out meta qt;
 `;
 
+var throttlePromise: Promise<void> | null = null;
+
 const endpoint = 'https://overpass-api.de/api/interpreter';
 
 export async function queryStops(bbox: BBox) {
     const bboxString = getBBOXString(bbox);
     const query = stopsQ.replaceAll('{{bbox}}', bboxString);
+
+    if (throttlePromise) {
+        await throttlePromise;
+    }
+
+    throttlePromise = new Promise((resolve) => {
+        setTimeout(() => {
+            throttlePromise = null;
+            resolve();
+        }, 2500);
+    });
 
     return queryOverpass(query);
 }
