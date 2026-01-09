@@ -373,6 +373,14 @@ function OsmListElement({ f, edit, parentLonLat, tagActions, mouseEvents }: OsmL
         tagActions?.setCode && handleTagsChange({ ...tags, [key!]: value });
     }, [handleTagsChange, tags, tagActions]);
 
+    const handleMove = useCallback((lonLat: number[]) => {
+        if (!osmFeature) {
+            return;
+        }
+
+        OSM_DATA.setNodeLatLng({ lng: lonLat[0], lat: lonLat[1] }, osmFeature);
+    }, [osmFeature]);
+
     const alreadyMatchWarning = matchSet && matchSet !== 'no-match' &&
         <div className={'warning'}>
             <span>&#9888;</span>This OSM Element is already matched as {matchSet}
@@ -400,10 +408,36 @@ function OsmListElement({ f, edit, parentLonLat, tagActions, mouseEvents }: OsmL
                         {tagActions?.setName && <button onClick={handleSetName}>Set Name</button>}
                         {tagActions?.setId && <button onClick={handleSetId}>Set Id</button>}
                         {tagActions?.setCode && <button onClick={handleSetCode}>Set Code</button>}
+                        <MoveController onMove={handleMove} />
                     </div>
                 </TagEditor>
         }
     </li>
+}
+
+function MoveController({ onMove }: { onMove: (lonLat: number[]) => void }) {
+    const [active, setActive] = useState(false);
+    const map = useContext(MapContext)?.map;
+
+    useEffect(() => {
+        if (active && map) {
+            const sub = map.on('click', (e) => {
+                onMove([e.lngLat.lng, e.lngLat.lat]);
+                setActive(false);
+            });
+
+            return () => {
+                sub.unsubscribe();
+            }
+        }
+    }, [map, active, setActive, onMove]);
+
+    return active ?
+        <span>
+            <span>Click on map to set new location </span>
+            <button onClick={() => setActive(false)}>Cancel</button>
+        </span> :
+        <button onClick={() => setActive(true)}>Move</button>
 }
 
 type AddOsmStopControllerProps = {
