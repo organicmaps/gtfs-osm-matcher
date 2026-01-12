@@ -6,11 +6,9 @@ import { getDistanceLonLat } from "../map/distance";
 import { LocateMe } from "./locate-me";
 import { TagEditor } from "./editor/osm-tags";
 
-const OSM_DATA = new OSMData();
-
 import "./selection-info.css";
 import { Routes } from "./routes";
-import OSMData, { queryStops } from "../services/OSMData";
+import { OSM_DATA, queryStops } from "../services/OSMData";
 import { Changes } from "./editor/changes";
 import { useSyncExternalStore } from "preact/compat";
 import { getTileBBox, getTileXYZ } from "../services/tile-utils";
@@ -18,7 +16,7 @@ import { HtmlMapMarker } from "./editor/map-marker";
 import { cls } from "./cls";
 
 
-const importantTagsRg = /(name|ref|gtfs|bus|train|tram|ferry|station|platform|public_transport)/;
+const importantTagsRg = /(name|ref|gtfs|bus|train|tram|trolleybus|ferry|station|platform|public_transport)/;
 
 const ABC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -29,7 +27,6 @@ export function SelectionInfo({ selection }: SelectionInfoProps) {
 
     const [showChanges, setShowChanges] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [edit, setEdit] = useState(false);
 
     const properties = selection?.feature.properties;
     const datasetName = selection?.datasetName;
@@ -45,18 +42,13 @@ export function SelectionInfo({ selection }: SelectionInfoProps) {
                 <input type="checkbox" checked={showChanges}
                     onChange={(e: Event) => setShowChanges((e.target as HTMLInputElement).checked)} />
 
-                <label>Edit OSM data:</label>
-                <input type="checkbox" checked={edit}
-                    onChange={(e: Event) => setEdit((e.target as HTMLInputElement).checked)} />
-
                 <div>
                     <label>Loading osm data: </label> <span className={cls("loading-indicator", loading && "spin")}>&#x1F5D8;</span>
                 </div>
-
             </div>
             {showChanges && <Changes osmData={OSM_DATA} />}
             {properties && reportRegion &&
-                <MatchInfo {...{ datasetName, properties, geometry, reportRegion, idTags, edit, setLoading }} />}
+                <MatchInfo {...{ datasetName, properties, geometry, reportRegion, idTags, setLoading }} />}
         </div>
     </>
     )
@@ -67,12 +59,11 @@ type MatchInfoProps = {
     properties: { [k: string]: any }
     geometry: GeoJSON.Geometry | undefined
     reportRegion: string
-    edit: boolean
     setLoading?: (loading: boolean) => void
     datasetName?: string
     idTags?: { [k: string]: number }
 }
-function MatchInfo({ datasetName, properties, geometry, idTags, edit, setLoading }: MatchInfoProps) {
+function MatchInfo({ datasetName, properties, geometry, idTags, setLoading }: MatchInfoProps) {
 
     const name = properties?.['gtfsStopName'] || properties?.['name'];
 
@@ -142,10 +133,10 @@ function MatchInfo({ datasetName, properties, geometry, idTags, edit, setLoading
         <Routes routes={routes} gtfsRouteTypes={properties.gtfsRouteTypes} stopLonLat={[lon, lat]} />
 
         <div className={"edit-actions"}>
-            <AddOsmStopController id={properties.gtfsStopId} code={properties.gtfsStopCode} {...{ edit, name, idTags }} />
+            <AddOsmStopController id={properties.gtfsStopId} code={properties.gtfsStopCode} {...{ name, idTags }} />
         </div>
 
-        <OsmElements edit={edit} setLoading={setLoading} osmFeatures={osmFeatures} tagActions={tagActions} parentLonLat={[lon, lat]} />
+        <OsmElements setLoading={setLoading} osmFeatures={osmFeatures} tagActions={tagActions} parentLonLat={[lon, lat]} />
 
     </div>)
 }
@@ -179,14 +170,13 @@ type TagActionsT = {
 }
 
 interface OsmElementsProps {
-    edit: boolean;
     osmFeatures: any[];
     parentLonLat: number[];
     tagActions?: TagActionsT;
     loading?: boolean;
     setLoading?: (loading: boolean) => void;
 }
-function OsmElements({ edit, osmFeatures, parentLonLat, tagActions, setLoading }: OsmElementsProps) {
+function OsmElements({ osmFeatures, parentLonLat, tagActions, setLoading }: OsmElementsProps) {
 
     const [highlightId, setHighlightId] = useState<string | null>(null);
 
@@ -249,7 +239,14 @@ function OsmElements({ edit, osmFeatures, parentLonLat, tagActions, setLoading }
     });
 
     const markersOsm = osmFeatures.map((f: any, i: number) => {
-        return <HtmlMapMarker key={f.id} name={"osm " + letterCode(i)} lon={f.lon} lat={f.lat}
+        var lonLat = [f.lon, f.lat];
+
+        const updF = OSM_DATA.getByNWRId(f.id);
+        if (updF) {
+            lonLat = OSM_DATA.getLonLat(updF)!;
+        }
+
+        return <HtmlMapMarker key={f.id} name={"osm " + letterCode(i)} lon={lonLat[0]} lat={lonLat[1]}
             className={cls(highlightId === f.id && 'highlight')}
         />
     });
@@ -257,7 +254,7 @@ function OsmElements({ edit, osmFeatures, parentLonLat, tagActions, setLoading }
     const osmLi = osmFeatures.map((f: any) =>
         <OsmListElement key={f.id} f={f}
             mouseEvents={{ onHoverUpdate: handleHover.bind(undefined, f.id) }}
-            {...{ edit, parentLonLat, tagActions }}
+            {...{ parentLonLat, tagActions }}
         />
     );
 
@@ -265,13 +262,13 @@ function OsmElements({ edit, osmFeatures, parentLonLat, tagActions, setLoading }
         const id = f.type[0] + f.id;
         return <OsmListElement key={id} f={{ ...f, id }}
             mouseEvents={{ onHoverUpdate: handleHover.bind(undefined, id) }}
-            {...{ edit, parentLonLat, tagActions }}
+            {...{ parentLonLat, tagActions }}
         />
     });
 
     const newOverpassLi = overpassElements.filter((f: any) => f.id < 0).map((f: any) => {
         const id = f.type[0] + f.id;
-        return <OsmListElement key={id} f={{ ...f, id }} edit={true}
+        return <OsmListElement key={id} f={{ ...f, id }} editDefault={true}
             mouseEvents={{ onHoverUpdate: handleHover.bind(undefined, id) }}
             {...{ parentLonLat, tagActions }}
         />
@@ -319,13 +316,16 @@ export type MouseEventsHandlers = {
 
 type OsmListElementProps = {
     f: any;
-    edit: boolean;
     parentLonLat: number[];
+    editDefault?: boolean;
     tagActions?: TagActionsT;
     mouseEvents?: MouseEventsHandlers
 };
 
-function OsmListElement({ f, edit, parentLonLat, tagActions, mouseEvents }: OsmListElementProps) {
+function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents }: OsmListElementProps) {
+
+    const [edit, setEdit] = useState(editDefault || false);
+
     const type = f.id[0] === 'n' ? 'node' : 'way';
     const idn = f.id.slice(1);
 
@@ -408,12 +408,24 @@ function OsmListElement({ f, edit, parentLonLat, tagActions, mouseEvents }: OsmL
 
     return <li key={f.id} className="osm-list-item" {...mouseEventsHandler}>
         <b>{name} </b>
-        <div>{osmHref} {distanceInfo} <LocateMe lonlatFeature={f} /></div>
+        <div>
+            {osmHref} {distanceInfo}
+            <SpanSpacer w={'10px'} />
+            <LocateMe lonlatFeature={f} />
+            <SpanSpacer w={'10px'} />
+            <span>
+                <label>Edit</label><input type="checkbox" checked={edit}
+                    onChange={(e) => setEdit((e.target as HTMLInputElement).checked)} />
+            </span>
+        </div>
         {alreadyMatchWarning}
 
         {
             !(edit && osmFeature) ?
-                <TagsTable tags={f.tags} /> :
+                <TagsTable tags={tags}
+                    importantTagKeysRegex={importantTagsRg}
+                    importantTagValuesRegex={importantTagsRg}
+                /> :
                 <TagEditor key={'tags_' + tHash} tags={tags}
                     tagsOriginal={f.tags} onChange={handleTagsChange}
                     importantTagKeysRegex={importantTagsRg}
@@ -456,7 +468,6 @@ function MoveController({ onMove }: { onMove: (lonLat: number[]) => void }) {
 }
 
 type AddOsmStopControllerProps = {
-    edit: boolean;
     name: string;
     id: string;
     code?: string;
@@ -506,6 +517,10 @@ function AddOsmStopController({ name, id, code, idTags }: AddOsmStopControllerPr
     )
 }
 
+function SpanSpacer({ w }: { w: string }) {
+    return <span style={{ display: 'inline-block', width: w }} />
+}
+
 
 function DatasetHelp({ datasetName }: { datasetName?: string }) {
 
@@ -538,16 +553,18 @@ function DatasetHelp({ datasetName }: { datasetName?: string }) {
 type TagsTableProps = {
     tags: {
         [k: string]: string
-    }
+    },
+    importantTagKeysRegex?: RegExp;
+    importantTagValuesRegex?: RegExp;
 }
-function TagsTable({ tags }: TagsTableProps) {
+function TagsTable({ tags, importantTagKeysRegex, importantTagValuesRegex }: TagsTableProps) {
 
     const rows = Object.entries(tags).map(([k, v]) => <tr key={k}>
-        <td>{k}</td>
-        <td>{v}</td>
+        <td className={importantTagKeysRegex?.test(k) ? 'important' : ''}>{k}</td>
+        <td className={importantTagValuesRegex?.test(v) ? 'important' : ''}>{v}</td>
     </tr>);
 
-    return <table>
+    return <table className={'tags-table'}>
         <tbody>
             {rows}
         </tbody>

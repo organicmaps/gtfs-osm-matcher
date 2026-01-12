@@ -73,7 +73,7 @@ export function TagEditor({ tags, tagsOriginal, onChange, children, protectedKey
 
     }, [setEntries, onChange]);
 
-    const updateEntriesDebounce = useDebounce<TagEntry[]>(updateEntries, 1000);
+    const updateEntriesDebounce = useDebounce<TagEntry[]>(updateEntries, 1500);
 
     const handleKeyEdit = (id: string, evnt: Event) => {
         const newKey = (evnt.target as HTMLInputElement).value;

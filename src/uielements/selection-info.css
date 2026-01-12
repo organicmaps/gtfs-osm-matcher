@@ -36,6 +36,10 @@
     font-weight: bolder;
 }
 
+.tags-table td.important {
+    font-weight: bold;
+}
+
 .tag-edit-actions button {
     margin-left: 0.5em;
     font-size: 0.75em;

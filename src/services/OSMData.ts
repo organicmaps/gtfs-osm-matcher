@@ -343,3 +343,5 @@ function createElementCopy(element: OSMElement) {
 function isBlank(str: string) {
     return str === undefined || str === null || /^\s*$/.test(str);
 }
+
+export const OSM_DATA = new OSMData();
