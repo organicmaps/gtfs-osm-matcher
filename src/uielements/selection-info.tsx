@@ -7,7 +7,7 @@ import { LocateMe } from "./locate-me";
 import { TagEditor } from "./editor/osm-tags";
 
 import "./selection-info.css";
-import { Routes } from "./routes";
+import { RoutesMap } from "./routes";
 import { OSM_DATA, queryStops } from "../services/OSMData";
 import { Changes } from "./editor/changes";
 import { useSyncExternalStore } from "preact/compat";
@@ -102,7 +102,31 @@ function MatchInfo({ datasetName, properties, geometry, idTags, setLoading }: Ma
         tagActions.setCode = [gtfsIdTag, properties.gtfsStopCode] as [string, string];
     }
 
-    const gtfsLi = gtfsFeatures.map((f: any) => <li key={f.id}><span>{f.id}</span>{f.code && <span> code: {f.code}</span>}</li>);
+    // For single gtfs stop display routes is a property 
+    // of the subject feature
+    // For clusetrs routes are a property of gtfs features
+    const routesDisplayEntries = routes ?
+        [{ stopLonLat: [lon, lat], routes }] :
+        gtfsFeatures.map((f: any) => ({ stopLonLat: [f.lon, f.lat], routes: f.gtfsRoutes }));
+
+    const gtfsLi = gtfsFeatures.map((f: any) => {
+        const gtfsRoutes = f.gtfsRoutes;
+        return (
+            <li key={f.id}>
+                <span>{f.id}</span>
+                {f.code && <span> code: {f.code}</span>}
+
+                <div>
+                    {gtfsRoutes && <div className="routes"><b>Routes: </b>
+                        {Object.entries(gtfsRoutes || {}).map(([routeId, _route]) =>
+                            <span key={routeId}>{routeId} </span>
+                        )}
+                    </div>}
+                </div>
+
+            </li>
+        );
+    });
 
     const markersGtfs = gtfsFeatures.map((f: any, i: number) =>
         <HtmlMapMarker key={f.id} name={"gtfs " + letterCode(i)} lon={f.lon} lat={f.lat} />);
@@ -130,7 +154,18 @@ function MatchInfo({ datasetName, properties, geometry, idTags, setLoading }: Ma
             {markersGtfs}
         </div>}
 
-        <Routes routes={routes} gtfsRouteTypes={properties.gtfsRouteTypes} stopLonLat={[lon, lat]} />
+        <RoutesMap entries={routesDisplayEntries} />
+
+        <div>
+            {(properties.gtfsRouteTypes?.length || 0) > 0 &&
+                <div>Gtfs route types: <b>{properties.gtfsRouteTypes}</b></div>
+            }
+            {routes && <div><b>Routes: </b>
+                {Object.entries(routes || {}).map(([routeId, _route]) =>
+                    <span key={routeId}>{routeId} </span>
+                )}
+            </div>}
+        </div>
 
         <div className={"edit-actions"}>
             <AddOsmStopController id={properties.gtfsStopId} code={properties.gtfsStopCode} {...{ name, idTags }} />
@@ -217,8 +252,12 @@ function OsmElements({ osmFeatures, parentLonLat, tagActions, setLoading }: OsmE
                     .filter((f, inx, arr) => arr.findIndex(t => t.x === f.x && t.y === f.y) === inx);
 
                 for (const t of tiles) {
-                    const overpass = await queryStops(getTileBBox(t));
-                    OSM_DATA.updateOverpassData(overpass);
+                    try {
+                        const overpass = await queryStops(getTileBBox(t));
+                        OSM_DATA.updateOverpassData(overpass);
+                    } catch (e) {
+                        console.error('Error fetching osm data', e);
+                    }
                 }
 
                 setLoading?.(false);

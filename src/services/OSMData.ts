@@ -1,5 +1,6 @@
+import { getDistanceLonLat } from "../map/distance";
 import type { LonLatTuple, OSMElement, OSMElementTags, OSMNode, OSMRelation, OSMWay } from "./OSMData.types";
-import type { BBox } from "./tile-utils";
+import { type BBox } from "./tile-utils";
 
 const stopsQ: string = `
 [out:json][timeout:1800];
@@ -113,10 +114,28 @@ export function getElementLonLat(e: OSMElement, osmData: OSMData) {
 
         try {
             const llngs = nodes.map(({ lat, lon }) => ({ lat, lng: lon }));
-            // @ts-ignore
-            const center = new L.LatLngBounds(llngs).getCenter();
 
-            return [center.lng, center.lat] as LonLatTuple;
+            if (nodes[0].id === nodes[nodes.length - 1].id) {
+                const center = getBoundsCenter(llngs);
+
+                if (!center) {
+                    console.log('Failed to get geometry for way', e, nodes);
+                    return undefined;
+                }
+
+                return [center.lng, center.lat] as LonLatTuple;
+            }
+            else {
+                const center = getLineCenter(llngs);
+
+                if (!center) {
+                    console.log('Failed to get geometry for way', e, nodes);
+                    return undefined;
+                }
+
+                return [center.lng, center.lat] as LonLatTuple;
+            }
+
         }
         catch (err) {
             console.log('Failed to get geometry for way', e, nodes);
@@ -186,11 +205,15 @@ export default class OSMData {
     }
 
     updateOverpassData(overpassData: OSMData) {
-        overpassData.elements.forEach(e => {
-            this.updateElement(e);
-        });
+        if (overpassData.elements &&
+            Array.isArray(overpassData.elements)) {
 
-        this.dataUpdated();
+            overpassData.elements.forEach(e => {
+                this.updateElement(e);
+            });
+
+            this.dataUpdated();
+        }
     }
 
     updateElement(element: OSMElement) {
@@ -345,3 +368,78 @@ function isBlank(str: string) {
 }
 
 export const OSM_DATA = new OSMData();
+
+/**
+ * Calculates the center of a set of coordinates.
+ * @param points Array of {lat, lng} objects
+ * @returns Center point {lat, lng}
+ */
+export function getBoundsCenter(points: { lat: number, lng: number }[]): { lat: number, lng: number } | undefined {
+    if (points.length === 0) {
+        return undefined;
+    }
+
+    let minLat = Infinity;
+    let maxLat = -Infinity;
+    let minLng = Infinity;
+    let maxLng = -Infinity;
+
+    for (const p of points) {
+        minLat = Math.min(minLat, p.lat);
+        maxLat = Math.max(maxLat, p.lat);
+        minLng = Math.min(minLng, p.lng);
+        maxLng = Math.max(maxLng, p.lng);
+    }
+
+    return {
+        lat: (minLat + maxLat) / 2,
+        lng: (minLng + maxLng) / 2
+    };
+}
+
+/**
+ * Calculates the center of a line (middle point along the path).
+ * @param points Array of {lat, lng} objects
+ * @returns Center point {lat, lng}
+ */
+export function getLineCenter(points: { lat: number, lng: number }[]): { lat: number, lng: number } | undefined {
+    if (points.length === 0) {
+        return undefined;
+    }
+    if (points.length === 1) {
+        return points[0];
+    }
+
+    let totalDist = 0;
+    const dists: number[] = [];
+
+    // Calculate total length and segment lengths
+    for (let i = 0; i < points.length - 1; i++) {
+        const d = getDistanceLonLat([points[i].lng, points[i].lat], [points[i + 1].lng, points[i + 1].lat]);
+        totalDist += d;
+        dists.push(d);
+    }
+
+    let currentDist = 0;
+    const halfDist = totalDist / 2;
+
+    // Find the segment containing the midpoint
+    for (let i = 0; i < points.length - 1; i++) {
+        if (currentDist + dists[i] >= halfDist) {
+            const segmentDist = dists[i];
+            const distInSegment = halfDist - currentDist;
+            const ratio = segmentDist === 0 ? 0 : distInSegment / segmentDist;
+
+            const p1 = points[i];
+            const p2 = points[i + 1];
+
+            return {
+                lat: p1.lat + (p2.lat - p1.lat) * ratio,
+                lng: p1.lng + (p2.lng - p1.lng) * ratio
+            };
+        }
+        currentDist += dists[i];
+    }
+
+    return points[points.length - 1];
+}

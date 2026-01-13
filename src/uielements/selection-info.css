@@ -24,6 +24,10 @@
     margin-bottom: 0.5em;
 }
 
+.routes {
+    max-width: 300px;
+}
+
 .locate-icon {
     cursor: pointer;
     width: 1.25em; 
