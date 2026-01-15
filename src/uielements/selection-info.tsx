@@ -391,13 +391,9 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
 
     const osmFeature = OSM_DATA.getByTypeAndId(type, idn);
     const tags = osmFeature?.tags || f.tags;
-    const [tHash, setTHash] = useState<number>(tagsHash(tags) || 0);
+    const [_tHash, setTHash] = useState<number>(tagsHash(tags) || 0);
 
     const handleTagsChange = useCallback((tags: { [k: string]: string }) => {
-
-        if (import.meta.env.DEV) {
-            console.log('Edit tags for osm feature ', osmFeature, tags);
-        }
 
         if (!osmFeature) {
             return;
@@ -465,7 +461,7 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
                     importantTagKeysRegex={importantTagsRg}
                     importantTagValuesRegex={importantTagsRg}
                 /> :
-                <TagEditor key={'tags_' + tHash} tags={tags}
+                <TagEditor key={'tags_' + f.id} tags={tags}
                     tagsOriginal={f.tags} onChange={handleTagsChange}
                     importantTagKeysRegex={importantTagsRg}
                     importantTagValuesRegex={importantTagsRg} >

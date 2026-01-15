@@ -10,7 +10,8 @@ type TagEntry = {
     id: string;
     k: string;
     v: string;
-    isDeleted?: boolean;
+    deleted?: boolean;
+    tmp?: boolean;
 };
 
 export type TagEditorProps = {
@@ -33,15 +34,16 @@ export function TagEditor({ tags, tagsOriginal, onChange, children, protectedKey
         const initialEntries: TagEntry[] = [];
         let counter = 0;
 
-        // Add all current tags
-        Object.entries(tags).forEach(([k, v]) => {
-            initialEntries.push({ id: `item_${counter++}`, k, v, isDeleted: false });
-        });
+        if (tagsOriginal) {
+            Object.entries(tagsOriginal).forEach(([k, v]) => {
+                const currentVal = tags[k] !== undefined ? tags[k] : v;
+                initialEntries.push({ id: `item_${counter++}`, k, v: currentVal, deleted: tags[k] === undefined, tmp: false });
+            });
+        }
 
-        // Add deleted tags (present in original but not in current)
-        Object.keys(tagsOriginal || {}).forEach(k => {
-            if (!(k in tags)) {
-                initialEntries.push({ id: `item_${counter++}`, k, v: tagsOriginal![k], isDeleted: true });
+        Object.entries(tags).forEach(([k, v]) => {
+            if (tagsOriginal?.[k] === undefined) {
+                initialEntries.push({ id: `item_${counter++}`, k, v, tmp: false });
             }
         });
 
@@ -54,7 +56,7 @@ export function TagEditor({ tags, tagsOriginal, onChange, children, protectedKey
 
         setEntries(newEntries);
 
-        const activeEntries = newEntries.filter(e => !e.isDeleted);
+        const activeEntries = newEntries.filter(e => !e.tmp && !e.deleted);
 
         if (activeEntries.some(e => !e.k || !e.v)) {
             return;
@@ -73,16 +75,14 @@ export function TagEditor({ tags, tagsOriginal, onChange, children, protectedKey
 
     }, [setEntries, onChange]);
 
-    const updateEntriesDebounce = useDebounce<TagEntry[]>(updateEntries, 1500);
-
     const handleKeyEdit = (id: string, evnt: Event) => {
         const newKey = (evnt.target as HTMLInputElement).value;
-        updateEntriesDebounce(entries.map(e => e.id === id ? { ...e, k: newKey } : e));
+        updateEntries(entries.map(e => e.id === id ? { ...e, k: newKey, tmp: false } : e));
     };
 
     const handleValueEdit = (id: string, evnt: Event) => {
         const newValue = (evnt.target as HTMLInputElement).value;
-        updateEntriesDebounce(entries.map(e => e.id === id ? { ...e, v: newValue } : e));
+        updateEntries(entries.map(e => e.id === id ? { ...e, v: newValue, tmp: false } : e));
     };
 
     const handleAddTag = () => {
@@ -90,32 +90,39 @@ export function TagEditor({ tags, tagsOriginal, onChange, children, protectedKey
             id: `new_${nextIdRef.current++}`,
             k: 'key',
             v: 'value',
-            isDeleted: false
+            tmp: true
         }]);
     };
 
     const handleDelete = (id: string) => {
-        updateEntries(entries.filter(e => e.id !== id));
+        const entry = entries.find(e => e.id === id);
+        if (entry?.tmp) {
+            updateEntries(entries.filter(e => e.id !== id));
+            return;
+        }
+
+        updateEntries(entries.map(e => e.id === id ? { ...e, deleted: true } : e));
     };
 
     const handleRestore = (id: string, originalKey: string) => {
         updateEntries(entries.map(e => {
             if (e.id === id) {
-                if (e.isDeleted) {
-                    return { ...e, isDeleted: false, v: tagsOriginal![originalKey] };
+                if (e.deleted) {
+                    return { ...e, deleted: false, v: tagsOriginal?.[originalKey] || tags[originalKey] };
                 }
-                return { ...e, v: tagsOriginal![e.k] };
+                return { ...e, v: tagsOriginal?.[e.k] || tags[e.k] };
             }
             return e;
         }));
     };
 
     const rows = entries.map((entry) => {
-        const { id, k, v, isDeleted } = entry;
+        const { id, k, v, tmp, deleted } = entry;
         const readonly = protectedKeys?.includes(k);
         const isInvalid = !k || !v;
         const important = importantTagKeysRegex?.test(k) || importantTagValuesRegex?.test(v);
 
+        const isDeleted = deleted;
         const originalValue = tagsOriginal?.[k];
         const isModified = !isDeleted && originalValue !== undefined && originalValue !== v;
 
@@ -154,14 +161,16 @@ export function TagEditor({ tags, tagsOriginal, onChange, children, protectedKey
 
                 <td className={cls('osm-tag-key', important && 'important', isInvalid && 'invalid', readonly && 'protected')}>
                     <input
-                        value={k}
+                        value={tmp ? '' : k}
+                        placeholder={tmp ? 'key' : ''}
                         readOnly={readonly}
                         onInput={(e) => handleKeyEdit(id, e)} />
                 </td>
 
                 <td className={cls('osm-tag-value', important && 'important', isInvalid && 'invalid', readonly && 'protected')}>
                     <input
-                        value={v}
+                        value={tmp ? '' : v}
+                        placeholder={tmp ? 'value' : ''}
                         readOnly={readonly}
                         onInput={(e) => handleValueEdit(id, e)} />
                 </td>

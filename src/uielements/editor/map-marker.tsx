@@ -29,8 +29,19 @@ export function HtmlMapMarker({ name, lat, lon, className, mouseEvents }: HtmlMa
 
         const m = new Marker({ anchor: "bottom" }).setLngLat([lon, lat]).addTo(map);
 
+        const markerContent = document.createElement('div');
+        markerContent.innerText = name;
+        markerContent.classList.add('map-marker-content');
+
+        const markerNotch = document.createElement('div');
+        markerNotch.classList.add('map-marker-position');
+
         m.getElement().classList.add(...cls('map-marker', className).split(' '));
-        m.getElement().innerText = name;
+
+        m.getElement().innerHTML = "";
+
+        m.getElement().appendChild(markerContent);
+        m.getElement().appendChild(markerNotch);
 
         const { onClick, onHoverUpdate } = mouseEvents || {};
 
