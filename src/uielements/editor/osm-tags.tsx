@@ -195,19 +195,3 @@ export function TagEditor({ tags, tagsOriginal, onChange, children, protectedKey
     </>);
 
 }
-
-function useDebounce<T>(cb?: (val: T) => void, delay?: number) {
-    const timerRef = useRef<any>();
-    const valueRef = useRef<T>();
-
-    return useCallback((val: T) => {
-        clearTimeout(timerRef.current);
-
-        timerRef.current = setTimeout(
-            () => cb?.(valueRef.current!),
-            delay || 500
-        );
-
-        valueRef.current = val;
-    }, [cb, timerRef, delay]);
-}
