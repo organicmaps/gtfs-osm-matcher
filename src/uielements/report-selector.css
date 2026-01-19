@@ -90,3 +90,11 @@
     float: right;
 }
 
+.report-datasets.collapsed {
+    display: none;
+}
+
+.report-datasets.expanded {
+    display: block;
+}
+

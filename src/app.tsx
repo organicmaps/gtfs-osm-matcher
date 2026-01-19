@@ -9,6 +9,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { MatchReportSelector } from './uielements/report-selector';
 import { SelectionInfo } from './uielements/selection-info';
 import { SchedulePreview } from './uielements/schedule-preview';
+import { AppHeader } from './uielements/app-header';
 
 export type MapContextT = {
   map: Map,
@@ -81,8 +82,9 @@ export function App() {
 
   return (
     <>
+      <AppHeader />
       <div id="map-view"></div>
-      <button id="map-style-button">Map Style</button>
+
       <MapContext value={mapContextVal} >
         <SelectionContext value={selectionContext} >
 

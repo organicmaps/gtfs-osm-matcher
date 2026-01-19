@@ -1,15 +1,15 @@
 import { useEffect, useState } from "preact/hooks";
 import { parseUrlReportRegion, useHashRoute } from "./routing";
 import { MatchReport, type Report } from "./report";
-import "./report-selector.css";
-import { ReportHelpOverlay } from "./report-help-overlay";
 import { ReportTable } from "./report-table";
+import { cls } from "./cls";
+import "./report-selector.css";
 
 type MatchReportSelectorProps = {
     onSelectReport?: (reportRegion: string | null) => void;
 };
 export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps) {
-    const [showHelp, setShowHelp] = useState(false);
+    const [expanded, setExpanded] = useState(true);
     const [matchReports, setMatchReports] = useState<Report[]>([]);
 
     const reportRegion = useHashRoute(parseUrlReportRegion);
@@ -46,15 +46,18 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
                     <div>
                         <a onClick={() => onSelectReport?.(null)} href="#/">Back to reports</a>
                         <span className={'float-right'}>
-                            <span className={'link-like'} onClick={() => setShowHelp(!showHelp)}>Help</span>
+                            <span className={'link-like'} onClick={() => setExpanded(!expanded)}>
+                                {expanded ? 'Hide' : 'Show'}
+                            </span>
                         </span>
                     </div>
-                    <MatchReport
-                        key={reportRegion}
-                        reportRegion={reportRegion}
-                        reportData={reportData} />
+                    <div className={cls('report-datasets', expanded ? 'expanded' : 'collapsed')}>
+                        {<MatchReport
+                            key={reportRegion}
+                            reportRegion={reportRegion}
+                            reportData={reportData} />}
+                    </div>
                 </div>
-                {showHelp && <ReportHelpOverlay onClose={() => setShowHelp(false)} />}
             </>
         )
     }

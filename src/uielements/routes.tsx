@@ -72,7 +72,9 @@ export function RoutesMap({ entries }: RoutesMapProps) {
         if (!map.hasImage('route-arrow')) {
             const img = new Image();
             img.onload = function () {
-                map.addImage('route-arrow', img);
+                if (!map.hasImage('route-arrow')) {
+                    map.addImage('route-arrow', img);
+                }
             }
             img.src = 'arrow.svg';
         }

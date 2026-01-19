@@ -9,7 +9,6 @@ import { TagEditor } from "./editor/osm-tags";
 import "./selection-info.css";
 import { RoutesMap } from "./routes";
 import { OSM_DATA, queryStops } from "../services/OSMData";
-import { Changes } from "./editor/changes";
 import { useSyncExternalStore } from "preact/compat";
 import { getTileBBox, getTileXYZ } from "../services/tile-utils";
 import { HtmlMapMarker } from "./editor/map-marker";
@@ -25,9 +24,6 @@ export type SelectionInfoProps = {
 }
 export function SelectionInfo({ selection }: SelectionInfoProps) {
 
-    const [showChanges, setShowChanges] = useState(false);
-    const [loading, setLoading] = useState(false);
-
     const properties = selection?.feature.properties;
     const datasetName = selection?.datasetName;
     const reportRegion = selection?.reportRegion;
@@ -36,19 +32,9 @@ export function SelectionInfo({ selection }: SelectionInfoProps) {
     const geometry = selection?.feature.geometry;
 
     return (<>
-        <div id={"selection-info"}>
-            <div>
-                <label>Show OSM changes</label>
-                <input type="checkbox" checked={showChanges}
-                    onChange={(e: Event) => setShowChanges((e.target as HTMLInputElement).checked)} />
-
-                <div>
-                    <label>Loading osm data: </label> <span className={cls("loading-indicator", loading && "spin")}>&#x1F5D8;</span>
-                </div>
-            </div>
-            {showChanges && <Changes osmData={OSM_DATA} />}
+        <div id={"selection-info"} className={cls(!selection && "hidden")}>
             {properties && reportRegion &&
-                <MatchInfo {...{ datasetName, properties, geometry, reportRegion, idTags, setLoading }} />}
+                <MatchInfo {...{ datasetName, properties, geometry, reportRegion, idTags }} />}
         </div>
     </>
     )
@@ -59,11 +45,12 @@ type MatchInfoProps = {
     properties: { [k: string]: any }
     geometry: GeoJSON.Geometry | undefined
     reportRegion: string
-    setLoading?: (loading: boolean) => void
     datasetName?: string
     idTags?: { [k: string]: number }
 }
-function MatchInfo({ datasetName, properties, geometry, idTags, setLoading }: MatchInfoProps) {
+function MatchInfo({ datasetName, properties, geometry, idTags }: MatchInfoProps) {
+
+    const [loading, setLoading] = useState(false);
 
     const name = properties?.['gtfsStopName'] || properties?.['name'];
 
@@ -98,7 +85,7 @@ function MatchInfo({ datasetName, properties, geometry, idTags, setLoading }: Ma
         tagActions.setId = [gtfsIdTag, properties.gtfsStopId] as [string, string];
     }
 
-    if (properties.gtfsStopCode) {
+    if (properties.gtfsStopCode && properties.gtfsStopCode != 'null' && properties.gtfsStopCode.length > 0) {
         tagActions.setCode = [gtfsIdTag, properties.gtfsStopCode] as [string, string];
     }
 
@@ -108,6 +95,8 @@ function MatchInfo({ datasetName, properties, geometry, idTags, setLoading }: Ma
     const routesDisplayEntries = routes ?
         [{ stopLonLat: [lon, lat], routes }] :
         gtfsFeatures.map((f: any) => ({ stopLonLat: [f.lon, f.lat], routes: f.gtfsRoutes }));
+
+    const routeTypes = properties.gtfsRouteTypes;
 
     const gtfsLi = gtfsFeatures.map((f: any) => {
         const gtfsRoutes = f.gtfsRoutes;
@@ -168,8 +157,10 @@ function MatchInfo({ datasetName, properties, geometry, idTags, setLoading }: Ma
         </div>
 
         <div className={"edit-actions"}>
-            <AddOsmStopController id={properties.gtfsStopId} code={properties.gtfsStopCode} {...{ name, idTags }} />
+            <AddOsmStopController id={properties.gtfsStopId} code={properties.gtfsStopCode} routeTypes={routeTypes} {...{ name, idTags }} />
         </div>
+
+        {loading && <div>Loading OSM data...</div>}
 
         <OsmElements setLoading={setLoading} osmFeatures={osmFeatures} tagActions={tagActions} parentLonLat={[lon, lat]} />
 
@@ -267,7 +258,14 @@ function OsmElements({ osmFeatures, parentLonLat, tagActions, setLoading }: OsmE
 
     const overpassElements = useOsmFeatures()
         .filter(e => e.tags && Object.keys(e.tags).length > 0)
-        .filter(e => getDistanceLonLat(OSM_DATA.getLonLat(e)!, parentLonLat as [number, number]) < 500)
+        .filter(e => {
+            const elLL = OSM_DATA.getLonLat(e);
+            if (!elLL) {
+                // I still want to show all elements that have tags 
+                return true;
+            }
+            return elLL && getDistanceLonLat(elLL, parentLonLat as [number, number]) < 500
+        })
         .filter(ovp =>
             !osmFeatures.some(f => f.id === `${ovp.type[0]}${ovp.id}`));
 
@@ -365,6 +363,8 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
 
     const [edit, setEdit] = useState(editDefault || false);
 
+    const [version, setVersion] = useState(0);
+
     const type = f.id[0] === 'n' ? 'node' : 'way';
     const idn = f.id.slice(1);
 
@@ -390,8 +390,8 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
     const matchSet = f.matchSet;
 
     const osmFeature = OSM_DATA.getByTypeAndId(type, idn);
+
     const tags = osmFeature?.tags || f.tags;
-    const [_tHash, setTHash] = useState<number>(tagsHash(tags) || 0);
 
     const handleTagsChange = useCallback((tags: { [k: string]: string }) => {
 
@@ -400,28 +400,28 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
         }
 
         OSM_DATA.setElementTags(tags, osmFeature);
-
-        setTHash(tagsHash(tags));
-
-    }, [osmFeature, tagsHash, setTHash]);
+    }, [osmFeature]);
 
     const handleSetName = useCallback(() => {
         const [key, value] = tagActions?.setName || [];
         import.meta.env.DEV && console.log('SetName', key, value);
         tagActions?.setName && handleTagsChange({ ...tags, [key!]: value });
-    }, [handleTagsChange, tags, tagActions]);
+        setVersion(v => v + 1);
+    }, [handleTagsChange, tags, tagActions, setVersion]);
 
     const handleSetId = useCallback(() => {
         const [key, value] = tagActions?.setId || [];
         import.meta.env.DEV && console.log('SetId', key, value);
         tagActions?.setId && handleTagsChange({ ...tags, [key!]: value });
-    }, [handleTagsChange, tags, tagActions]);
+        setVersion(v => v + 1);
+    }, [handleTagsChange, tags, tagActions, setVersion]);
 
     const handleSetCode = useCallback(() => {
         const [key, value] = tagActions?.setCode || [];
         import.meta.env.DEV && console.log('SetCode', key, value);
         tagActions?.setCode && handleTagsChange({ ...tags, [key!]: value });
-    }, [handleTagsChange, tags, tagActions]);
+        setVersion(v => v + 1);
+    }, [handleTagsChange, tags, tagActions, setVersion]);
 
     const handleMove = useCallback((lonLat: number[]) => {
         if (!osmFeature) {
@@ -461,7 +461,7 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
                     importantTagKeysRegex={importantTagsRg}
                     importantTagValuesRegex={importantTagsRg}
                 /> :
-                <TagEditor key={'tags_' + f.id} tags={tags}
+                <TagEditor key={'tags_' + f.id + '_' + version} tags={tags}
                     tagsOriginal={f.tags} onChange={handleTagsChange}
                     importantTagKeysRegex={importantTagsRg}
                     importantTagValuesRegex={importantTagsRg} >
@@ -506,9 +506,10 @@ type AddOsmStopControllerProps = {
     name: string;
     id: string;
     code?: string;
+    routeTypes?: string[];
     idTags?: { [tag: string]: number };
 }
-function AddOsmStopController({ name, id, code, idTags }: AddOsmStopControllerProps) {
+function AddOsmStopController({ name, id, code, routeTypes, idTags }: AddOsmStopControllerProps) {
     const map = useContext(MapContext)?.map;
     const [active, setActive] = useState(false);
 
@@ -538,7 +539,7 @@ function AddOsmStopController({ name, id, code, idTags }: AddOsmStopControllerPr
             }
         }
 
-    }, [map, active, setActive, name, id, code, idTags]);
+    }, [map, active, setActive, name, id, code, idTags, routeTypes]);
 
     return (
         <>
@@ -622,20 +623,4 @@ function parseJsonSafe(json: string | undefined, defValue: any) {
 
 function letterCode(i: number) {
     return (ABC[i / ABC.length - 1] || '') + ABC[i % ABC.length];
-}
-
-function tagsHash(tags: { [key: string]: string }): number {
-    let hash = 0;
-    const keys = Object.keys(tags).sort();
-
-    for (const key of keys) {
-        const str = key + ':' + tags[key];
-        for (let i = 0; i < str.length; i++) {
-            const char = str.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash |= 0;
-        }
-    }
-
-    return hash;
 }

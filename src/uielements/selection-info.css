@@ -1,6 +1,6 @@
 #selection-info {
     position: absolute;
-    top: 10px;
+    top: 40px;
     left: 10px;
     max-width: 30%;
     max-height: 80%;
@@ -13,6 +13,10 @@
     padding: 1em;
 
     border-radius: 4px;
+}
+
+#selection-info.hidden {
+    display: none;
 }
 
 #selection-info ol {
