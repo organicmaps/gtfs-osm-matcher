@@ -1,16 +1,21 @@
-import { useCallback } from "preact/hooks";
+import { useCallback, useState } from "preact/hooks";
 
-import OSMData, { type OSMDataChange } from "../../services/OSMData";
+import OSMData, { OSM_DATA, type OSMDataChange } from "../../services/OSMData";
 import "./changes.css";
+import { cls } from "../cls";
 
 type ChangesProps = {
     osmData?: OSMData
 };
 export function Changes({ osmData }: ChangesProps) {
+    const [ignoredChanges, setIgnoredChanges] = useState<string[]>([]);
+
     const downloadHandler = useCallback(() => {
         const changes = osmData?.listChanges();
-        if (changes) {
-            const data = encodeChanges(changes);
+        const filteredChanges = changes?.filter(ch => !ignoredChanges.includes(`${ch.element.type[0]}${ch.element.id}`));
+
+        if (filteredChanges) {
+            const data = encodeChanges(filteredChanges);
 
             const blob = new Blob([data], { type: 'application/xml' });
             const url = URL.createObjectURL(blob);
@@ -19,15 +24,31 @@ export function Changes({ osmData }: ChangesProps) {
 
             URL.revokeObjectURL(url);
         }
-    }, [osmData]);
+    }, [osmData, ignoredChanges]);
 
-    const changes = osmData?.listChanges().map(ch =>
-        <div className={'osm-change'}>
+    const changes = osmData?.listChanges().map(ch => {
+        const nwrId = `${ch.element.type[0]}${ch.element.id}`;
+        const ignored = ignoredChanges.includes(nwrId);
+
+        return <div className={cls('osm-change', ignored && 'ignored')}>
+            <span className={'actions'} title={"Ignored changes will not be exported to OSM changeset"}>
+                <button onClick={() => {
+                    if (ignored) {
+                        setIgnoredChanges(ignoredChanges.filter(id => id !== nwrId));
+                    } else {
+                        setIgnoredChanges([...ignoredChanges, nwrId]);
+                    }
+                }}>
+                    {ignored ? 'Restore' : 'Ignore'}
+                </button>
+            </span>
+
             <span className={'change-element-type'}>{ch.element.type}</span>
             <span className={'change-element-id'}>{ch.element.id + (ch.element.id < 0 ? ' (new)' : '')}</span>
+            <span className={'change-element-name'}>{ch.element.tags?.name || '<No Name>'}</span>
             <span className={'change-action'}>{asArray(ch.action).join(', ')}</span>
         </div>
-    )
+    });
 
     return <>
         <h4>Changes</h4>

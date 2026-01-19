@@ -1,7 +1,14 @@
 .osm-changes-list {
-    max-height: 150px;
+    max-height: 75%;
     overflow-y: auto;
+
+    margin-bottom: 1em;
 }
+
+.osm-change.ignored {
+    background-color: #ccc;
+}
+
 .osm-change span {
     margin-left: 0.25em;
     margin-right: 0.25em;
@@ -12,6 +19,13 @@
     width: 7em;
     display: inline-block;
 }
+
+.change-element-name {
+    width: 15em;
+    text-overflow: ellipsis;
+    display: inline-block;
+}
+
 .change-element-type {
     width: 3em;
     display: inline-block;

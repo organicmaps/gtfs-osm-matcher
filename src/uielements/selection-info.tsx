@@ -1,18 +1,20 @@
-import { useCallback, useContext, useEffect, useState } from "preact/hooks";
-import { MapContext, type SelectionT } from "../app";
+import "./selection-info.css";
 
-import { Marker } from "maplibre-gl";
+import { useCallback, useEffect, useState } from "preact/hooks";
+import { type SelectionT } from "../app";
+
 import { getDistanceLonLat } from "../map/distance";
 import { LocateMe } from "./locate-me";
 import { TagEditor } from "./editor/osm-tags";
 
-import "./selection-info.css";
+import { cls } from "./cls";
 import { RoutesMap } from "./routes";
 import { OSM_DATA, queryStops } from "../services/OSMData";
 import { useSyncExternalStore } from "preact/compat";
 import { getTileBBox, getTileXYZ } from "../services/tile-utils";
 import { HtmlMapMarker } from "./editor/map-marker";
-import { cls } from "./cls";
+import { AddOsmStopController } from "./editor/add-stop-controller";
+import { MoveController } from "./editor/move-stop-controller";
 
 
 const importantTagsRg = /(name|ref|gtfs|bus|train|tram|trolleybus|ferry|station|platform|public_transport)/;
@@ -477,86 +479,9 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
     </li>
 }
 
-function MoveController({ onMove }: { onMove: (lonLat: number[]) => void }) {
-    const [active, setActive] = useState(false);
-    const map = useContext(MapContext)?.map;
-
-    useEffect(() => {
-        if (active && map) {
-            const sub = map.on('click', (e) => {
-                onMove([e.lngLat.lng, e.lngLat.lat]);
-                setActive(false);
-            });
-
-            return () => {
-                sub.unsubscribe();
-            }
-        }
-    }, [map, active, setActive, onMove]);
-
-    return active ?
-        <span>
-            <span>Click on map to set new location </span>
-            <button onClick={() => setActive(false)}>Cancel</button>
-        </span> :
-        <button onClick={() => setActive(true)}>Move</button>
-}
-
-type AddOsmStopControllerProps = {
-    name: string;
-    id: string;
-    code?: string;
-    routeTypes?: string[];
-    idTags?: { [tag: string]: number };
-}
-function AddOsmStopController({ name, id, code, routeTypes, idTags }: AddOsmStopControllerProps) {
-    const map = useContext(MapContext)?.map;
-    const [active, setActive] = useState(false);
-
-    useEffect(() => {
-        if (!map) {
-            return;
-        }
-
-        if (active) {
-            const sub = map.on('click', (e) => {
-                const m = new Marker().setLngLat([e.lngLat.lng, e.lngLat.lat]).addTo(map);
-                m.getElement().innerText = name;
-
-                const gtfsIdTag = Object.entries(idTags || {}).map(([k, _cnt]) => k)[0] || 'ref:gtfs';
-                const tags = {
-                    name,
-                    [gtfsIdTag]: code || id,
-                };
-
-                OSM_DATA.createNewNode(e.lngLat, tags);
-
-                setActive(false);
-            });
-
-            return () => {
-                sub.unsubscribe();
-            }
-        }
-
-    }, [map, active, setActive, name, id, code, idTags, routeTypes]);
-
-    return (
-        <>
-            {active ?
-                <span>
-                    <span>Click on map to add OSM Stop </span>
-                    <button onClick={() => setActive(false)}>Cancel</button>
-                </span> :
-                <button onClick={() => setActive(true)}>Add OSM Stop</button>}
-        </>
-    )
-}
-
 function SpanSpacer({ w }: { w: string }) {
     return <span style={{ display: 'inline-block', width: w }} />
 }
-
 
 function DatasetHelp({ datasetName }: { datasetName?: string }) {
 
