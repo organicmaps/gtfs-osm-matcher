@@ -1,6 +1,6 @@
 import { useCallback, useState } from "preact/hooks";
 
-import OSMData, { OSM_DATA, type OSMDataChange } from "../../services/OSMData";
+import OSMData, { type OSMDataChange } from "../../services/OSMData";
 import "./changes.css";
 import { cls } from "../cls";
 
