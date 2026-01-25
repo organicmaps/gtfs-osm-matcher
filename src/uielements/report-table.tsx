@@ -100,14 +100,6 @@ export function ReportTable({ reports }: ReportTableProps) {
                         currentSortColumn={sortColumn}
                         sortDirection={sortDirection}
                         onSort={handleHeaderClick} />
-                    <SortableHeader column={'matchPercent'} label={'Match percent'}
-                        currentSortColumn={sortColumn}
-                        sortDirection={sortDirection}
-                        onSort={handleHeaderClick} />
-                    <SortableHeader column={'total'} label={'Total'}
-                        currentSortColumn={sortColumn}
-                        sortDirection={sortDirection}
-                        onSort={handleHeaderClick} />
                     <SortableHeader column={'matched'} label={'Matched'}
                         currentSortColumn={sortColumn}
                         sortDirection={sortDirection}
@@ -144,8 +136,6 @@ export function ReportTable({ reports }: ReportTableProps) {
                             <td className={matchClass}>
                                 {matchPercent ? `${matchPercent.toFixed(0)}% (${matched} of ${matchStats?.total})` : '-'}
                             </td>
-                            <td>{matchStats?.total || '-'}</td>
-                            <td>{matched || '-'}</td>
                             <td>{matchStats?.empty || '-'}</td>
                             <td>{matchStats?.noMatch || '-'}</td>
                         </tr>
