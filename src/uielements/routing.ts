@@ -1,20 +1,30 @@
-import { useSyncExternalStore } from "preact/compat";
+import { useRef, useSyncExternalStore } from "preact/compat";
 
 
 export function useHash() {
-    return useSyncExternalStore(subscribe, () => window.location.hash);
+    const hashRef = useRef<String>(window.location.hash);
+    return useSyncExternalStore((callback) => {
+        window.addEventListener("hashchange", () => {
+            if (hashRef.current !== window.location.hash) {
+                hashRef.current = window.location.hash;
+
+                if (import.meta.env.DEV) {
+                    console.log('Hash changed', hashRef.current);
+                }
+
+                callback();
+            }
+        });
+
+        return () => {
+            window.removeEventListener("hashchange", callback);
+        }
+    }, () => window.location.hash);
 }
 
 export function useHashRoute<T>(parser: (hashString: string) => T) {
     const hash = useHash();
     return parser(hash);
-}
-
-function subscribe(callback: () => void) {
-    window.addEventListener("hashchange", callback);
-    return () => {
-        window.removeEventListener("hashchange", callback);
-    }
 }
 
 export function parseUrlReportRegion(hashString: string) {

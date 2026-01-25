@@ -1,6 +1,6 @@
 import "./selection-info.css";
 
-import { useCallback, useEffect, useState } from "preact/hooks";
+import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
 import { type SelectionT } from "../app";
 
 import { getDistanceLonLat } from "../map/distance";
@@ -9,12 +9,13 @@ import { TagEditor } from "./editor/osm-tags";
 
 import { cls } from "./cls";
 import { RoutesMap } from "./routes";
-import { OSM_DATA, queryStops } from "../services/OSMData";
+import { OSM_DATA } from "../services/OSMData";
 import { useSyncExternalStore } from "preact/compat";
-import { getTileBBox, getTileXYZ } from "../services/tile-utils";
+import { getTileXYZ } from "../services/tile-utils";
 import { HtmlMapMarker } from "./editor/map-marker";
 import { AddOsmStopController } from "./editor/add-stop-controller";
 import { MoveController } from "./editor/move-stop-controller";
+import { OSM_QUERY_QUEUE } from "../services/OsmQuerryQueue";
 
 
 const importantTagsRg = /(name|ref|gtfs|bus|train|tram|trolleybus|ferry|station|platform|public_transport)/;
@@ -25,7 +26,6 @@ export type SelectionInfoProps = {
     selection: SelectionT | null
 }
 export function SelectionInfo({ selection }: SelectionInfoProps) {
-
     const properties = selection?.feature.properties;
     const datasetName = selection?.datasetName;
     const reportRegion = selection?.reportRegion;
@@ -61,9 +61,9 @@ function MatchInfo({ datasetName, properties, geometry, idTags }: MatchInfoProps
     //@ts-ignore
     const [lon, lat] = geometry?.coordinates || [];
 
-    const gtfsFeatures = getGtfsFeatures(properties);
-    const osmFeatures = parseJsonSafe(properties['osmFeatures'], []);
-    const routes = parseJsonSafe(properties['gtfsRoutes'], null);
+    const gtfsFeatures = useMemo(() => getGtfsFeatures(properties), [properties]);
+    const osmFeatures = useMemo(() => parseJsonSafe(properties['osmFeatures'], []), [properties]);
+    const routes = useMemo(() => parseJsonSafe(properties['gtfsRoutes'], null), [properties]);
 
     if (import.meta.env.DEV) {
         console.log('render selection', {
@@ -213,52 +213,40 @@ function OsmElements({ osmFeatures, parentLonLat, tagActions, setLoading }: OsmE
         setHighlightId((activeHl) => hover ? id : (activeHl === id ? null : activeHl));
     }, [setHighlightId]);
 
-    const missingOsmFeatures = osmFeatures.filter(f => !OSM_DATA.getByNWRId(f.id));
+    const allOsmFeatures = useOsmFeatures();
+
+    const missingOsmFeatures = useMemo(() => {
+        import.meta.env.DEV &&
+            console.log('Update osm features to load');
+        return osmFeatures.filter(f => !OSM_DATA.getByNWRId(f.id));
+    }, [osmFeatures, allOsmFeatures]);
 
     useEffect(() => {
-        if (missingOsmFeatures) {
+        if (missingOsmFeatures.length > 0) {
             const nodes = missingOsmFeatures.filter(f => f.id[0] === 'n').map(f => f.id.substring(1));
             const ways = missingOsmFeatures.filter(f => f.id[0] === 'w').map(f => f.id.substring(1));
 
             (async () => {
-                setLoading?.(true);
-                if (nodes.length > 0) {
-                    await fetch('https://api.openstreetmap.org/api/0.6/nodes.json?nodes=' + nodes.join(','))
-                        .then(response => response.json())
-                        .then(data => {
-                            console.log('osm nodes data', data);
-                            OSM_DATA.updateOverpassData(data);
-                        });
+                if (import.meta.env.DEV) {
+                    console.log('Loading OSM data');
                 }
 
-                if (ways.length > 0) {
-                    await fetch('https://api.openstreetmap.org/api/0.6/ways.json?ways=' + ways.join(','))
-                        .then(response => response.json())
-                        .then(data => {
-                            console.log('osm ways data', data);
-                            OSM_DATA.updateOverpassData(data);
-                        });
-                }
+                setLoading?.(true);
+
+                await OSM_QUERY_QUEUE.queryDataByIds(nodes, ways);
 
                 const tiles = missingOsmFeatures
                     .map(f => getTileXYZ(f.lat, f.lon, 16))
                     .filter((f, inx, arr) => arr.findIndex(t => t.x === f.x && t.y === f.y) === inx);
 
-                for (const t of tiles) {
-                    try {
-                        const overpass = await queryStops(getTileBBox(t));
-                        OSM_DATA.updateOverpassData(overpass);
-                    } catch (e) {
-                        console.error('Error fetching osm data', e);
-                    }
-                }
+                await OSM_QUERY_QUEUE.queryStopsForTiles(tiles);
 
                 setLoading?.(false);
             })();
         }
     }, [missingOsmFeatures, setLoading]);
 
-    const overpassElements = useOsmFeatures()
+    const overpassElements = allOsmFeatures
         .filter(e => e.tags && Object.keys(e.tags).length > 0)
         .filter(e => {
             const elLL = OSM_DATA.getLonLat(e);

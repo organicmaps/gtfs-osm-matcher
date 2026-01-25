@@ -1,153 +1,5 @@
 import { getDistanceLonLat } from "../map/distance";
 import type { LonLatTuple, OSMElement, OSMElementTags, OSMNode, OSMRelation, OSMWay } from "./OSMData.types";
-import { type BBox } from "./tile-utils";
-
-const stopsQ: string = `
-[out:json][timeout:1800];
-(
-  node["public_transport"="platform"]({{bbox}});
-  way["public_transport"="platform"]({{bbox}});
-  
-  node["public_transport"="stop_position"]({{bbox}});
-  
-  node["highway"="bus_stop"]({{bbox}});
-  node["highway"="platform"]({{bbox}});
-
-  node["amenity"="bus_station"]({{bbox}});
-  way["amenity"="bus_station"]({{bbox}});
-  
-  node["amenity"="ferry_terminal"]({{bbox}});
-  way["amenity"="ferry_terminal"]({{bbox}});
-  
-  node["railway"="tram_stop"]({{bbox}});
-  node["railway"="platform"]({{bbox}});
-  way["railway"="platform"]({{bbox}});
-);
-out meta;
->;
-out meta qt;
-`;
-
-export function queryForId(id: number, type: 'node' | 'way') {
-    return `
-[out:json][timeout:900];
-${type}(${id});
-out meta qt;
-`;
-
-}
-
-const ROUTE_TYPES = ['bus', 'ferry', 'train', 'railway', 'tram', 'trolleybus', 'aerialway'];
-const routesQ: string = `
-[out:json][timeout:900];
-(
-  relation["route"~"^(${ROUTE_TYPES.join('|')})$"]({{bbox}});
-  relation["type"="route_master"]({{bbox}});
-);
-out meta;
->;
-out meta qt;
-`;
-
-var throttlePromise: Promise<void> | null = null;
-
-const endpoint = 'https://overpass-api.de/api/interpreter';
-
-export async function queryStops(bbox: BBox) {
-    const bboxString = getBBOXString(bbox);
-    const query = stopsQ.replaceAll('{{bbox}}', bboxString);
-
-    if (throttlePromise) {
-        await throttlePromise;
-    }
-
-    throttlePromise = new Promise((resolve) => {
-        setTimeout(() => {
-            throttlePromise = null;
-            resolve();
-        }, 2500);
-    });
-
-    return queryOverpass(query);
-}
-
-export async function queryRoutes(bbox: BBox) {
-    const bboxString = getBBOXString(bbox);
-    const query = routesQ.replaceAll('{{bbox}}', bboxString);
-
-    return queryOverpass(query);
-}
-
-function getBBOXString(bbox: BBox) {
-    // south, west, north, east
-    return `${bbox.south},${bbox.west},${bbox.north},${bbox.east}`;
-}
-
-export async function queryOverpass(query: string) {
-    const response = await fetch(endpoint, {
-        method: "POST",
-        mode: "cors",
-        cache: "no-cache",
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-        },
-        body: `data=${encodeURIComponent(query)}`
-    });
-
-    return await response.json();
-}
-
-export function getElementLonLat(e: OSMElement, osmData: OSMData) {
-    if (e.type === 'node') {
-        return [e.lon, e.lat] as LonLatTuple;
-    }
-
-    if (e.type === 'way') {
-        const nodes = e.nodes
-            .map(nid => osmData.getNodeById(nid))
-            .filter(n => n !== undefined);
-
-        if (nodes.length === 0) {
-            console.log('Failed to load nodes for way', e);
-            return undefined;
-        }
-
-        try {
-            const llngs = nodes.map(({ lat, lon }) => ({ lat, lng: lon }));
-
-            if (nodes[0].id === nodes[nodes.length - 1].id) {
-                const center = getBoundsCenter(llngs);
-
-                if (!center) {
-                    console.log('Failed to get geometry for way', e, nodes);
-                    return undefined;
-                }
-
-                return [center.lng, center.lat] as LonLatTuple;
-            }
-            else {
-                const center = getLineCenter(llngs);
-
-                if (!center) {
-                    console.log('Failed to get geometry for way', e, nodes);
-                    return undefined;
-                }
-
-                return [center.lng, center.lat] as LonLatTuple;
-            }
-
-        }
-        catch (err) {
-            console.log('Failed to get geometry for way', e, nodes);
-            console.error('Failed to get geometry for way', err);
-        }
-    }
-
-    if (e.type === 'relation') {
-
-    }
-
-}
 
 export function lonLatToLatLng(lonLat: LonLatTuple) {
     if (!lonLat) {
@@ -167,11 +19,11 @@ export type OSMDataChange = {
     original: OSMElement
     action: string[]
 };
+
 export type ElementChangeAction = {
     element: OSMElement
     action: string
 };
-export type TagStatistics = Map<string, number>;
 
 export default class OSMData {
     idMap: Map<string, OSMElement>
@@ -368,6 +220,58 @@ function isBlank(str: string) {
 }
 
 export const OSM_DATA = new OSMData();
+
+export function getElementLonLat(e: OSMElement, osmData: OSMData) {
+    if (e.type === 'node') {
+        return [e.lon, e.lat] as LonLatTuple;
+    }
+
+    if (e.type === 'way') {
+        const nodes = e.nodes
+            .map(nid => osmData.getNodeById(nid))
+            .filter(n => n !== undefined);
+
+        if (nodes.length === 0) {
+            console.log('Failed to load nodes for way', e);
+            return undefined;
+        }
+
+        try {
+            const llngs = nodes.map(({ lat, lon }) => ({ lat, lng: lon }));
+
+            if (nodes[0].id === nodes[nodes.length - 1].id) {
+                const center = getBoundsCenter(llngs);
+
+                if (!center) {
+                    console.log('Failed to get geometry for way', e, nodes);
+                    return undefined;
+                }
+
+                return [center.lng, center.lat] as LonLatTuple;
+            }
+            else {
+                const center = getLineCenter(llngs);
+
+                if (!center) {
+                    console.log('Failed to get geometry for way', e, nodes);
+                    return undefined;
+                }
+
+                return [center.lng, center.lat] as LonLatTuple;
+            }
+
+        }
+        catch (err) {
+            console.log('Failed to get geometry for way', e, nodes);
+            console.error('Failed to get geometry for way', err);
+        }
+    }
+
+    if (e.type === 'relation') {
+        // TODO: (requires changes to overpass query and backend first)
+    }
+
+}
 
 /**
  * Calculates the center of a set of coordinates.
