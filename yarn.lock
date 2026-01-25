@@ -928,10 +928,10 @@ potpack@^2.1.0:
   resolved "https://registry.yarnpkg.com/potpack/-/potpack-2.1.0.tgz#fe548e2f9061e9937f17191c1ab6dd98ca30e02f"
   integrity sha512-pcaShQc1Shq0y+E7GqJqvZj8DTthWV1KeHGdi0Z6IAin2Oi3JnLCOfwnCo84qc+HAp52wT9nK9H7FAJp5a44GQ==
 
-preact@^10.27.2:
-  version "10.27.2"
-  resolved "https://registry.yarnpkg.com/preact/-/preact-10.27.2.tgz#19b9009c1be801a76a0aaf0fe5ba665985a09312"
-  integrity sha512-5SYSgFKSyhCbk6SrXyMpqjb5+MQBgfvEKE/OC+PujcY34sOpqtr+0AZQtPYx5IA6VxynQ7rUPCtKzyovpj9Bpg==
+preact@^10.27.3:
+  version "10.27.3"
+  resolved "https://registry.yarnpkg.com/preact/-/preact-10.27.3.tgz#d2b79ea7fe222e17b91f018723a211bb0e2cef92"
+  integrity sha512-ZieIP3zQHiQsNF3BA+SNVS8dcuRIg/nsxlkFbCMBLS2L1Ww4Bkxd9n6Md2A1crfTZsEbQPADV0neYmh/EElgeQ==
 
 protocol-buffers-schema@^3.3.1:
   version "3.6.0"
