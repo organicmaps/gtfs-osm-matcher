@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "maplibre-gl": "^5.10.0",
-    "preact": "^10.27.2"
+    "preact": "^10.27.3"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.2",
