@@ -1,0 +1,26 @@
+.tag-actions span {
+    color: inherit;
+    cursor: pointer;
+}
+
+.osm-tags-table input {
+    border: 1px solid #666;
+}
+
+.deleted input {
+    background-color: #ccc;
+    pointer-events: none;
+    text-decoration: line-through;
+}
+
+.important input {
+    font-weight: bold;
+}
+
+.invalid input {
+    background-color: #dc9e9e;
+}
+
+span.osm-tag-delete:hover {
+    color: red;
+}

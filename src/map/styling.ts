@@ -13,7 +13,9 @@ export const satMapStyle: StyleSpecification = {
         id: "imagery-raster",
         type: "raster",
         source: "esri-world"
-    }]
+    }],
+    "sprite": "https://tiles.openfreemap.org/sprites/ofm_f384/ofm",
+    "glyphs": "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf"
 };
 
 export async function mixinToStyle(url: string, mixin: (style: StyleSpecification) => StyleSpecification) {
