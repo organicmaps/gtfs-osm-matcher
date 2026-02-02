@@ -1,0 +1,28 @@
+.map-marker {
+    border-bottom: 1px solid black;
+}
+
+.map-marker-position {
+    width: 0;
+    height: 0;
+    
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+
+    border-style: solid;
+    border-width: 8px 4px 0 4px;
+    border-color: black transparent transparent transparent;
+}
+
+@keyframes marker-flash {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.map-marker.highlight {
+    font-weight: bold;
+    font-size: 1.5em;
+    animation: marker-flash 0.25s 3;
+}

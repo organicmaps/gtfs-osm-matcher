@@ -21,10 +21,6 @@ export type ReportRow = {
     } | undefined;
 }
 
-type ReportTableProps = {
-    reports: ReportRow[];
-}
-
 type SortableHeaderProps<T> = {
     column: T;
     currentSortColumn: T;
@@ -41,7 +37,11 @@ function SortableHeader<T extends string>({ column, currentSortColumn, sortDirec
     )
 }
 
-export function ReportTable({ reports }: ReportTableProps) {
+type ReportTableProps = {
+    reports: ReportRow[];
+    onSelectReport?: (reportRegion: string | null) => void;
+}
+export function ReportTable({ reports, onSelectReport }: ReportTableProps) {
     const sortingColumns = ['region', 'gtfsDate', 'matchPercent', 'total', 'matched', 'empty', 'noMatch'] as const;
     const [sortColumn, setSortColumn] = useState<typeof sortingColumns[number]>('region');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -131,7 +131,7 @@ export function ReportTable({ reports }: ReportTableProps) {
 
                     return (
                         <tr key={region}>
-                            <td><a href={`#/match-report/${region}`}>{region}</a></td>
+                            <td><a onClick={() => onSelectReport?.(region)} href={`#/match-report/${region}`}>{region}</a></td>
                             <td>{formatDate(gtfsDate)}</td>
                             <td className={matchClass}>
                                 {matchPercent ? `${matchPercent.toFixed(0)}% (${matched} of ${matchStats?.total})` : '-'}

@@ -9,7 +9,8 @@ import { parseDsAndId, useHash } from "./routing";
 var shouldUpdateBoundsSignal = {
     value: false
 };
-window.addEventListener('SelectingReports',
+
+window.addEventListener('ShouldUpdateBounds',
     () => shouldUpdateBoundsSignal.value = true
 );
 
@@ -64,7 +65,13 @@ const matchDatasetOrderComparator = (a: MatchDataset, b: MatchDataset) => {
 
 export type Report = {
     region: string;
+
     matchDatasets: MatchDataset[];
+
+    idTags: {
+        [key: string]: number
+    };
+
     matchStats: {
         total: number;
         matchId: number;
@@ -74,6 +81,7 @@ export type Report = {
         noMatch: number;
         empty: number;
     };
+
     matchMeta: {
         coveredPbfSources: {
             path: string,
@@ -87,7 +95,8 @@ export type Report = {
             top: number
             bottom: number
         }
-    }
+    };
+
 }
 
 type GeojsonDataT = {
@@ -108,14 +117,15 @@ type DatasetsDataByName = {
 
 type MatchReportProps = {
     reportRegion: string;
-    reportData: Report
+    reportData: Report;
 }
 export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
-    const updateSelection = useContext(SelectionContext)[1];
+    const { selection, updateSelection } = useContext(SelectionContext);
     const map = useContext(MapContext)?.map;
 
     const hashSelection = parseDsAndId(useHash(), datasetKeys);
     const matchMeta = reportData.matchMeta;
+    const idTags = reportData.idTags;
 
     console.log('hashSelection', hashSelection);
     console.log('reportData', reportData);
@@ -144,8 +154,16 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
             [ds]: data
         });
 
+        // TODO: Factor out into separate callback
         if (ds === hashSelection?.dataset && hashSelection.featureId) {
             const lookupId = hashSelection.featureId;
+
+            if (selection?.feature.properties.gtfsStopId === lookupId ||
+                (selection?.feature.properties.gtfsFeatures as { id: string }[])?.some(({ id }) => lookupId === id)) {
+                // Same feature is already selected
+                return;
+            }
+
             const found = data.features.find((f: any) => {
                 const feature = f as GeoJSONFeature;
 
@@ -165,11 +183,13 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
                 updateSelection({
                     feature: stringifyProperties(found),
                     datasetName: ds,
+                    idTags,
                     reportRegion,
+                    reportData
                 })
             }
         }
-    }, [reportRegion, datasetData, updateDatasetData, hashSelection, updateSelection]);
+    }, [reportRegion, idTags, datasetData, updateDatasetData, hashSelection, selection, updateSelection]);
 
     useEffect(() => {
         if (reportRegion) {
@@ -200,8 +220,8 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         });
 
     const handleSelect = useCallback((datasetName: string, feature: any) => {
-        updateSelection({ feature, datasetName, reportRegion });
-    }, [reportRegion, updateSelection]);
+        updateSelection({ feature, datasetName, reportRegion, idTags });
+    }, [reportRegion, updateSelection, idTags]);
 
     const datasetElements = Object.entries(datasetData)
         .filter(([name]) => selectedDatasets[name])

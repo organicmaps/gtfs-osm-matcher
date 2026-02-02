@@ -1,15 +1,18 @@
 import { useEffect, useState } from "preact/hooks";
-import { parseUrlReportRegion, useHash } from "./routing";
+import { parseUrlReportRegion, useHashRoute } from "./routing";
 import { MatchReport, type Report } from "./report";
-import "./report-selector.css";
-import { ReportHelpOverlay } from "./report-help-overlay";
 import { ReportTable } from "./report-table";
+import { cls } from "./cls";
+import "./report-selector.css";
 
-
-export function MatchReportSelector() {
-    const [showHelp, setShowHelp] = useState(false);
+type MatchReportSelectorProps = {
+    onSelectReport?: (reportRegion: string | null) => void;
+};
+export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps) {
+    const [expanded, setExpanded] = useState(true);
     const [matchReports, setMatchReports] = useState<Report[]>([]);
-    const reportRegion = parseUrlReportRegion(useHash());
+
+    const reportRegion = useHashRoute(parseUrlReportRegion);
 
     useEffect(() => {
         fetch('/data/match-report.json')
@@ -35,27 +38,26 @@ export function MatchReportSelector() {
     });
 
     const reportData = reportRegion && matchReports.find(r => r.region === reportRegion);
-    if (matchReports.length > 0 && !reportData) {
-        // Arm map bounds fly-to only when reposrts selector is open and links are loaded
-        window.dispatchEvent(new CustomEvent('SelectingReports'));
-    }
 
     if (reportData) {
         return (
             <>
                 <div className={'right-top'}>
                     <div>
-                        <a href="#/">Back to reports</a>
+                        <a onClick={() => onSelectReport?.(null)} href="#/">Back to reports</a>
                         <span className={'float-right'}>
-                            <span className={'link-like'} onClick={() => setShowHelp(!showHelp)}>Help</span>
+                            <span className={'link-like'} onClick={() => setExpanded(!expanded)}>
+                                {expanded ? 'Hide' : 'Show'}
+                            </span>
                         </span>
                     </div>
-                    <MatchReport
-                        key={reportRegion}
-                        reportRegion={reportRegion}
-                        reportData={reportData} />
+                    <div className={cls('report-datasets', expanded ? 'expanded' : 'collapsed')}>
+                        {<MatchReport
+                            key={reportRegion}
+                            reportRegion={reportRegion}
+                            reportData={reportData} />}
+                    </div>
                 </div>
-                {showHelp && <ReportHelpOverlay onClose={() => setShowHelp(false)} />}
             </>
         )
     }
@@ -65,7 +67,7 @@ export function MatchReportSelector() {
             <div className={'overlay-content'}>
                 <h2>Available match reports</h2>
                 <div className={'reports'}>
-                    <ReportTable reports={reports} />
+                    <ReportTable reports={reports} onSelectReport={onSelectReport} />
                 </div>
                 <div className={"report-list-footer"}>
                     To add your city or country, or for any other inquiries, please write us at

@@ -2,11 +2,19 @@
   margin: 0;
   height: 100%;
   width: 100%;
+
+  display: flex;
+  flex-direction: column;
+}
+
+#app-header {
+  height: 35px;
 }
 
 #map-view {
   height: 100%;
   width: 100%;
+  flex: 1;
 }
 
 #map-location {
