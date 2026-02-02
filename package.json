@@ -15,10 +15,12 @@
     "preact": "^10.27.3"
   },
   "devDependencies": {
+    "@babel/core": "^7.29.0",
     "@preact/preset-vite": "^2.10.2",
-    "@types/node": "^24.6.0",
+    "@types/node": "^25.2.0",
     "baseline-browser-mapping": "^2.9.15",
     "typescript": "~5.9.3",
     "vite": "^7.1.7"
-  }
+  },
+  "packageManager": "yarn@4.12.0"
 }
