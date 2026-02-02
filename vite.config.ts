@@ -12,6 +12,7 @@ export default defineConfig(({ mode }) => {
     build: {
       sourcemap: devBuild,
       emptyOutDir: false,
+      chunkSizeWarningLimit: 1100,  // For maplibre-gl
       rollupOptions: {
         output: {
           manualChunks: {
