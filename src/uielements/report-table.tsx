@@ -1,8 +1,16 @@
 import { useState } from "preact/hooks";
 
 const dateFormatter = new Intl.DateTimeFormat(navigator.language, { year: 'numeric', month: 'short', day: 'numeric' });
+
 function formatDate(date: Date | null | undefined) {
     return date ? dateFormatter.format(date) : 'N/A';
+}
+
+function daysSince(date: Date) {
+    const diff = Date.now() - date.getTime();
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+
+    return days > 0 ? `(${days} days)` : "";
 }
 
 export type ReportRow = {
@@ -132,7 +140,7 @@ export function ReportTable({ reports, onSelectReport }: ReportTableProps) {
                     return (
                         <tr key={region}>
                             <td><a onClick={() => onSelectReport?.(region)} href={`#/match-report/${region}`}>{region}</a></td>
-                            <td>{formatDate(gtfsDate)}</td>
+                            <td>{formatDate(gtfsDate)} {gtfsDate && daysSince(gtfsDate)}</td>
                             <td className={matchClass}>
                                 {matchPercent ? `${matchPercent.toFixed(0)}% (${matched} of ${matchStats?.total})` : '-'}
                             </td>
