@@ -3,6 +3,7 @@ import { parseUrlReportRegion, useHashRoute } from "./routing";
 import { MatchReport, type Report } from "./report";
 import { ReportTable } from "./report-table";
 import { cls } from "./cls";
+import { DATA_BASE_URL } from "../config";
 import "./report-selector.css";
 
 type MatchReportSelectorProps = {
@@ -15,7 +16,7 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
     const reportRegion = useHashRoute(parseUrlReportRegion);
 
     useEffect(() => {
-        fetch('/data/match-report.json')
+        fetch(`${DATA_BASE_URL}/match-report.json`)
             .then(r => r.json())
             .then(data => { setMatchReports(data.matchedRegions); });
     }, [setMatchReports]);

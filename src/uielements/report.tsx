@@ -5,6 +5,7 @@ import type { GeoJSONFeature, MapGeoJSONFeature, MapMouseEvent } from "maplibre-
 
 import "./report.css"
 import { parseDsAndId, useHash } from "./routing";
+import { DATA_BASE_URL } from "../config";
 
 var shouldUpdateBoundsSignal = {
     value: false
@@ -196,7 +197,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
             Object.keys(selectedDatasets).filter(ds => selectedDatasets[ds as keyof typeof selectedDatasets]).forEach((ds) => {
                 if (!datasetData[ds]) {
                     console.log('Loading', reportRegion, ds);
-                    fetch(`/data/${reportRegion}/${ds}.geojson`)
+                    fetch(`${DATA_BASE_URL}/${reportRegion}/${ds}.geojson`)
                         .then(r => r.json())
                         .then(data => {
                             handleDatasetLoad(ds, data);
