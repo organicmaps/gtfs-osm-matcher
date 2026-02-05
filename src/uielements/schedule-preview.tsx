@@ -186,7 +186,7 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
             const ts = visibleTrips.map(t => {
                 const update = updates?.find((u: any) => u.trip.tripId === t.tripId);
                 return <span key={t.tripId}>
-                    {`${Math.floor(t.arrivalTime / 3600)}:${Math.floor(t.arrivalTime % 3600 / 60)} `}
+                    {`${formatTime(Math.floor(t.arrivalTime / 3600), Math.floor(t.arrivalTime % 3600 / 60))} `}
                     {update && <span style={{ color: 'red' }}>{update.stopTimeUpdates?.[0].arrivalDelay} sec</span>}
                 </span>
             });
@@ -209,12 +209,16 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
         {schedule.length > 0 && <h4>{schedule[0].stop.stop_name}</h4>} {lonlat && <LocateMe zoom={18} lonlatFeature={{ lon: lonlat[0], lat: lonlat[1] }} />}
         <div>Today: {i_date} {dow}</div>
         <div>
-            <span>{dateObj.getHours()}:{dateObj.getMinutes()} </span>
+            <span>{formatTime(dateObj.getHours(), dateObj.getMinutes())} </span>
             <label> Show schedule for the whole day </label>
             <input type="checkbox" checked={showTheWholeDay} onChange={() => setShowTheWholeDay(!showTheWholeDay)}></input>
         </div>
         {scheduleElements}
     </div>)
+}
+
+function formatTime(hours: number, minutes: number) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}`;
 }
 
 function matchPeriod(section: ScheduleSectionT, i_date: number) {
