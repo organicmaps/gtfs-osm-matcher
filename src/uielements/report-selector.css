@@ -60,17 +60,17 @@
     background-color: #f9f9f9;
 }
 
-.match-high {
+.hl-green {
     background-color: #d4edda !important;
     color: #155724;
 }
 
-.match-medium {
+.hl-yellow {
     background-color: #fff3cd !important;
     color: #856404;
 }
 
-.match-low {
+.hl-red {
     background-color: #f8d7da !important;
     color: #721c24;
 }

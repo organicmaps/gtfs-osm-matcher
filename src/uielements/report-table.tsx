@@ -1,8 +1,14 @@
 import { useState } from "preact/hooks";
 
 const dateFormatter = new Intl.DateTimeFormat(navigator.language, { year: 'numeric', month: 'short', day: 'numeric' });
+
 function formatDate(date: Date | null | undefined) {
     return date ? dateFormatter.format(date) : 'N/A';
+}
+
+function daysSince(date: Date) {
+    const diff = Date.now() - date.getTime();
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
 export type ReportRow = {
@@ -121,18 +127,32 @@ export function ReportTable({ reports, onSelectReport }: ReportTableProps) {
                     let matchClass = '';
                     if (matchPercent) {
                         if (matchPercent >= 85) {
-                            matchClass = 'match-high';
+                            matchClass = 'hl-green';
                         } else if (matchPercent >= 75) {
-                            matchClass = 'match-medium';
+                            matchClass = 'hl-yellow';
                         } else {
-                            matchClass = 'match-low';
+                            matchClass = 'hl-red';
+                        }
+                    }
+
+                    const days = gtfsDate && daysSince(gtfsDate);
+                    let daysSinceClass = "";
+                    if (days) {
+                        if (days <= 14) {
+                            daysSinceClass = 'hl-green';
+                        } else if (days <= 45) {
+                            daysSinceClass = 'hl-yellow';
+                        } else {
+                            daysSinceClass = 'hl-red';
                         }
                     }
 
                     return (
                         <tr key={region}>
                             <td><a onClick={() => onSelectReport?.(region)} href={`#/match-report/${region}`}>{region}</a></td>
-                            <td>{formatDate(gtfsDate)}</td>
+                            <td className={daysSinceClass}>
+                                {formatDate(gtfsDate)} {days && days > 0 && <span>({days} days)</span>}
+                            </td>
                             <td className={matchClass}>
                                 {matchPercent ? `${matchPercent.toFixed(0)}% (${matched} of ${matchStats?.total})` : '-'}
                             </td>
