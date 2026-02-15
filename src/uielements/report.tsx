@@ -96,6 +96,8 @@ export type Report = {
         [key: string]: number
     };
 
+    liveUpdates?: boolean;
+
     matchStats: {
         total: number;
         matchId: number;

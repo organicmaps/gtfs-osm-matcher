@@ -23,7 +23,11 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
 
     const reports = matchReports.map((report) => {
         const region = report.region;
-        const gtfsDate = report.matchMeta?.gtfsTimeStamp ? new Date(report.matchMeta.gtfsTimeStamp) : null;
+        const liveUpdates = report.liveUpdates;
+        
+        const gtfsDate = report.matchMeta?.gtfsTimeStamp ? 
+                new Date(report.matchMeta.gtfsTimeStamp) : 
+                null;
 
         const matchStats = report?.matchStats;
         const matched = matchStats && (matchStats.matchId + matchStats.nameMatch + matchStats.manyToOne + matchStats.transitHubs);
@@ -35,6 +39,7 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
             matched,
             matchPercent,
             matchStats,
+            liveUpdates
         }
     });
 
