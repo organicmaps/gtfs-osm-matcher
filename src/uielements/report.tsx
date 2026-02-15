@@ -50,18 +50,41 @@ type MatchDataset = {
 }
 
 const matchDatasetSortOrder = [
+    'preview',
     'match-id',
     'match-name',
+    'match-name-id-conflict',
     'separated-clusters',
     'transit-hub-clusters',
     'many-to-one',
     'clusters',
+    'match-generic',
     'no-match',
     'no-osm-stops',
 ];
 
+const dsTitles: {[key: string]: string} = {
+    'preview': 'Preview timetables for all matched',
+    'match-id': 'Stops matched by GTFS Id or Code',
+    'match-name': 'Stops matched by Name',
+    'match-name-id-conflict': 'Stops matched by Name but mismatched by id',
+    'separated-clusters': 'Many OSM stops matched one or many GTFS, but successfuly separated',
+    'transit-hub-clusters': 'Many OSM platforms or stops matched to one Station by name',
+    'many-to-one': 'Many OSM stops matched exactly one GTFS by name',
+    'clusters': 'Many OSM stops matched one or many GTFS by name',
+    'match-generic': 'Matched to a stop without name or code nearby',
+    'no-match': 'No osm element matched',
+    'no-osm-stops': 'No OSM elemnts of matching transport mode found in the area',
+};
+
 const matchDatasetOrderComparator = (a: MatchDataset, b: MatchDataset) => {
-    return matchDatasetSortOrder.indexOf(a.name) - matchDatasetSortOrder.indexOf(b.name);
+    const aInx = matchDatasetSortOrder.indexOf(a.name);
+    const bInx = matchDatasetSortOrder.indexOf(b.name);
+    
+    const aCmp = aInx < 0 ? 100: aInx;
+    const bCmp = bInx < 0 ? 100: bInx;
+
+    return aCmp - bCmp;
 }
 
 export type Report = {
@@ -218,12 +241,12 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
     const datasetControls = reportData?.matchDatasets
         ?.sort(matchDatasetOrderComparator)
         ?.map(({ name: dsName, featuresCount }) => {
-
+            const title = dsTitles[dsName];
             return (<div key={dsName}>
-                <input type={"checkbox"} checked={selectedDatasets[dsName]} onChange={(e) => {
+                <input className={'match-dataset-select'} type={"checkbox"} checked={selectedDatasets[dsName]} onChange={(e) => {
                     updateSelectedDatasets({ ...selectedDatasets, [dsName]: (e.target as HTMLInputElement).checked });
                 }} />
-                <span className={'match-dataset'}>{dsName}</span>
+                <span className={'match-dataset'} title={title} >{dsName}</span>
                 <span className={'match-dataset-count'}>{featuresCount}</span>
             </div>)
         });
