@@ -121,7 +121,7 @@ type MatchReportProps = {
     reportData: Report;
 }
 export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
-    const { selection, updateSelection } = useContext(SelectionContext);
+    const { selection, selectionSource, updateSelection } = useContext(SelectionContext);
     const map = useContext(MapContext)?.map;
 
     const hashSelection = parseDsAndId(useHash(), datasetKeys);
@@ -187,10 +187,18 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
                     idTags,
                     reportRegion,
                     reportData
-                })
+                }, 'url-hash');
             }
         }
     }, [reportRegion, idTags, datasetData, updateDatasetData, hashSelection, selection, updateSelection]);
+
+    useEffect(() => {
+        if (map && selectionSource === 'url-hash' && selection) {
+            const lonlat = (selection.feature.geometry as { coordinates: number[] } & any)?.coordinates;
+            console.log('about to fly to', selection?.feature);
+            map.flyTo({center: lonlat, zoom: 18, duration: 1});
+        }
+    }, [map, selection, selectionSource]);
 
     useEffect(() => {
         if (reportRegion) {
@@ -221,7 +229,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         });
 
     const handleSelect = useCallback((datasetName: string, feature: any) => {
-        updateSelection({ feature, datasetName, reportRegion, idTags });
+        updateSelection({ feature, datasetName, reportRegion, idTags }, 'map-click');
     }, [reportRegion, updateSelection, idTags]);
 
     const datasetElements = Object.entries(datasetData)
