@@ -1,10 +1,16 @@
 
 .match-dataset {
     display: inline-block;
-    width: 8em;
+    width: 11em;
     margin-left: 0.5em;
     margin-right: 0.5em;
+    vertical-align: middle;
+    overflow-x: hidden;
     white-space: nowrap;
+    text-overflow: clip;
+}
+.match-dataset-select {
+    vertical-align: middle;
 }
 .match-dataset-count {
     padding-inline-start: 0.5em;
