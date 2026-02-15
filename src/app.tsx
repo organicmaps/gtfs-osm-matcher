@@ -27,14 +27,18 @@ export type SelectionT = {
   [k: string]: any
 }
 
+export type SelectionSourceT = 'map-click' | 'report-reset' | 'app-init' | 'url-hash';
+
 export type SelectionContextT = {
   selection: SelectionT | null;
-  updateSelection: (newSelection: SelectionT) => void;
+  selectionSource: SelectionSourceT;
+  updateSelection: (newSelection: SelectionT, eventSource: SelectionSourceT) => void;
   onReportSelect: (reportRegion: string | null) => void;
 };
 
 export const SelectionContext = createContext<SelectionContextT>({
   selection: null,
+  selectionSource: 'app-init',
   onReportSelect: () => { },
   updateSelection: () => { }
 });
@@ -43,12 +47,18 @@ export function App() {
 
   const [mapContextVal, setMapContextVal] = useState<MapContextT>();
   const [selection, updateSelection] = useState<SelectionT | null>(null);
+  const [selectionSource, updateSelectionSource] = useState<SelectionSourceT>('app-init');
 
   const selectionContext: SelectionContextT = {
     selection,
-    updateSelection,
+    updateSelection: (selection, source) => {
+      updateSelection(selection);
+      updateSelectionSource(source);
+    },
+    selectionSource,
     onReportSelect: (_r: string | null) => {
       updateSelection(null);
+      updateSelectionSource('report-reset');
       window.dispatchEvent(new Event('ShouldUpdateBounds'));
     }
   }
