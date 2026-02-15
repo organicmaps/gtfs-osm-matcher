@@ -16,6 +16,7 @@ export type ReportRow = {
     gtfsDate: Date | null;
     matched: number | undefined;
     matchPercent: number | undefined;
+    liveUpdates?: boolean;
     matchStats: {
         total: number;
         matchId: number;
@@ -48,7 +49,7 @@ type ReportTableProps = {
     onSelectReport?: (reportRegion: string | null) => void;
 }
 export function ReportTable({ reports, onSelectReport }: ReportTableProps) {
-    const sortingColumns = ['region', 'gtfsDate', 'matchPercent', 'total', 'matched', 'empty', 'noMatch'] as const;
+    const sortingColumns = ['region', 'gtfsDate', 'matchPercent', 'liveUpdates', 'total', 'matched', 'empty', 'noMatch'] as const;
     const [sortColumn, setSortColumn] = useState<typeof sortingColumns[number]>('region');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -71,6 +72,9 @@ export function ReportTable({ reports, onSelectReport }: ReportTableProps) {
         switch (sortColumn) {
             case 'region':
                 result = a.region.localeCompare(b.region);
+                break;
+            case 'liveUpdates':
+                result = (a.liveUpdates ? 1 : 0) - (b.liveUpdates ? 1 : 0);
                 break;
             case 'gtfsDate':
                 result = (a.gtfsDate?.getTime() || 0) - (b.gtfsDate?.getTime() || 0);
@@ -102,6 +106,10 @@ export function ReportTable({ reports, onSelectReport }: ReportTableProps) {
                         currentSortColumn={sortColumn}
                         sortDirection={sortDirection}
                         onSort={handleHeaderClick} />
+                    <SortableHeader column={'liveUpdates'} label={'Live Updates'}
+                        currentSortColumn={sortColumn}
+                        sortDirection={sortDirection}
+                        onSort={handleHeaderClick} />
                     <SortableHeader column={'gtfsDate'} label={'GTFS Date'}
                         currentSortColumn={sortColumn}
                         sortDirection={sortDirection}
@@ -122,7 +130,7 @@ export function ReportTable({ reports, onSelectReport }: ReportTableProps) {
             </thead>
             <tbody>
                 {sortedReports.map(report => {
-                    const { region, gtfsDate, matched, matchPercent, matchStats } = report;
+                    const { region, gtfsDate, matched, matchPercent, matchStats, liveUpdates } = report;
 
                     let matchClass = '';
                     if (matchPercent) {
@@ -150,6 +158,9 @@ export function ReportTable({ reports, onSelectReport }: ReportTableProps) {
                     return (
                         <tr key={region}>
                             <td><a onClick={() => onSelectReport?.(region)} href={`#/match-report/${region}`}>{region}</a></td>
+                            <td>
+                                {liveUpdates ? 'Yes' : 'No'}
+                            </td>
                             <td className={daysSinceClass}>
                                 {formatDate(gtfsDate)} {days && days > 0 && <span>({days} days)</span>}
                             </td>
