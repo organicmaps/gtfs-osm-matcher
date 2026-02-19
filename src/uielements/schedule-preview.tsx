@@ -186,7 +186,7 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
             const ts = visibleTrips.map(t => {
                 const update = updates?.find((u: any) => u.trip.tripId === t.tripId);
                 return <span key={t.tripId}>
-                    {`${formatTime(Math.floor(t.arrivalTime / 3600), Math.floor(t.arrivalTime % 3600 / 60))} `}
+                    {`${formatTime(Math.floor(t.arrivalTime / 3600) % 24, Math.floor(t.arrivalTime % 3600 / 60))} `}
                     {update && <span style={{ color: 'red' }}>{update.stopTimeUpdates?.[0].arrivalDelay} sec</span>}
                 </span>
             });
@@ -218,7 +218,7 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
 }
 
 function formatTime(hours: number, minutes: number) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}`;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 }
 
 function matchPeriod(section: ScheduleSectionT, i_date: number) {
