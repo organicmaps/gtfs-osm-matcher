@@ -102,6 +102,28 @@ class OSMQueryQueue {
                     import.meta.env.DEV
                         && console.log('osm ways data', data);
                     OSM_DATA.updateOverpassData(data);
+                    return data;
+                })
+                .then(data => {
+                    // Ways reference node IDs but don't include node coordinates.
+                    // Fetch any referenced nodes that are not already in OSM_DATA
+                    // so we can compute way centroids.
+                    const wayNodeIds = (data.elements || [])
+                        .filter((e: any) => e.type === 'way' && Array.isArray(e.nodes))
+                        .flatMap((e: any) => e.nodes)
+                        .filter((nid: number) => !OSM_DATA.getNodeById(nid));
+
+                    const uniqueNodeIds = [...new Set<number>(wayNodeIds)];
+
+                    if (uniqueNodeIds.length > 0) {
+                        return fetch(OSM_ENDPOINT + '/nodes.json?nodes=' + uniqueNodeIds.join(','))
+                            .then(response => response.json())
+                            .then(nodeData => {
+                                import.meta.env.DEV
+                                    && console.log('osm way child nodes data', nodeData);
+                                OSM_DATA.updateOverpassData(nodeData);
+                            });
+                    }
                 });
         }
     }
