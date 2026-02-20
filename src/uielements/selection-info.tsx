@@ -16,6 +16,7 @@ import { HtmlMapMarker } from "./editor/map-marker";
 import { AddOsmStopController } from "./editor/add-stop-controller";
 import { MoveController } from "./editor/move-stop-controller";
 import { OSM_QUERY_QUEUE } from "../services/OsmQuerryQueue";
+import type { LonLatTuple } from "../services/OSMData.types";
 
 
 const importantTagsRg = /(name|ref|gtfs|bus|train|tram|trolleybus|ferry|station|platform|public_transport)/;
@@ -199,7 +200,7 @@ type TagActionsT = {
 
 interface OsmElementsProps {
     osmFeatures: any[];
-    parentLonLat: number[];
+    parentLonLat: [number, number];
     tagActions?: TagActionsT;
     loading?: boolean;
     setLoading?: (loading: boolean) => void;
@@ -260,18 +261,18 @@ function OsmElements({ osmFeatures, parentLonLat, tagActions, setLoading }: OsmE
             !osmFeatures.some(f => f.id === `${ovp.type[0]}${ovp.id}`));
 
     const osmMapElements = overpassElements.map((f: any) => {
+        const lonLat = OSM_DATA.getLonLat(f);
+        if (!lonLat) return null;
         return <HtmlMapMarker key={f.id}
             className={cls(highlightId === `${f.type[0]}${f.id}` && 'highlight')}
-            name={f.id} lon={f.lon} lat={f.lat} />
+            name={f.id} lon={lonLat[0]} lat={lonLat[1]} />
     });
 
     const markersOsm = osmFeatures.map((f: any, i: number) => {
-        var lonLat = [f.lon, f.lat];
-
         const updF = OSM_DATA.getByNWRId(f.id);
-        if (updF) {
-            lonLat = OSM_DATA.getLonLat(updF)!;
-        }
+        const lonLat = updF
+            ? OSM_DATA.getLonLat(updF) ?? [f.lon, f.lat]
+            : [f.lon, f.lat];
 
         return <HtmlMapMarker key={f.id} name={"osm " + letterCode(i)} lon={lonLat[0]} lat={lonLat[1]}
             className={cls(highlightId === f.id && 'highlight')}
@@ -343,7 +344,7 @@ export type MouseEventsHandlers = {
 
 type OsmListElementProps = {
     f: any;
-    parentLonLat: number[];
+    parentLonLat: [number, number];
     editDefault?: boolean;
     tagActions?: TagActionsT;
     mouseEvents?: MouseEventsHandlers
@@ -370,8 +371,6 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
         mouseEventsHandler.onMouseLeave = () => onHoverUpdate?.(false);
     }
 
-    const [lon, lat] = parentLonLat;
-
     const name = f.tags.name;
 
     const osmUrl = `https://osm.org/${type}/${idn}`;
@@ -380,6 +379,12 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
     const matchSet = f.matchSet;
 
     const osmFeature = OSM_DATA.getByTypeAndId(type, idn);
+
+    // Resolve lon/lat: prefer OSM_DATA lookup (handles ways/relations),
+    // fall back to f.lon/f.lat from the report data
+    const featureLonLat : LonLatTuple = osmFeature
+        ? OSM_DATA.getLonLat(osmFeature) ?? [f.lon, f.lat]
+        : [f.lon, f.lat];
 
     const tags = osmFeature?.tags || f.tags;
 
@@ -426,9 +431,9 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
             <span>&#9888;</span>This OSM Element is already matched as {matchSet}
         </div>;
 
-    const distanceInfo = lon && lat &&
+    const distanceInfo = parentLonLat[0] && parentLonLat[1] &&
         <span>
-            ({getDistanceLonLat([lon, lat], [f.lon, f.lat]).toFixed(1)}m)
+            ({getDistanceLonLat(parentLonLat, featureLonLat).toFixed(1)}m)
         </span>;
 
     return <li key={f.id} className="osm-list-item" {...mouseEventsHandler}>
@@ -436,7 +441,7 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
         <div>
             {osmHref} {distanceInfo}
             <SpanSpacer w={'10px'} />
-            <LocateMe lonlatFeature={f} />
+            <LocateMe lonlatFeature={{lon: featureLonLat[0], lat: featureLonLat[1]}} />
             <SpanSpacer w={'10px'} />
             <span>
                 <label>Edit</label><input type="checkbox" checked={edit}
