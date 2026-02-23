@@ -47,11 +47,13 @@ function SortableHeader<T extends string>({ column, currentSortColumn, sortDirec
 type ReportTableProps = {
     reports: ReportRow[];
     onSelectReport?: (reportRegion: string | null) => void;
+    foldByName?: string[];
 }
-export function ReportTable({ reports, onSelectReport }: ReportTableProps) {
+export function ReportTable({ reports, onSelectReport, foldByName = [] }: ReportTableProps) {
     const sortingColumns = ['region', 'gtfsDate', 'matchPercent', 'liveUpdates', 'total', 'matched', 'empty', 'noMatch'] as const;
     const [sortColumn, setSortColumn] = useState<typeof sortingColumns[number]>('region');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+    const [unfoldedPrefix, setUnfoldedPrefix] = useState<string | null>(null);
 
     const handleHeaderClick = (column: typeof sortingColumns[number]) => {
         if (sortColumn === column) {
@@ -129,50 +131,102 @@ export function ReportTable({ reports, onSelectReport }: ReportTableProps) {
                 </tr>
             </thead>
             <tbody>
-                {sortedReports.map(report => {
-                    const { region, gtfsDate, matched, matchPercent, matchStats, liveUpdates } = report;
+                {(() => {
+                    const rows: any[] = [];
+                    const groups: Record<string, ReportRow[]> = {};
+                    const normalReports: ReportRow[] = [];
 
-                    let matchClass = '';
-                    if (matchPercent) {
-                        if (matchPercent >= 85) {
-                            matchClass = 'hl-green';
-                        } else if (matchPercent >= 75) {
-                            matchClass = 'hl-yellow';
+                    sortedReports.forEach(report => {
+                        const prefix = foldByName.find(p => report.region.startsWith(p));
+                        if (prefix) {
+                            if (!groups[prefix]) groups[prefix] = [];
+                            groups[prefix].push(report);
                         } else {
-                            matchClass = 'hl-red';
+                            normalReports.push(report);
                         }
-                    }
+                    });
 
-                    const days = gtfsDate && daysSince(gtfsDate);
-                    let daysSinceClass = "";
-                    if (days) {
-                        if (days <= 14) {
-                            daysSinceClass = 'hl-green';
-                        } else if (days <= 45) {
-                            daysSinceClass = 'hl-yellow';
-                        } else {
-                            daysSinceClass = 'hl-red';
+                    // Add normal reports and prefix groups to rows in the order they appear
+                    // Actually, it might be better to keep the sorting order but group continuous rows with the same prefix.
+                    // But the requirement says "fold-prefix* <120> feeds", implying we group ALL feeds with that prefix.
+                    
+                    // Let's iterate through foldByName to keep consistent order if needed, 
+                    // or just use the order of appearance in sortedReports.
+                    
+                    const processedPrefixes = new Set<string>();
+                    
+                    sortedReports.forEach(report => {
+                        const prefix = foldByName.find(p => report.region.startsWith(p));
+                        if (!prefix) {
+                            rows.push(renderReportRow(report, onSelectReport));
+                        } else if (!processedPrefixes.has(prefix)) {
+                            processedPrefixes.add(prefix);
+                            const group = groups[prefix];
+                            const isUnfolded = unfoldedPrefix === prefix;
+                            
+                            rows.push(
+                                <tr key={prefix} className="fold-header" onClick={() => setUnfoldedPrefix(isUnfolded ? null : prefix)}>
+                                    <td colSpan={6} style={{ cursor: 'pointer', fontWeight: 'bold' }}>
+                                        {prefix}* <span className="feed-count">{group.length} feeds</span> {isUnfolded ? '▼' : '▶'}
+                                    </td>
+                                </tr>
+                            );
+                            
+                            if (isUnfolded) {
+                                group.forEach(groupedReport => {
+                                    rows.push(renderReportRow(groupedReport, onSelectReport, "grouped-row"));
+                                });
+                            }
                         }
-                    }
+                    });
 
-                    return (
-                        <tr key={region}>
-                            <td><a onClick={() => onSelectReport?.(region)} href={`#/match-report/${region}`}>{region}</a></td>
-                            <td>
-                                {liveUpdates ? 'Yes' : 'No'}
-                            </td>
-                            <td className={daysSinceClass}>
-                                {formatDate(gtfsDate)} {days && days > 0 && <span>({days} days)</span>}
-                            </td>
-                            <td className={matchClass}>
-                                {matchPercent ? `${matchPercent.toFixed(0)}% (${matched} of ${matchStats?.total})` : '-'}
-                            </td>
-                            <td>{matchStats?.empty || '-'}</td>
-                            <td>{matchStats?.noMatch || '-'}</td>
-                        </tr>
-                    );
-                })}
+                    return rows;
+                })()}
             </tbody>
         </table>
+    );
+}
+
+function renderReportRow(report: ReportRow, onSelectReport: ((reportRegion: string | null) => void) | undefined, className = "") {
+    const { region, gtfsDate, matched, matchPercent, matchStats, liveUpdates } = report;
+
+    let matchClass = '';
+    if (matchPercent) {
+        if (matchPercent >= 85) {
+            matchClass = 'hl-green';
+        } else if (matchPercent >= 75) {
+            matchClass = 'hl-yellow';
+        } else {
+            matchClass = 'hl-red';
+        }
+    }
+
+    const days = gtfsDate && daysSince(gtfsDate);
+    let daysSinceClass = "";
+    if (days) {
+        if (days <= 14) {
+            daysSinceClass = 'hl-green';
+        } else if (days <= 45) {
+            daysSinceClass = 'hl-yellow';
+        } else {
+            matchClass = 'hl-red';
+        }
+    }
+
+    return (
+        <tr key={region} className={className}>
+            <td><a onClick={() => onSelectReport?.(region)} href={`#/match-report/${region}`}>{region}</a></td>
+            <td>
+                {liveUpdates ? 'Yes' : 'No'}
+            </td>
+            <td className={daysSinceClass}>
+                {formatDate(gtfsDate)} {days && days > 0 && <span>({days} days)</span>}
+            </td>
+            <td className={matchClass}>
+                {matchPercent ? `${matchPercent.toFixed(0)}% (${matched} of ${matchStats?.total})` : '-'}
+            </td>
+            <td>{matchStats?.empty || '-'}</td>
+            <td>{matchStats?.noMatch || '-'}</td>
+        </tr>
     );
 }

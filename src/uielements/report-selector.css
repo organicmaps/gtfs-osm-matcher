@@ -112,3 +112,30 @@
         overflow-x: auto;
     }
 }
+
+.fold-header {
+    background-color: #f0f0f0;
+    cursor: pointer;
+}
+
+.fold-header:hover {
+    background-color: #e0e0e0 !important;
+}
+
+.fold-header td {
+    border-bottom: 2px solid #ccc !important;
+}
+
+.feed-count {
+    color: #666;
+    font-weight: normal;
+    font-size: 0.9em;
+}
+
+.grouped-row {
+    background-color: #fafafa;
+}
+
+.grouped-row td:first-child {
+    padding-left: 2em;
+}

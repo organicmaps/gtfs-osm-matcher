@@ -12,14 +12,18 @@ type MatchReportSelectorProps = {
 export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps) {
     const [expanded, setExpanded] = useState(true);
     const [matchReports, setMatchReports] = useState<Report[]>([]);
+    const [foldByName, setFoldByName] = useState<string[]>([]);
 
     const reportRegion = useHashRoute(parseUrlReportRegion);
 
     useEffect(() => {
         fetch(`${DATA_BASE_URL}/match-report.json`)
             .then(r => r.json())
-            .then(data => { setMatchReports(data.matchedRegions); });
-    }, [setMatchReports]);
+            .then(data => {
+                setMatchReports(data.matchedRegions);
+                setFoldByName(data.foldByName || []);
+            });
+    }, [setMatchReports, setFoldByName]);
 
     const reports = matchReports.map((report) => {
         const region = report.region;
@@ -73,7 +77,11 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
             <div className={'overlay-content'}>
                 <h2>Available match reports</h2>
                 <div className={'reports'}>
-                    <ReportTable reports={reports} onSelectReport={onSelectReport} />
+                    <ReportTable 
+                        reports={reports} 
+                        onSelectReport={onSelectReport} 
+                        foldByName={foldByName} 
+                    />
                 </div>
                 <div className={"report-list-footer"}>
                     To add your city or country, or for any other inquiries, please write us at
