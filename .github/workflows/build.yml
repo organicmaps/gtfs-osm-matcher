@@ -1,10 +1,17 @@
 name: Build and Test
 
 on:
+  workflow_dispatch: # Manual trigger
   push:
     branches: [ main ]
   pull_request:
-    branches: [ main ]
+    paths-ignore:
+      - .gitignore
+      - .github/**
+      - '!.github/workflows/build.yml'  # Run check on self change
+      - LICENSE
+      - NOTICE
+      - README.md
 
 jobs:
   build:
