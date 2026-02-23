@@ -1,0 +1,37 @@
+name: Build and Test
+
+on:
+  workflow_dispatch: # Manual trigger
+  push:
+    branches: [ main ]
+  pull_request:
+    paths-ignore:
+      - .gitignore
+      - .github/**
+      - '!.github/workflows/build.yml'  # Run check on self change
+      - LICENSE
+      - NOTICE
+      - README.md
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build
+        run: yarn build
