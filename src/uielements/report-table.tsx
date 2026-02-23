@@ -146,12 +146,7 @@ export function ReportTable({ reports, onSelectReport, foldByName = [] }: Report
                         }
                     });
 
-                    // Add normal reports and prefix groups to rows in the order they appear
-                    // Actually, it might be better to keep the sorting order but group continuous rows with the same prefix.
-                    // But the requirement says "fold-prefix* <120> feeds", implying we group ALL feeds with that prefix.
-                    
-                    // Let's iterate through foldByName to keep consistent order if needed, 
-                    // or just use the order of appearance in sortedReports.
+                    // Add normal reports and prefix groups to rows in the order they appear.
                     
                     const processedPrefixes = new Set<string>();
                     
@@ -167,7 +162,7 @@ export function ReportTable({ reports, onSelectReport, foldByName = [] }: Report
                             rows.push(
                                 <tr key={prefix} className="fold-header" onClick={() => setUnfoldedPrefix(isUnfolded ? null : prefix)}>
                                     <td colSpan={6} style={{ cursor: 'pointer', fontWeight: 'bold' }}>
-                                        {prefix}* <span className="feed-count">{group.length} feeds</span> {isUnfolded ? '▼' : '▶'}
+                                        {prefix} <span className="feed-count">{group.length} feeds</span> {isUnfolded ? '▼' : '▶'}
                                     </td>
                                 </tr>
                             );
@@ -187,7 +182,8 @@ export function ReportTable({ reports, onSelectReport, foldByName = [] }: Report
     );
 }
 
-function renderReportRow(report: ReportRow, onSelectReport: ((reportRegion: string | null) => void) | undefined, className = "") {
+type ReportSelectCb = ((reportRegion: string | null) => void) | undefined;
+function renderReportRow(report: ReportRow, onSelectReport: ReportSelectCb, className = "") {
     const { region, gtfsDate, matched, matchPercent, matchStats, liveUpdates } = report;
 
     let matchClass = '';
