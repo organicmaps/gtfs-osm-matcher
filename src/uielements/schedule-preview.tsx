@@ -69,14 +69,27 @@ type ScheduleApiResponseT = {
     feedMeta: { [region: string]: FeedMetaT }
 }
 
+type ScheduleApiResponseV2 = {
+    formatVersion: string,
+    
+    schedules: {
+        feed: string;
+        timetables: ScheduleT[];
+    }[];
+
+    feedMeta: { 
+        [region: string]: FeedMetaT 
+    };
+}
+
 export type SchedulePreviewProps = {
     selection: SelectionT | null
 }
 export function SchedulePreview({ selection }: SchedulePreviewProps) {
     const id = selection?.feature.properties.id;
     const lonlat = (selection?.feature.geometry as { coordinates: number[] } & any)?.coordinates;
-    // Response type is {timetables: ScheduleT[], feedMeta: {['feedId': string]: FeedMeta}}
     const [schedule, setSchedule] = useState<ScheduleT[]>([]);
+    const [liveUpdates, setLiveUpdates] = useState<boolean>(false);
     const [tripUpdates, setTripUpdates] = useState<any>();
 
     const [showTheWholeDay, setShowTheWholeDay] = useState<boolean>(false);
@@ -84,25 +97,44 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
     useEffect(() => {
         setSchedule([]);
 
-        fetch(`${SchedulesAPIBase}/${id}`).then(r => r.json()).then((data: ScheduleApiResponseT) => {
-            console.log('Schedule response', data);
-            setSchedule(data.timetables);
+        fetch(`${SchedulesAPIBase}/${id}`).then(r => r.json()).then((data: any) => {
+            
+            import.meta.env.DEV && 
+                console.log('Schedule response', data);
+
+            if (data.formatVersion === '2') {
+                setSchedule((data as ScheduleApiResponseV2)
+                        .schedules.flatMap(s => s.timetables));
+            }
+            else {
+                setSchedule((data as ScheduleApiResponseT).timetables);
+            }
+
+            const liveUpdates = Object.values(data.feedMeta)
+                    .some((meta) => (meta as FeedMetaT).liveUpdates);
+
+            setLiveUpdates(liveUpdates);
         });
+
+    }, [id]);
+
+    useEffect(() => {
+        if (!liveUpdates) {
+            return;
+        }
 
         const getUpdates = () => {
             fetch(`${RTUpdatesAPIBase}/${id}`).then(r => r.json()).then(tripUpdates => {
-                console.log('Trip updates', tripUpdates);
                 setTripUpdates(tripUpdates);
             });
         }
 
-        // TODO: Would be nice to have more sophisticated subscriber
         const rt = setInterval(getUpdates, 5000);
         getUpdates();
 
         return () => clearInterval(rt);
 
-    }, [id]);
+    }, [id, liveUpdates]);
 
     const dateObj = new Date();
     const month = dateObj.getMonth() + 1;
