@@ -34,7 +34,7 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
                 null;
 
         const matchStats = report?.matchStats;
-        const matched = matchStats && (matchStats.matchId + matchStats.nameMatch + matchStats.manyToOne + matchStats.transitHubs);
+        const matched = matchStats && (matchStats.total - matchStats.noMatch - matchStats.empty);
         const matchPercent = matched && matched / matchStats.total * 100;
 
         return {
