@@ -10,6 +10,8 @@ import { MatchReportSelector } from './uielements/report-selector';
 import { SelectionInfo } from './uielements/selection-info';
 import { SchedulePreview } from './uielements/schedule-preview';
 import { AppHeader } from './uielements/app-header';
+import { parseUrlReportRegion, useHashRoute } from './uielements/routing';
+import { cls } from './uielements/cls';
 
 export type MapContextT = {
   map: Map,
@@ -44,7 +46,7 @@ export const SelectionContext = createContext<SelectionContextT>({
 });
 
 export function App() {
-
+  const [expanded, setExpanded] = useState(true);
   const [mapContextVal, setMapContextVal] = useState<MapContextT>();
   const [selection, updateSelection] = useState<SelectionT | null>(null);
   const [selectionSource, updateSelectionSource] = useState<SelectionSourceT>('app-init');
@@ -89,21 +91,36 @@ export function App() {
 
 
   const preview = selection?.datasetName === 'preview';
+  const reportRegion = useHashRoute(parseUrlReportRegion);
 
   return (
     <>
       <AppHeader />
-      <div id="map-view"></div>
-
       <MapContext value={mapContextVal} >
         <SelectionContext value={selectionContext} >
+          <div id="content-area">
+            <div id="side-panel" className={cls(reportRegion && 'slim')}>
+              <div>
+                <a onClick={() => selectionContext.onReportSelect(null)} href="#/">Back to reports</a>
+                <span className={'float-right'}>
+                  <span className={'link-like'} onClick={() => setExpanded(!expanded)}>
+                    {expanded ? 'Hide' : 'Show'}
+                  </span>
+                </span>
+              </div>
 
-          <MatchReportSelector onSelectReport={selectionContext.onReportSelect} />
-          {preview ?
-            <SchedulePreview selection={selection} /> :
-            <SelectionInfo selection={selection} />
-          }
-
+              {preview ?
+                <SchedulePreview selection={selection} /> :
+                <SelectionInfo selection={selection} />
+              }
+              
+              <MatchReportSelector onSelectReport={selectionContext.onReportSelect} />
+              
+            </div>
+            <div id="map-container">
+              <div id="map-view"></div>
+            </div>
+          </div>
         </SelectionContext>
       </MapContext>
     </>

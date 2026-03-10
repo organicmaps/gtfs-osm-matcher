@@ -24,19 +24,11 @@
     overflow-y: scroll;
 }
 
-.right-top {
-    position: absolute;
-    top: 40px;
-    right: 10px;
-    z-index: 10;
-
-    width: 275px;
-
-    background-color: white;
-
+.report-list-panel {
     padding: 1em;
-
-    border-radius: 4px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
 }
 
 .report-table {
@@ -90,27 +82,8 @@
     float: right;
 }
 
-.report-datasets.collapsed {
-    display: none;
-}
-
-.report-datasets.expanded {
-    display: block;
-}
-
-@media (max-width: 600px) {
-    .overlay-content {
-        width: 98%;
-        min-width: unset;
-        margin: 0.5em auto;
-        border-radius: 0.5em;
-        padding: 0.5em;
-        box-sizing: border-box;
-    }
-
-    .reports {
-        overflow-x: auto;
-    }
+.report-datasets {
+    border-top: 1px solid #ddd;
 }
 
 .fold-header {

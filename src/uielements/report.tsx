@@ -91,6 +91,7 @@ const matchDatasetOrderComparator = (a: MatchDataset, b: MatchDataset) => {
 
 export type Report = {
     region: string;
+    source?: string;
 
     matchDatasets: MatchDataset[];
 

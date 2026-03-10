@@ -10,7 +10,7 @@ type MatchReportSelectorProps = {
     onSelectReport?: (reportRegion: string | null) => void;
 };
 export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps) {
-    const [expanded, setExpanded] = useState(true);
+    
     const [matchReports, setMatchReports] = useState<Report[]>([]);
     const [foldByName, setFoldByName] = useState<string[]>([]);
 
@@ -26,8 +26,7 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
     }, [setMatchReports, setFoldByName]);
 
     const reports = matchReports.map((report) => {
-        const region = report.region;
-        const liveUpdates = report.liveUpdates;
+        const {region, source, liveUpdates} = report;
         
         const gtfsDate = report.matchMeta?.gtfsTimeStamp ? 
                 new Date(report.matchMeta.gtfsTimeStamp) : 
@@ -39,6 +38,7 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
 
         return {
             region,
+            source,
             gtfsDate,
             matched,
             matchPercent,
@@ -51,47 +51,33 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
 
     if (reportData) {
         return (
-            <>
-                <div className={'right-top'}>
-                    <div>
-                        <a onClick={() => onSelectReport?.(null)} href="#/">Back to reports</a>
-                        <span className={'float-right'}>
-                            <span className={'link-like'} onClick={() => setExpanded(!expanded)}>
-                                {expanded ? 'Hide' : 'Show'}
-                            </span>
-                        </span>
-                    </div>
-                    <div className={cls('report-datasets', expanded ? 'expanded' : 'collapsed')}>
-                        {<MatchReport
-                            key={reportRegion}
-                            reportRegion={reportRegion}
-                            reportData={reportData} />}
-                    </div>
-                </div>
-            </>
-        )
+            <div className={cls('report-datasets')}>
+                {<MatchReport
+                    key={reportRegion}
+                    reportRegion={reportRegion}
+                    reportData={reportData} />}
+            </div>
+        );
     }
 
     return (
-        <div className={"overlay"}>
-            <div className={'overlay-content'}>
-                <h2>Available match reports</h2>
-                <div className={'reports'}>
-                    <ReportTable 
-                        reports={reports} 
-                        onSelectReport={onSelectReport} 
-                        foldByName={foldByName} 
-                    />
-                </div>
-                <div className={"report-list-footer"}>
-                    To add your city or country, or for any other inquiries, please write us at
-                    <span> <a href="mailto:publictransport@organicmaps.app">
-                        publictransport@organicmaps.app
-                    </a></span> or create an issue on
-                    <span> <a href="https://github.com/organicmaps/gtfs-osm-matcher/issues?q=label%3Anew-gtfs-source">
-                        GitHub
-                    </a></span>
-                </div>
+        <div className={"report-list-panel"}>
+            <h2>Available match reports</h2>
+            <div className={'reports'}>
+                <ReportTable
+                    reports={reports}
+                    onSelectReport={onSelectReport}
+                    foldByName={foldByName}
+                />
+            </div>
+            <div className={"report-list-footer"}>
+                To add your city or country, or for any other inquiries, please write us at
+                <span> <a href="mailto:publictransport@organicmaps.app">
+                    publictransport@organicmaps.app
+                </a></span> or create an issue on
+                <span> <a href="https://github.com/organicmaps/gtfs-osm-matcher/issues?q=label%3Anew-gtfs-source">
+                    GitHub
+                </a></span>
             </div>
         </div>
     )
