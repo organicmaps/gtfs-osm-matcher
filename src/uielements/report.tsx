@@ -52,6 +52,7 @@ type MatchDataset = {
 const matchDatasetSortOrder = [
     'preview',
     'match-id',
+    'match-routes',
     'match-name',
     'match-name-id-conflict',
     'separated-clusters',
@@ -66,6 +67,7 @@ const matchDatasetSortOrder = [
 const dsTitles: {[key: string]: string} = {
     'preview': 'Preview timetables for all matched',
     'match-id': 'Stops matched by GTFS Id or Code',
+    'match-routes': 'Stops matched by routes going through this stop',
     'match-name': 'Stops matched by Name',
     'match-name-id-conflict': 'Stops matched by Name but mismatched by id',
     'separated-clusters': 'Many OSM stops matched one or many GTFS, but successfuly separated',
