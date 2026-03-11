@@ -24,6 +24,11 @@
     overflow-y: scroll;
 }
 
+.no-decoration {
+    text-decoration: none;
+    color: #333;
+}
+
 .report-list-panel {
     padding: 1em;
     flex: 1;

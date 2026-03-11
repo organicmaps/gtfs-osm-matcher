@@ -71,13 +71,14 @@
 }
 
 @media (max-width: 1200px) {
-#side-panel {
-  padding-left: 0.25em;
-  padding-right: 0.25em;
-}
-#side-panel.slim {
-  width: unset !important;
-}
+  #side-panel {
+    padding-left: 0.25em;
+    padding-right: 0.25em;
+  }
+
+  #side-panel.slim {
+    width: unset !important;
+  }
 }
 
 #side-panel.slim {
@@ -165,5 +166,13 @@
     order: 1;
     height: 55vh;
     flex-shrink: 0;
+  }
+
+  #map-location input {
+    width: 8em;
+  }
+
+  #app-header button {
+    font-size: 1em;
   }
 }
