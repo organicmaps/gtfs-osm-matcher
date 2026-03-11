@@ -3,7 +3,9 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { satMapStyle } from "./styling";
 import { LayerControls } from "./layers-controls";
 
-const DEFAULT_LOCATION = { zoom: 4, lat: 46.16, lon: -29.44 };
+// Zoom further away for mobile
+const DEFAULT_ZOOM = screen.width > 1200 ? 4 : 1;
+const DEFAULT_LOCATION = { zoom: DEFAULT_ZOOM, lat: 46.16, lon: -29.44 };
 
 export function createMap(containerId: string) {
     const savedLocation = localStorage.getItem('map-location');
