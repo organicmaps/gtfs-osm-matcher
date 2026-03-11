@@ -2,6 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import { parseUrlReportRegion, useHashRoute } from "./routing";
 import { MatchReport, type Report } from "./report";
 import { ReportTable } from "./report-table";
+import { RegionMarkersLayer } from "./region-markers";
 import { cls } from "./cls";
 import { DATA_BASE_URL } from "../config";
 import "./report-selector.css";
@@ -62,6 +63,7 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
 
     return (
         <div className={"report-list-panel"}>
+            <RegionMarkersLayer reports={matchReports} onSelectReport={onSelectReport} />
             <h2>Available match reports</h2>
             <div className={'reports'}>
                 <ReportTable
