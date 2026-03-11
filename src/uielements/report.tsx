@@ -156,8 +156,10 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
     const matchMeta = reportData.matchMeta;
     const idTags = reportData.idTags;
 
-    console.log('hashSelection', hashSelection);
-    console.log('reportData', reportData);
+    if (import.meta.env.DEV) {
+        console.log('hashSelection', hashSelection);
+        console.log('reportData', reportData);
+    }
 
     useEffect(() => {
         if (map && matchMeta?.gtfsBbox && shouldUpdateBoundsSignal.value) {
@@ -175,6 +177,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
     const urlSelectedSet = hashSelection?.dataset ? { [hashSelection?.dataset]: true } : undefined;
     const [selectedDatasets, updateSelectedDatasets] = useState(urlSelectedSet || defaultSets);
     const [datasetData, updateDatasetData] = useState<DatasetsDataByName>({});
+    const [minimized, setMinimized] = useState(false);
 
     const handleDatasetLoad = useCallback((ds: string, data: any) => {
         console.log('Loaded', reportRegion, ds);
@@ -274,18 +277,27 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
     });
 
     return (<div>
-        <h2>{reportRegion}</h2>
-        {datasetControls}
+        <h2 className={"report-header"}>
+            {reportRegion}
+            <span className={"minimize-toggle button-like"} 
+                title={minimized ? 'maximize' : 'minimize'}
+                onClick={() => setMinimized(!minimized)}>
+                {minimized ? '🗖' : '🗕'}
+            </span>
+        </h2>
         {datasetElements}
-        <div className={"match-report-meta"}>
-            <div className={"section"}>
-                <label>GTFS source timestamp </label><div className={"ts-value"}>{gtfsTS}</div>
+        {!minimized && <>
+            {datasetControls}
+            <div className={"match-report-meta"}>
+                <div className={"section"}>
+                    <label>GTFS source timestamp </label><div className={"ts-value"}>{gtfsTS}</div>
+                </div>
+                <div className={"section"}>
+                    <label>OSM Sources timestamps</label>
+                    {osmSourcesTS}
+                </div>
             </div>
-            <div className={"section"}>
-                <label>OSM Sources timestamps</label>
-                {osmSourcesTS}
-            </div>
-        </div>
+        </>}
     </div>)
 
 }

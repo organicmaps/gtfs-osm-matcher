@@ -99,25 +99,16 @@ export function App() {
       <MapContext value={mapContextVal} >
         <SelectionContext value={selectionContext} >
           <div id="content-area">
-            <div id="side-panel" className={cls(reportRegion && 'slim')}>
-              <div>
-                <a onClick={() => selectionContext.onReportSelect(null)} href="#/">Back to reports</a>
-                <span className={'float-right'}>
-                  <span className={'link-like'} onClick={() => setExpanded(!expanded)}>
-                    {expanded ? 'Hide' : 'Show'}
-                  </span>
-                </span>
-              </div>
-
+            <div id="side-panel" className={cls(reportRegion && 'slim', !expanded && 'hidden')}>
+              <button id="drawer-toggle" onClick={() => setExpanded(false)} />
               {preview ?
                 <SchedulePreview selection={selection} /> :
                 <SelectionInfo selection={selection} />
               }
-              
               <MatchReportSelector onSelectReport={selectionContext.onReportSelect} />
-              
             </div>
             <div id="map-container">
+              {!expanded && <button id="drawer-restore" onClick={() => setExpanded(true)} />}
               <div id="map-view"></div>
             </div>
           </div>

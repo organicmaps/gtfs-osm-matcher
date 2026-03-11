@@ -23,6 +23,7 @@
   padding-left: 1em;
   padding-right: 1em;
 
+  position: relative;
   width: 50vw;
   flex-shrink: 0;
   overflow-y: auto;
@@ -31,14 +32,71 @@
   flex-direction: column;
 }
 
+@media (max-width: 1200px) {
+#side-panel {
+  padding-left: 0.25em;
+  padding-right: 0.25em;
+}
+#side-panel.slim {
+  width: unset !important;
+}
+}
+
 #side-panel.slim {
   width: 20vw;
+}
+
+#side-panel.hidden {
+  display: none;
 }
 
 #map-container {
   flex: 1;
   position: relative;
   min-width: 0;
+}
+
+#drawer-toggle, #drawer-restore {
+  position: absolute;
+  z-index: 10;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 0.75em 0.8em;
+  font-size: 0.75em;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  cursor: pointer;
+}
+
+#drawer-toggle:hover, #drawer-restore:hover {
+  background: #f0f0f0;
+}
+
+/* Desktop: toggle at top-right of panel, restore at top-left of map */
+#drawer-toggle {
+  top: 8px;
+  right: 2em;
+}
+#drawer-toggle::after { content: '◀'; }
+
+#drawer-restore {
+  top: 8px;
+  left: 8px;
+}
+#drawer-restore::after { content: '▶'; }
+
+/* Mobile: panel is at bottom; restore at bottom-right of map */
+@media (max-width: 1200px) {
+  #drawer-toggle::after { content: '▼'; }
+
+  #drawer-restore {
+    top: auto;
+    left: auto;
+    bottom: 8px;
+    right: 8px;
+  }
+  #drawer-restore::after { content: '▲'; }
 }
 
 #map-view {

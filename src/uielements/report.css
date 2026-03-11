@@ -1,3 +1,21 @@
+.report-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0.5em 0;
+}
+
+.minimize-toggle {
+    background: none;
+    padding: 0.15em 0.4em;
+    cursor: pointer;
+    font-size: 0.7em;
+    flex-shrink: 0;
+}
+
+.minimize-toggle:hover {
+    background: #f0f0f0;
+}
 
 .match-dataset {
     display: inline-block;
