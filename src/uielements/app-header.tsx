@@ -9,11 +9,18 @@ export function AppHeader() {
 
     return (
         <div id="app-header">
-            <button id="map-style-button">Map Style</button>
-
-            <span className={'link-like'} onClick={() => setShowHelp(!showHelp)}>Help</span>
-            <span>&nbsp;|&nbsp;</span>
-            <span className={'link-like'} onClick={() => setShowChanges(!showChanges)}>OSM Changes</span>
+            <div id="header-left">
+                <span className={'link-like'} onClick={() => setShowHelp(!showHelp)}>Help</span>
+                <span className={'header-sep'}>|</span>
+                <span className={'link-like'} onClick={() => setShowChanges(!showChanges)}>OSM Changes</span>
+            </div>
+            <div id="header-right">
+                <button id="map-style-button">Map Style</button>
+                <div id="map-location">
+                    <input/>
+                    <a target={'_blank'} className={'goto-button'}><button>Goto OSM</button></a>
+                </div>
+            </div>
             {showHelp && <ReportHelpOverlay onClose={() => setShowHelp(false)} />}
             {showChanges &&
                 <div className={"overlay"}>

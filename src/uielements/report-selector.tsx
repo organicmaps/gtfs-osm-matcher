@@ -53,6 +53,7 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
     if (reportData) {
         return (
             <div className={cls('report-datasets')}>
+                <a onClick={() => onSelectReport?.(null)} href="#/">← Back to reports</a>
                 {<MatchReport
                     key={reportRegion}
                     reportRegion={reportRegion}

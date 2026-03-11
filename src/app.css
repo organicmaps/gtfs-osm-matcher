@@ -7,9 +7,47 @@
   flex-direction: column;
 }
 
+@media (max-width: 1200px) {
+:root {
+  font-size: 0.6em;
+}
+}
+
 #app-header {
   height: 35px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 0.75em;
+  border-bottom: 1px solid #ddd;
+  gap: 1em;
+}
+
+#header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+#header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  margin-left: auto;
+}
+
+.header-sep {
+  color: #ccc;
+}
+
+#map-location {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+#map-location input {
+  width: 275px;
 }
 
 #content-area {
@@ -104,32 +142,8 @@
   width: 100%;
 }
 
-#map-location {
-  position: absolute;
-  z-index: 10;
-  top: 5px;
-  right: 10px;
-  width: calc(275px + 2em);
-}
-
 #map-location input {
-  margin-right: 1em;
-}
-
-#map-style-button {
-  position: absolute;
-  z-index: 10;
-  top: 5px;
-  right: calc(275px + 2em + 40px);
-}
-
-a.goto-button {
-  background-color: rgb(251, 250, 250);
-  padding: 0.2em 0.5em;
-  border: 1px solid #666;
-  border-radius: 5px;
-  text-decoration: none;
-  font-size: .8em;
+  width: 12em;
 }
 
 /* Mobile: map on top, panel at bottom */

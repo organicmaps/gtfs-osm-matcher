@@ -36,28 +36,25 @@ export function createMap(containerId: string) {
         };
     }
 
-    const mapLocationEl = document.createElement('div');
-    mapLocationEl.id = "map-location";
+    const mapLocationEl = document.getElementById('map-location');
 
-    const locationInput = document.createElement('input');
-    mapLocationEl.appendChild(locationInput);
+    const locationInput = mapLocationEl?.querySelector('input');
+    const osmHref = mapLocationEl?.querySelector('a.goto-button');
 
-    const osmHref = document.createElement('a');
-    osmHref.target = "_blank";
-    osmHref.innerText = "Goto OSM";
-    osmHref.className = "goto-button";
-    mapLocationEl.appendChild(osmHref);
-
-    document.getElementById('app')?.appendChild(mapLocationEl);
+    if (!mapLocationEl) {
+        console.error('Cant find map-location div');
+    }
 
     map.on('idle', () => {
-        const hstr = mapHashString(map);
-        locationInput.value = hstr;
-        osmHref.href = `https://openstreetmap.org#map=${hstr}`;
-        localStorage.setItem('map-location', hstr);
+        if (locationInput && osmHref) {
+            const hstr = mapHashString(map);
+            locationInput.value = hstr;
+            (osmHref as HTMLAnchorElement).href = `https://openstreetmap.org#map=${hstr}`;
+            localStorage.setItem('map-location', hstr);
+        }
     });
 
-    locationInput.onchange = (e: Event) => {
+    (locationInput as HTMLInputElement).onchange = (e: Event) => {
         const { zoom, lon, lat } = mapLocationFromHashString((e.target as HTMLInputElement).value);
 
         if (lon && !Number.isNaN(lon) && lat && !Number.isNaN(lat) && zoom) {
