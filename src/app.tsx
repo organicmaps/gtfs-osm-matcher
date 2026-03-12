@@ -12,6 +12,9 @@ import { SchedulePreview } from './uielements/schedule-preview';
 import { AppHeader } from './uielements/app-header';
 import { parseUrlReportRegion, useHashRoute } from './uielements/routing';
 import { cls } from './uielements/cls';
+import { OSM_DATA } from './services/OSMData';
+import { Changes } from './uielements/editor/changes';
+import { useSyncExternalStore } from 'preact/compat';
 
 export type MapContextT = {
   map: Map,
@@ -46,12 +49,18 @@ const togglePanel = () =>
 type SidePanelNavProps = {
   reportRegion: string | undefined;
   selection: SelectionT | null;
-  activeTab: 'report' | 'selection';
-  setActiveTab: (tab: 'report' | 'selection') => void;
+  activeTab: 'report' | 'selection' | 'changes';
+  setActiveTab: (tab: 'report' | 'selection' | 'changes') => void;
   onBackToReports: () => void;
 }
 
 function SidePanelNav({ reportRegion, selection, activeTab, setActiveTab, onBackToReports }: SidePanelNavProps) {
+
+  const anyOsmChanges = useSyncExternalStore<boolean>(
+    (sub) => OSM_DATA.subscribe(sub), 
+    () => OSM_DATA.listChanges().length > 0
+  );
+
   return (
     <div className={'report-nav'}>
       {reportRegion && <>
@@ -66,6 +75,11 @@ function SidePanelNav({ reportRegion, selection, activeTab, setActiveTab, onBack
       {selection && <>
         <span className={cls('tab', activeTab === 'selection' && 'tab-active')}
           onClick={() => { restorePanel(); setActiveTab('selection'); }}>Selection</span>
+        <span className={'tab-sep'}>|</span>
+      </>}
+      {anyOsmChanges && <>
+        <span className={cls('tab', activeTab === 'changes' && 'tab-active')}
+          onClick={() => { restorePanel(); setActiveTab('changes'); }}>OSM Changes</span>
         <span className={'tab-sep'}>|</span>
       </>}
       <span className={'minimize-toggle'} onClick={togglePanel}>
@@ -84,7 +98,7 @@ export const SelectionContext = createContext<SelectionContextT>({
 });
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'report' | 'selection'>('report');
+  const [activeTab, setActiveTab] = useState<'report' | 'selection' | 'changes'>('report');
   const [mapContextVal, setMapContextVal] = useState<MapContextT>();
   const [selection, updateSelection] = useState<SelectionT | null>(null);
   const [selectionSource, updateSelectionSource] = useState<SelectionSourceT>('app-init');
@@ -157,6 +171,10 @@ export function App() {
 
               <div className={cls(activeTab !== 'report' && 'tab-hidden')}>
                 <MatchReportSelector onSelectReport={selectionContext.onReportSelect} />
+              </div>
+
+              <div className={cls(activeTab !== 'changes' && 'tab-hidden')}>
+                <Changes osmData={OSM_DATA} />
               </div>
 
             </div>

@@ -131,9 +131,17 @@
   display: none;
 }
 
-.minimize-toggle .label-restore { display: none; }
-.minimized-panel .minimize-toggle .label-minimize { display: none; }
-.minimized-panel .minimize-toggle .label-restore { display: inline; }
+.minimize-toggle .label-restore { 
+  display: none; 
+}
+
+.minimized-panel .minimize-toggle .label-minimize { 
+  display: none; 
+}
+
+.minimized-panel .minimize-toggle .label-restore { 
+  display: inline; 
+}
 
 #map-container {
   flex: 1;

@@ -31,14 +31,20 @@ export default class OSMData {
     elements: OSMElement[]
     changes: OSMDataChange[]
 
-    dataUpdated: () => void;
+    private listeners = new Set<() => void>();
+
+    subscribe(fn: () => void): () => void {
+        this.listeners.add(fn);
+        return () => this.listeners.delete(fn);
+    }
+
+    private emit() {
+        this.listeners.forEach(fn => fn());
+    }
 
     constructor() {
         this.newIdCounter = -1;
         this.changes = [];
-
-        this.dataUpdated = () => { };
-
         this.elements = [];
         this.idMap = new Map<string, OSMElement>();
     }
@@ -64,7 +70,7 @@ export default class OSMData {
                 this.updateElement(e);
             });
 
-            this.dataUpdated();
+            this.emit();
         }
     }
 
@@ -153,7 +159,7 @@ export default class OSMData {
             });
         }
 
-        this.dataUpdated();
+        this.emit();
     }
 
     getLonLat(element: OSMElement) {
