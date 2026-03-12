@@ -52,17 +52,17 @@ function SidePanelNav({ reportRegion, selection, activeTab, setActiveTab, minimi
   return (
     <div className={'report-nav'}>
       {reportRegion && <>
-        <a className={'no-decoration'} onClick={onBackToReports} href="#/">All reports</a>
+        <a className={'no-decoration'} onClick={() => {setMinimized(false); onBackToReports();}} href="#/">All reports</a>
         <span className={'tab-sep'}>|</span>
       </>}
       {reportRegion && <>
         <span className={cls('tab', activeTab === 'report' && 'tab-active')}
-          onClick={() => setActiveTab('report')}>Report</span>
+          onClick={() => {setMinimized(false); setActiveTab('report');}}>Report</span>
         <span className={'tab-sep'}>|</span>
       </>}
       {selection && <>
         <span className={cls('tab', activeTab === 'selection' && 'tab-active')}
-          onClick={() => setActiveTab('selection')}>Selection</span>
+          onClick={() => {setMinimized(false); setActiveTab('selection');}}>Selection</span>
         <span className={'tab-sep'}>|</span>
       </>}
       <span className={'minimize-toggle'}
@@ -133,6 +133,9 @@ export function App() {
   const preview = selection?.datasetName === 'preview';
   const reportRegion = useHashRoute(parseUrlReportRegion);
 
+  const selectionHidden = (activeTab !== 'selection' || minimized);
+  const reportHiddent = (activeTab !== 'report' || minimized);
+
   return (
     <>
       <AppHeader />
@@ -149,17 +152,18 @@ export function App() {
                 setMinimized={setMinimized}
                 onBackToReports={() => selectionContext.onReportSelect(null)}
               />
-              {!minimized && <>
-                <div className={cls(activeTab !== 'selection' && 'tab-hidden')}>
-                  {preview ?
-                    <SchedulePreview selection={selection} /> :
-                    <SelectionInfo selection={selection} />
-                  }
-                </div>
-                <div className={cls(activeTab !== 'report' && 'tab-hidden')}>
-                  <MatchReportSelector onSelectReport={selectionContext.onReportSelect} />
-                </div>
-              </>}
+              
+              <div className={cls(selectionHidden && 'tab-hidden')}>
+                {preview ?
+                  <SchedulePreview selection={selection} /> :
+                  <SelectionInfo selection={selection} />
+                }
+              </div>
+
+              <div className={cls(reportHiddent && 'tab-hidden')}>
+                <MatchReportSelector onSelectReport={selectionContext.onReportSelect} />
+              </div>
+
             </div>
             <div id="map-container">
               <div id="map-view"></div>

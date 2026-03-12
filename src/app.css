@@ -80,6 +80,7 @@
   flex-direction: row;
   flex: 1;
   min-height: 0;
+  position: relative;
 }
 
 #side-panel {
@@ -112,6 +113,18 @@
 
 #side-panel.hidden {
   display: none;
+}
+
+#side-panel.minimized {
+  position: absolute;
+  z-index: 10;
+  width: auto !important;
+  border-right: none;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  border-radius: 0 0 4px 4px;
+  overflow: visible;
+  padding-bottom: 0.5em;
 }
 
 #map-container {
@@ -191,6 +204,15 @@
     order: 1;
     height: 55vh;
     flex-shrink: 0;
+  }
+
+  #side-panel.minimized {
+    position: static;
+    width: 100% !important;
+    height: auto;
+    box-shadow: none;
+    border-radius: 0;
+    border-top: 1px solid #ddd;
   }
 
   #map-location input {
