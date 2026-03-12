@@ -9,7 +9,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { MatchReportSelector } from './uielements/report-selector';
 import { SelectionInfo } from './uielements/selection-info';
 import { SchedulePreview } from './uielements/schedule-preview';
-import { AppHeader } from './uielements/app-header';
+import { MapTools } from './uielements/map-tools';
 import { parseUrlReportRegion, useHashRoute } from './uielements/routing';
 import { cls } from './uielements/cls';
 import { OSM_DATA } from './services/OSMData';
@@ -63,7 +63,7 @@ function SidePanelNav({ reportRegion, selection, activeTab, setActiveTab, onBack
 
   return (
     <div className={'report-nav'}>
-      {reportRegion && <>
+      {(reportRegion || anyOsmChanges) && <>
         <a className={'no-decoration'} onClick={() => { restorePanel(); onBackToReports(); }} href="#/">All reports</a>
         <span className={'tab-sep'}>|</span>
       </>}
@@ -149,7 +149,6 @@ export function App() {
 
   return (
     <>
-      <AppHeader />
       <MapContext value={mapContextVal} >
         <SelectionContext value={selectionContext} >
           <div id="content-area">
@@ -179,6 +178,7 @@ export function App() {
 
             </div>
             <div id="map-container">
+              <MapTools />
               <div id="map-view"></div>
             </div>
           </div>

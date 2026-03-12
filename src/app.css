@@ -13,31 +13,42 @@
 }
 }
 
-#app-header {
-  height: 35px;
-  flex-shrink: 0;
+#map-tools {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
   display: flex;
-  align-items: center;
-  padding: 0 0.75em;
-  border-bottom: 1px solid #ddd;
-  gap: 1em;
-}
-
-#header-left {
-  display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 0.5em;
+  padding: 0.25em 0.4em;
+  background: white;
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
 }
 
-#header-right {
+#map-tools-content {
   display: flex;
   align-items: center;
-  gap: 0.5em;
-  margin-left: auto;
+  gap: 0.75em;
 }
 
-.header-sep {
-  color: #ccc;
+#map-tools-content.folded {
+  display: none;
+}
+
+
+.map-tools-toggle {
+  cursor: pointer;
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  color: #555;
+  user-select: none;
+}
+
+.map-tools-toggle:hover {
+  background: #f0f0f0;
 }
 
 .tab {
@@ -149,6 +160,11 @@
   min-width: 0;
 }
 
+#map-view {
+  height: 100%;
+  width: 100%;
+}
+
 #drawer-toggle, #drawer-restore {
   position: absolute;
   z-index: 10;
@@ -192,10 +208,6 @@
   #drawer-restore::after { content: '▲'; }
 }
 
-#map-view {
-  height: 100%;
-  width: 100%;
-}
 
 #map-location input {
   width: 12em;
@@ -235,7 +247,7 @@
     width: 8em;
   }
 
-  #app-header button {
+  #map-tools button {
     font-size: 1em;
   }
 }
