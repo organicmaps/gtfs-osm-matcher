@@ -38,38 +38,39 @@ export type SelectionContextT = {
   onReportSelect: (reportRegion: string | null) => void;
 };
 
+const restorePanel = () =>
+  document.getElementById('content-area')?.classList.remove('minimized-panel');
+const togglePanel = () =>
+  document.getElementById('content-area')?.classList.toggle('minimized-panel');
+
 type SidePanelNavProps = {
   reportRegion: string | undefined;
   selection: SelectionT | null;
   activeTab: 'report' | 'selection';
   setActiveTab: (tab: 'report' | 'selection') => void;
-  minimized: boolean;
-  setMinimized: (v: boolean) => void;
   onBackToReports: () => void;
 }
 
-function SidePanelNav({ reportRegion, selection, activeTab, setActiveTab, minimized, setMinimized, onBackToReports }: SidePanelNavProps) {
+function SidePanelNav({ reportRegion, selection, activeTab, setActiveTab, onBackToReports }: SidePanelNavProps) {
   return (
     <div className={'report-nav'}>
       {reportRegion && <>
-        <a className={'no-decoration'} onClick={() => {setMinimized(false); onBackToReports();}} href="#/">All reports</a>
+        <a className={'no-decoration'} onClick={() => { restorePanel(); onBackToReports(); }} href="#/">All reports</a>
         <span className={'tab-sep'}>|</span>
       </>}
       {reportRegion && <>
         <span className={cls('tab', activeTab === 'report' && 'tab-active')}
-          onClick={() => {setMinimized(false); setActiveTab('report');}}>Report</span>
+          onClick={() => { restorePanel(); setActiveTab('report'); }}>Report</span>
         <span className={'tab-sep'}>|</span>
       </>}
       {selection && <>
         <span className={cls('tab', activeTab === 'selection' && 'tab-active')}
-          onClick={() => {setMinimized(false); setActiveTab('selection');}}>Selection</span>
+          onClick={() => { restorePanel(); setActiveTab('selection'); }}>Selection</span>
         <span className={'tab-sep'}>|</span>
       </>}
-      <span className={'minimize-toggle'}
-        title={minimized ? 'maximize' : 'minimize'}
-        onClick={() => setMinimized(!minimized)}
-      >
-        {minimized ? <span>Restore</span> : <span>Minimize</span>}
+      <span className={'minimize-toggle'} onClick={togglePanel}>
+        <span className={'label-minimize'}>Minimize</span>
+        <span className={'label-restore'}>Restore</span>
       </span>
     </div>
   );
@@ -83,7 +84,6 @@ export const SelectionContext = createContext<SelectionContextT>({
 });
 
 export function App() {
-  const [minimized, setMinimized] = useState(false);
   const [activeTab, setActiveTab] = useState<'report' | 'selection'>('report');
   const [mapContextVal, setMapContextVal] = useState<MapContextT>();
   const [selection, updateSelection] = useState<SelectionT | null>(null);
@@ -133,34 +133,29 @@ export function App() {
   const preview = selection?.datasetName === 'preview';
   const reportRegion = useHashRoute(parseUrlReportRegion);
 
-  const selectionHidden = (activeTab !== 'selection' || minimized);
-  const reportHiddent = (activeTab !== 'report' || minimized);
-
   return (
     <>
       <AppHeader />
       <MapContext value={mapContextVal} >
         <SelectionContext value={selectionContext} >
           <div id="content-area">
-            <div id="side-panel" className={cls(reportRegion && 'slim', minimized && 'minimized')}>
+            <div id="side-panel" className={cls(reportRegion && 'slim')}>
               <SidePanelNav
                 reportRegion={reportRegion}
                 selection={selection}
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
-                minimized={minimized}
-                setMinimized={setMinimized}
                 onBackToReports={() => selectionContext.onReportSelect(null)}
               />
-              
-              <div className={cls(selectionHidden && 'tab-hidden')}>
+
+              <div className={cls(activeTab !== 'selection' && 'tab-hidden')}>
                 {preview ?
                   <SchedulePreview selection={selection} /> :
                   <SelectionInfo selection={selection} />
                 }
               </div>
 
-              <div className={cls(reportHiddent && 'tab-hidden')}>
+              <div className={cls(activeTab !== 'report' && 'tab-hidden')}>
                 <MatchReportSelector onSelectReport={selectionContext.onReportSelect} />
               </div>
 

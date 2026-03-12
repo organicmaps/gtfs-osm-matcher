@@ -115,7 +115,7 @@
   display: none;
 }
 
-#side-panel.minimized {
+.minimized-panel #side-panel {
   position: absolute;
   z-index: 10;
   width: auto !important;
@@ -126,6 +126,14 @@
   overflow: visible;
   padding-bottom: 0.5em;
 }
+
+.minimized-panel #side-panel > div:not(.report-nav) {
+  display: none;
+}
+
+.minimize-toggle .label-restore { display: none; }
+.minimized-panel .minimize-toggle .label-minimize { display: none; }
+.minimized-panel .minimize-toggle .label-restore { display: inline; }
 
 #map-container {
   flex: 1;
@@ -206,7 +214,7 @@
     flex-shrink: 0;
   }
 
-  #side-panel.minimized {
+  .minimized-panel #side-panel {
     position: static;
     width: 100% !important;
     height: auto;
