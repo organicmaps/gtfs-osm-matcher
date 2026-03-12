@@ -35,11 +35,12 @@ type SortableHeaderProps<T> = {
     sortDirection: 'asc' | 'desc';
     onSort: (column: T) => void;
     label: string;
+    className?: string;
 }
 
-function SortableHeader<T extends string>({ column, currentSortColumn, sortDirection, onSort, label }: SortableHeaderProps<T>) {
+function SortableHeader<T extends string>({ column, currentSortColumn, sortDirection, onSort, label, className }: SortableHeaderProps<T>) {
     return (
-        <th onClick={() => onSort(column)}>
+        <th className={className} onClick={() => onSort(column)}>
             <span>{label}</span>{currentSortColumn === column && <span>{sortDirection === 'asc' ? ' ▲' : ' ▼'}</span>}
         </th>
     )
@@ -117,7 +118,8 @@ export function ReportTable({ reports, onSelectReport, foldByName = [] }: Report
                     <SortableHeader column={'source'} label={'Source'}
                         currentSortColumn={sortColumn}
                         sortDirection={sortDirection}
-                        onSort={handleHeaderClick} />
+                        onSort={handleHeaderClick}
+                        className={'col-source'} />
                     <SortableHeader column={'liveUpdates'} label={'Live Updates'}
                         currentSortColumn={sortColumn}
                         sortDirection={sortDirection}
@@ -224,7 +226,7 @@ function renderReportRow(report: ReportRow, onSelectReport: ReportSelectCb, clas
     return (
         <tr key={region} className={className}>
             <td><a onClick={() => onSelectReport?.(region)} href={`#/match-report/${region}`}>{region}</a></td>
-            <td>
+            <td className="col-source">
                 {sourceDomain ? <a target={'blank'} href={`https://${sourceDomain}`}>{sourceDomain}</a> : '-'}
             </td>
             <td>
