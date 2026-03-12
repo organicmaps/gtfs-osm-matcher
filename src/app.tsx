@@ -38,6 +38,43 @@ export type SelectionContextT = {
   onReportSelect: (reportRegion: string | null) => void;
 };
 
+type SidePanelNavProps = {
+  reportRegion: string | undefined;
+  selection: SelectionT | null;
+  activeTab: 'report' | 'selection';
+  setActiveTab: (tab: 'report' | 'selection') => void;
+  minimized: boolean;
+  setMinimized: (v: boolean) => void;
+  onBackToReports: () => void;
+}
+
+function SidePanelNav({ reportRegion, selection, activeTab, setActiveTab, minimized, setMinimized, onBackToReports }: SidePanelNavProps) {
+  return (
+    <div className={'report-nav'}>
+      {reportRegion && <>
+        <a className={'no-decoration'} onClick={onBackToReports} href="#/">All reports</a>
+        <span className={'tab-sep'}>|</span>
+      </>}
+      {reportRegion && <>
+        <span className={cls('tab', activeTab === 'report' && 'tab-active')}
+          onClick={() => setActiveTab('report')}>Report</span>
+        <span className={'tab-sep'}>|</span>
+      </>}
+      {selection && <>
+        <span className={cls('tab', activeTab === 'selection' && 'tab-active')}
+          onClick={() => setActiveTab('selection')}>Selection</span>
+        <span className={'tab-sep'}>|</span>
+      </>}
+      <span className={'minimize-toggle'}
+        title={minimized ? 'maximize' : 'minimize'}
+        onClick={() => setMinimized(!minimized)}
+      >
+        {minimized ? <span>Restore</span> : <span>Minimize</span>}
+      </span>
+    </div>
+  );
+}
+
 export const SelectionContext = createContext<SelectionContextT>({
   selection: null,
   selectionSource: 'app-init',
@@ -46,7 +83,8 @@ export const SelectionContext = createContext<SelectionContextT>({
 });
 
 export function App() {
-  const [expanded, setExpanded] = useState(true);
+  const [minimized, setMinimized] = useState(false);
+  const [activeTab, setActiveTab] = useState<'report' | 'selection'>('report');
   const [mapContextVal, setMapContextVal] = useState<MapContextT>();
   const [selection, updateSelection] = useState<SelectionT | null>(null);
   const [selectionSource, updateSelectionSource] = useState<SelectionSourceT>('app-init');
@@ -56,11 +94,13 @@ export function App() {
     updateSelection: (selection, source) => {
       updateSelection(selection);
       updateSelectionSource(source);
+      setActiveTab('selection');
     },
     selectionSource,
     onReportSelect: (_r: string | null) => {
       updateSelection(null);
       updateSelectionSource('report-reset');
+      setActiveTab('report');
       window.dispatchEvent(new Event('ShouldUpdateBounds'));
     }
   }
@@ -99,16 +139,29 @@ export function App() {
       <MapContext value={mapContextVal} >
         <SelectionContext value={selectionContext} >
           <div id="content-area">
-            <div id="side-panel" className={cls(reportRegion && 'slim', !expanded && 'hidden')}>
-              <button id="drawer-toggle" onClick={() => setExpanded(false)} />
-              {preview ?
-                <SchedulePreview selection={selection} /> :
-                <SelectionInfo selection={selection} />
-              }
-              <MatchReportSelector onSelectReport={selectionContext.onReportSelect} />
+            <div id="side-panel" className={cls(reportRegion && 'slim', minimized && 'minimized')}>
+              <SidePanelNav
+                reportRegion={reportRegion}
+                selection={selection}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                minimized={minimized}
+                setMinimized={setMinimized}
+                onBackToReports={() => selectionContext.onReportSelect(null)}
+              />
+              {!minimized && <>
+                <div className={cls(activeTab !== 'selection' && 'tab-hidden')}>
+                  {preview ?
+                    <SchedulePreview selection={selection} /> :
+                    <SelectionInfo selection={selection} />
+                  }
+                </div>
+                <div className={cls(activeTab !== 'report' && 'tab-hidden')}>
+                  <MatchReportSelector onSelectReport={selectionContext.onReportSelect} />
+                </div>
+              </>}
             </div>
             <div id="map-container">
-              {!expanded && <button id="drawer-restore" onClick={() => setExpanded(true)} />}
               <div id="map-view"></div>
             </div>
           </div>

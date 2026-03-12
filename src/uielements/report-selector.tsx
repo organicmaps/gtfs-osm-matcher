@@ -14,7 +14,6 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
     
     const [matchReports, setMatchReports] = useState<Report[]>([]);
     const [foldByName, setFoldByName] = useState<string[]>([]);
-    const [minimized, setMinimized] = useState(false);
 
     const reportRegion = useHashRoute(parseUrlReportRegion);
 
@@ -54,24 +53,10 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
     if (reportData) {
         return (
             <div className={cls('report-datasets')}>
-                <div className={'report-nav'}>
-                    <a className={'no-decoration'} 
-                        onClick={() => onSelectReport?.(null)} href="#/">← Back to reports</a>
-                    <span>&nbsp;|&nbsp;</span>
-                    <span className={'minimize-toggle'}
-                        title={minimized ? 'maximize' : 'minimize'}
-                        onClick={() => setMinimized(!minimized)}
-                    >
-                        {minimized ? <span>Restore</span> : <span>Minimize</span>}
-                    </span>
-                </div>
-                {
-                    !minimized && 
-                    <MatchReport
-                        key={reportRegion}
-                        reportRegion={reportRegion}
-                        reportData={reportData}/>
-                }
+                <MatchReport
+                    key={reportRegion}
+                    reportRegion={reportRegion}
+                    reportData={reportData}/>
             </div>
         );
     }
