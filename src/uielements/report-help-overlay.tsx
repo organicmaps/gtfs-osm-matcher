@@ -1,5 +1,7 @@
+import { createPortal } from 'preact/compat';
+
 export function ReportHelpOverlay({ onClose }: { onClose: () => void }) {
-    return (
+    return createPortal(
         <div className={"overlay"}>
             <div className={'overlay-content'}>
                 <span className={'link-like'} onClick={onClose}>Close</span>
@@ -67,6 +69,7 @@ export function ReportHelpOverlay({ onClose }: { onClose: () => void }) {
                     </a></span>
                 </p>
             </div>
-        </div>
+        </div>,
+        document.body
     )
 }

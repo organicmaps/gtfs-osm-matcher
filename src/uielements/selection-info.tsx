@@ -171,12 +171,10 @@ function MatchInfo({ datasetName, properties, geometry, idTags }: MatchInfoProps
 }
 
 function useOsmFeatures() {
-    return useSyncExternalStore((sub) => {
-        OSM_DATA.dataUpdated = sub;
-        return () => {
-            OSM_DATA.dataUpdated = () => { };
-        }
-    }, () => OSM_DATA.elements);
+    return useSyncExternalStore(
+        (sub) => OSM_DATA.subscribe(sub),
+        () => [...OSM_DATA.elements]
+    );
 }
 
 function getGtfsFeatures(properties: { [k: string]: any }) {

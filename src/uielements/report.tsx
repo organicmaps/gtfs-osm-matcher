@@ -91,6 +91,7 @@ const matchDatasetOrderComparator = (a: MatchDataset, b: MatchDataset) => {
 
 export type Report = {
     region: string;
+    source?: string;
 
     matchDatasets: MatchDataset[];
 
@@ -155,8 +156,10 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
     const matchMeta = reportData.matchMeta;
     const idTags = reportData.idTags;
 
-    console.log('hashSelection', hashSelection);
-    console.log('reportData', reportData);
+    if (import.meta.env.DEV) {
+        console.log('hashSelection', hashSelection);
+        console.log('reportData', reportData);
+    }
 
     useEffect(() => {
         if (map && matchMeta?.gtfsBbox && shouldUpdateBoundsSignal.value) {
@@ -176,11 +179,12 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
     const [datasetData, updateDatasetData] = useState<DatasetsDataByName>({});
 
     const handleDatasetLoad = useCallback((ds: string, data: any) => {
-        console.log('Loaded', reportRegion, ds);
-        updateDatasetData({
-            ...datasetData,
-            [ds]: data
-        });
+
+        if (import.meta.env.DEV) {
+            console.log('Loaded', reportRegion, ds);
+        }
+
+        updateDatasetData(prev => ({ ...prev, [ds]: data }));
 
         // TODO: Factor out into separate callback
         if (ds === hashSelection?.dataset && hashSelection.featureId) {
@@ -273,9 +277,9 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
     });
 
     return (<div>
-        <h2>{reportRegion}</h2>
-        {datasetControls}
+        <h2 className={"report-header"}>{reportRegion}</h2>
         {datasetElements}
+        {datasetControls}
         <div className={"match-report-meta"}>
             <div className={"section"}>
                 <label>GTFS source timestamp </label><div className={"ts-value"}>{gtfsTS}</div>

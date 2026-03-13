@@ -3,7 +3,9 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { satMapStyle } from "./styling";
 import { LayerControls } from "./layers-controls";
 
-const DEFAULT_LOCATION = { zoom: 4, lat: 46.16, lon: -29.44 };
+// Zoom further away for mobile
+const DEFAULT_ZOOM = screen.width > 1200 ? 4 : 1;
+const DEFAULT_LOCATION = { zoom: DEFAULT_ZOOM, lat: 46.16, lon: -29.44 };
 
 export function createMap(containerId: string) {
     const savedLocation = localStorage.getItem('map-location');
@@ -34,36 +36,35 @@ export function createMap(containerId: string) {
         };
     }
 
-    const mapLocationEl = document.createElement('div');
-    mapLocationEl.id = "map-location";
+    const mapLocationEl = document.getElementById('map-location');
 
-    const locationInput = document.createElement('input');
-    mapLocationEl.appendChild(locationInput);
+    const locationInput = mapLocationEl?.querySelector('input');
+    const osmHref = mapLocationEl?.querySelector('a.goto-button');
 
-    const osmHref = document.createElement('a');
-    osmHref.target = "_blank";
-    osmHref.innerText = "Goto OSM";
-    osmHref.className = "goto-button";
-    mapLocationEl.appendChild(osmHref);
-
-    document.getElementById('app')?.appendChild(mapLocationEl);
+    if (!mapLocationEl) {
+        console.error('Cant find map-location div');
+    }
 
     map.on('idle', () => {
-        const hstr = mapHashString(map);
-        locationInput.value = hstr;
-        osmHref.href = `https://openstreetmap.org#map=${hstr}`;
-        localStorage.setItem('map-location', hstr);
+        if (locationInput && osmHref) {
+            const hstr = mapHashString(map);
+            locationInput.value = hstr;
+            (osmHref as HTMLAnchorElement).href = `https://openstreetmap.org#map=${hstr}`;
+            localStorage.setItem('map-location', hstr);
+        }
     });
 
-    locationInput.onchange = (e: Event) => {
-        const { zoom, lon, lat } = mapLocationFromHashString((e.target as HTMLInputElement).value);
-
-        if (lon && !Number.isNaN(lon) && lat && !Number.isNaN(lat) && zoom) {
-            map.setCenter([lon, lat]);
-            map.setZoom(zoom);
-        }
-
-    };
+    if (locationInput) {
+        (locationInput as HTMLInputElement).onchange = (e: Event) => {
+            const { zoom, lon, lat } = mapLocationFromHashString((e.target as HTMLInputElement).value);
+    
+            if (lon && !Number.isNaN(lon) && lat && !Number.isNaN(lat) && zoom) {
+                map.setCenter([lon, lat]);
+                map.setZoom(zoom);
+            }
+    
+        };
+    }
 
     // Expose map and layer controls instances
     (window as any).map = map;

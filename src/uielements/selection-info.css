@@ -1,18 +1,8 @@
 #selection-info {
-    position: absolute;
-    top: 40px;
-    left: 10px;
-    max-width: 30%;
-    max-height: 80%;
-
-    overflow-y: scroll;
-
-    z-index: 10;
-    background-color: white;
-
-    padding: 1em;
-
-    border-radius: 4px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    border-top: 1px solid #ddd;
 }
 
 #selection-info.hidden {

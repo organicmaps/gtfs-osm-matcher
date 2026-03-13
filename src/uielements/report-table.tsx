@@ -13,6 +13,7 @@ function daysSince(date: Date) {
 
 export type ReportRow = {
     region: string;
+    source?: string;
     gtfsDate: Date | null;
     matched: number | undefined;
     matchPercent: number | undefined;
@@ -34,11 +35,12 @@ type SortableHeaderProps<T> = {
     sortDirection: 'asc' | 'desc';
     onSort: (column: T) => void;
     label: string;
+    className?: string;
 }
 
-function SortableHeader<T extends string>({ column, currentSortColumn, sortDirection, onSort, label }: SortableHeaderProps<T>) {
+function SortableHeader<T extends string>({ column, currentSortColumn, sortDirection, onSort, label, className }: SortableHeaderProps<T>) {
     return (
-        <th onClick={() => onSort(column)}>
+        <th className={className} onClick={() => onSort(column)}>
             <span>{label}</span>{currentSortColumn === column && <span>{sortDirection === 'asc' ? ' ▲' : ' ▼'}</span>}
         </th>
     )
@@ -50,7 +52,7 @@ type ReportTableProps = {
     foldByName?: string[];
 }
 export function ReportTable({ reports, onSelectReport, foldByName = [] }: ReportTableProps) {
-    const sortingColumns = ['region', 'gtfsDate', 'matchPercent', 'liveUpdates', 'total', 'matched', 'empty', 'noMatch'] as const;
+    const sortingColumns = ['region', 'source', 'gtfsDate', 'matchPercent', 'liveUpdates', 'total', 'matched', 'empty', 'noMatch'] as const;
     const [sortColumn, setSortColumn] = useState<typeof sortingColumns[number]>('region');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
     const [unfoldedPrefix, setUnfoldedPrefix] = useState<string | null>(null);
@@ -74,6 +76,11 @@ export function ReportTable({ reports, onSelectReport, foldByName = [] }: Report
         switch (sortColumn) {
             case 'region':
                 result = a.region.localeCompare(b.region);
+                break;
+            case 'source':
+                const srcA = a.source || '';
+                const srcB = b.source || '';
+                result = srcA.localeCompare(srcB);
                 break;
             case 'liveUpdates':
                 result = (a.liveUpdates ? 1 : 0) - (b.liveUpdates ? 1 : 0);
@@ -108,6 +115,11 @@ export function ReportTable({ reports, onSelectReport, foldByName = [] }: Report
                         currentSortColumn={sortColumn}
                         sortDirection={sortDirection}
                         onSort={handleHeaderClick} />
+                    <SortableHeader column={'source'} label={'Source'}
+                        currentSortColumn={sortColumn}
+                        sortDirection={sortDirection}
+                        onSort={handleHeaderClick}
+                        className={'col-source'} />
                     <SortableHeader column={'liveUpdates'} label={'Live Updates'}
                         currentSortColumn={sortColumn}
                         sortDirection={sortDirection}
@@ -161,7 +173,7 @@ export function ReportTable({ reports, onSelectReport, foldByName = [] }: Report
                             
                             rows.push(
                                 <tr key={prefix} className="fold-header" onClick={() => setUnfoldedPrefix(isUnfolded ? null : prefix)}>
-                                    <td colSpan={6} style={{ cursor: 'pointer', fontWeight: 'bold' }}>
+                                    <td colSpan={7} style={{ cursor: 'pointer', fontWeight: 'bold' }}>
                                         {prefix} <span className="feed-count">{group.length} feeds</span> {isUnfolded ? '▼' : '▶'}
                                     </td>
                                 </tr>
@@ -184,7 +196,7 @@ export function ReportTable({ reports, onSelectReport, foldByName = [] }: Report
 
 type ReportSelectCb = ((reportRegion: string | null) => void) | undefined;
 function renderReportRow(report: ReportRow, onSelectReport: ReportSelectCb, className = "") {
-    const { region, gtfsDate, matched, matchPercent, matchStats, liveUpdates } = report;
+    const { region, source, gtfsDate, matched, matchPercent, matchStats, liveUpdates } = report;
 
     let matchClass = '';
     if (matchPercent) {
@@ -209,9 +221,14 @@ function renderReportRow(report: ReportRow, onSelectReport: ReportSelectCb, clas
         }
     }
 
+    const sourceDomain = source ? getDomainName(source) : null;
+
     return (
         <tr key={region} className={className}>
             <td><a onClick={() => onSelectReport?.(region)} href={`#/match-report/${region}`}>{region}</a></td>
+            <td className="col-source">
+                {sourceDomain ? <a target={'_blank'} href={`https://${sourceDomain}`}>{sourceDomain}</a> : '-'}
+            </td>
             <td>
                 {liveUpdates ? 'Yes' : 'No'}
             </td>
@@ -225,4 +242,13 @@ function renderReportRow(report: ReportRow, onSelectReport: ReportSelectCb, clas
             <td>{matchStats?.noMatch || '-'}</td>
         </tr>
     );
+}
+
+function getDomainName(url: string) {
+    try {
+        return new URL(url).hostname;
+    } catch (error) {
+        console.error("Invalid URL:", error);
+        return null;
+    }
 }
