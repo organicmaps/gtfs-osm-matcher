@@ -251,3 +251,45 @@
     font-size: 1em;
   }
 }
+
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 11;
+
+    background-color: rgba(0, 0, 0, 0.5);
+
+    padding-top: 1em;
+    padding-bottom: 1em;
+}
+
+.overlay-content {
+    background-color: white;
+    border-radius: 1em;
+    padding: 1em;
+    margin: 1em auto;
+    width: 50%;
+    min-width: 600px;
+
+    max-height: 95%;
+    overflow-y: scroll;
+}
+
+@media (max-width: 1200px) {
+  .overlay {
+    padding-top: 0.5em;
+    padding-bottom: 0.5em;
+  }
+  .overlay-content {
+    min-width: 75%;
+    max-width: 90%;
+  }
+}
+
+.no-decoration {
+    text-decoration: none;
+    color: #333;
+}
