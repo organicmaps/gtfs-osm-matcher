@@ -227,7 +227,7 @@ function renderReportRow(report: ReportRow, onSelectReport: ReportSelectCb, clas
         <tr key={region} className={className}>
             <td><a onClick={() => onSelectReport?.(region)} href={`#/match-report/${region}`}>{region}</a></td>
             <td className="col-source">
-                {sourceDomain ? <a target={'blank'} href={`https://${sourceDomain}`}>{sourceDomain}</a> : '-'}
+                {sourceDomain ? <a target={'_blank'} href={`https://${sourceDomain}`}>{sourceDomain}</a> : '-'}
             </td>
             <td>
                 {liveUpdates ? 'Yes' : 'No'}

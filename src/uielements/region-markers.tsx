@@ -193,30 +193,6 @@ export function RegionMarkersLayer({ reports, onSelectReport }: Props) {
             ]
         };
 
-        const handleClick = (e: any) => {
-            // Clusters: zoom to expand
-            const clusterFeatures = map.queryRenderedFeatures(e.point, { layers: [CLUSTERS_LAYER] });
-            if (clusterFeatures.length > 0) {
-                const clusterId = clusterFeatures[0].id as number;
-                const source = map.getSource(MARKERS_SOURCE) as any;
-                source.getClusterExpansionZoom(clusterId, (err: any, zoom: number) => {
-                    if (err) return;
-                    map.easeTo({
-                        center: (clusterFeatures[0].geometry as any).coordinates,
-                        zoom,
-                    });
-                });
-                return;
-            }
-
-            const circleFeatures = map.queryRenderedFeatures(e.point, { layers: [CIRCLES_LAYER] });
-            const region = circleFeatures[0]?.properties?.region;
-            if (region) {
-                window.location.hash = `#/match-report/${region}`;
-                onSelectReport?.(region);
-            }
-        };
-
         let hoveredRegion: string | null = null;
 
         const setHover = (region: string | null) => {
@@ -231,47 +207,72 @@ export function RegionMarkersLayer({ reports, onSelectReport }: Props) {
             }
         };
 
-        const handleMouseMove = (e: any) => {
-            // Clusters get pointer cursor but no region hover
-            const clusterFeatures = map.queryRenderedFeatures(e.point, { layers: [CLUSTERS_LAYER] });
-            if (clusterFeatures.length > 0) {
-                map.getCanvas().style.cursor = 'pointer';
-                if (hoveredRegion !== null) setHover(null);
-                return;
-            }
+        const handleClusterClick = (e: any) => {
+            const feature = e.features?.[0];
+            if (!feature) return;
+            const clusterId = feature.id as number;
+            (map.getSource(MARKERS_SOURCE) as any).getClusterExpansionZoom(clusterId, (err: any, zoom: number) => {
+                if (err) return;
+                map.easeTo({ center: (feature.geometry as any).coordinates, zoom });
+            });
+        };
 
-            const circleFeatures = map.queryRenderedFeatures(e.point, { layers: [CIRCLES_LAYER] });
-            const region = circleFeatures[0]?.properties?.region ?? null;
-            map.getCanvas().style.cursor = region ? 'pointer' : '';
-            if (region !== hoveredRegion) {
-                setHover(region);
+        const handleCircleClick = (e: any) => {
+            const region = e.features?.[0]?.properties?.region;
+            if (region) {
+                window.location.hash = `#/match-report/${region}`;
+                onSelectReport?.(region);
             }
         };
 
-        const handleMouseLeave = () => {
+        const handleClusterMouseEnter = () => {
+            map.getCanvas().style.cursor = 'pointer';
+            if (hoveredRegion !== null) setHover(null);
+        };
+
+        const handleClusterMouseLeave = () => {
+            map.getCanvas().style.cursor = '';
+        };
+
+        const handleCircleMouseMove = (e: any) => {
+            const region = e.features?.[0]?.properties?.region ?? null;
+            map.getCanvas().style.cursor = region ? 'pointer' : '';
+            if (region !== hoveredRegion) setHover(region);
+        };
+
+        const handleCircleMouseLeave = () => {
             map.getCanvas().style.cursor = '';
             setHover(null);
         };
 
-        const subscription = { canceled: false, promiseFulfilled: false };
+        const subscription = { canceled: false, promiseFulfilled: false, resolvedMap: null as typeof map | null };
 
-        mapLoaded.then(map => {
+        mapLoaded.then(resolvedMap => {
             subscription.promiseFulfilled = true;
+            subscription.resolvedMap = resolvedMap;
             if (!subscription.canceled) {
                 stylingControls.addOverlayImmediate(overlayStyle);
-                map.on('click', handleClick);
-                map.on('mousemove', handleMouseMove);
-                map.on('mouseout', handleMouseLeave);
+                resolvedMap.on('click', CLUSTERS_LAYER, handleClusterClick);
+                resolvedMap.on('click', CIRCLES_LAYER, handleCircleClick);
+                resolvedMap.on('mouseenter', CLUSTERS_LAYER, handleClusterMouseEnter);
+                resolvedMap.on('mouseleave', CLUSTERS_LAYER, handleClusterMouseLeave);
+                resolvedMap.on('mousemove', CIRCLES_LAYER, handleCircleMouseMove);
+                resolvedMap.on('mouseleave', CIRCLES_LAYER, handleCircleMouseLeave);
             }
         });
 
         return () => {
             subscription.canceled = true;
-            if (subscription.promiseFulfilled) {
+            setHover(null);
+            if (subscription.promiseFulfilled && subscription.resolvedMap) {
+                const m = subscription.resolvedMap;
                 stylingControls.removeOverlayImmediate(overlayStyle);
-                map.off('click', handleClick);
-                map.off('mousemove', handleMouseMove);
-                map.off('mouseout', handleMouseLeave);
+                m.off('click', CLUSTERS_LAYER, handleClusterClick);
+                m.off('click', CIRCLES_LAYER, handleCircleClick);
+                m.off('mouseenter', CLUSTERS_LAYER, handleClusterMouseEnter);
+                m.off('mouseleave', CLUSTERS_LAYER, handleClusterMouseLeave);
+                m.off('mousemove', CIRCLES_LAYER, handleCircleMouseMove);
+                m.off('mouseleave', CIRCLES_LAYER, handleCircleMouseLeave);
             }
         };
     }, [map, stylingControls, mapLoaded, bboxGeojson, markersGeojson, onSelectReport]);

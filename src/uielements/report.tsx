@@ -184,10 +184,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
             console.log('Loaded', reportRegion, ds);
         }
 
-        updateDatasetData({
-            ...datasetData,
-            [ds]: data
-        });
+        updateDatasetData(prev => ({ ...prev, [ds]: data }));
 
         // TODO: Factor out into separate callback
         if (ds === hashSelection?.dataset && hashSelection.featureId) {

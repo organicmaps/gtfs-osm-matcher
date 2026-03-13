@@ -54,15 +54,17 @@ export function createMap(containerId: string) {
         }
     });
 
-    (locationInput as HTMLInputElement).onchange = (e: Event) => {
-        const { zoom, lon, lat } = mapLocationFromHashString((e.target as HTMLInputElement).value);
-
-        if (lon && !Number.isNaN(lon) && lat && !Number.isNaN(lat) && zoom) {
-            map.setCenter([lon, lat]);
-            map.setZoom(zoom);
-        }
-
-    };
+    if (locationInput) {
+        (locationInput as HTMLInputElement).onchange = (e: Event) => {
+            const { zoom, lon, lat } = mapLocationFromHashString((e.target as HTMLInputElement).value);
+    
+            if (lon && !Number.isNaN(lon) && lat && !Number.isNaN(lat) && zoom) {
+                map.setCenter([lon, lat]);
+                map.setZoom(zoom);
+            }
+    
+        };
+    }
 
     // Expose map and layer controls instances
     (window as any).map = map;

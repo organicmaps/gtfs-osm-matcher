@@ -173,7 +173,7 @@ function MatchInfo({ datasetName, properties, geometry, idTags }: MatchInfoProps
 function useOsmFeatures() {
     return useSyncExternalStore(
         (sub) => OSM_DATA.subscribe(sub),
-        () => OSM_DATA.elements
+        () => [...OSM_DATA.elements]
     );
 }
 
