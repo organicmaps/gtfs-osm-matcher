@@ -173,7 +173,7 @@ function MatchInfo({ datasetName, properties, geometry, idTags }: MatchInfoProps
 function useOsmFeatures() {
     return useSyncExternalStore(
         (sub) => OSM_DATA.subscribe(sub),
-        () => [...OSM_DATA.elements]
+        () => OSM_DATA.elements
     );
 }
 
@@ -215,9 +215,16 @@ function OsmElements({ osmFeatures, parentLonLat, tagActions, setLoading }: OsmE
     const allOsmFeatures = useOsmFeatures();
 
     const missingOsmFeatures = useMemo(() => {
+        const seenIds = new Set();
+        const featuresToLoad = osmFeatures
+            .filter(f => !OSM_DATA.getByNWRId(f.id))
+            .filter(f => !seenIds.has(f.id) && seenIds.add(f.id));
+        
         import.meta.env.DEV &&
-            console.log('Update osm features to load');
-        return osmFeatures.filter(f => !OSM_DATA.getByNWRId(f.id));
+            console.log('Update osm features to load', featuresToLoad.length);
+
+        return featuresToLoad;
+
     }, [osmFeatures, allOsmFeatures]);
 
     useEffect(() => {
