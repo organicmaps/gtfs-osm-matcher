@@ -7,6 +7,10 @@
 
 export interface Schedule {
   feed: string;
+  /** List of unique stop names referenced by StopOnRoutePosition. */
+  snames: string[];
+  /** List of unique stop IDs referenced by StopOnRoutePosition. */
+  sids: string[];
   /** Deduplicated route descriptors referenced by routeStopTimes entries. */
   routes: Route[];
   periods: Periods;
@@ -182,8 +186,9 @@ export interface RouteStopTimes {
   arrivalTimes: string;
   /**
    * Same encoding as arrivalTimes, for departure times.
+   * Absent when departure times are identical to arrival times.
    */
-  departureTimes: string;
+  departureTimes?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -198,16 +203,20 @@ export interface StopOnRoutePosition {
    * explicitly scheduled. Absent when false.
    */
   interpolated?: true;
-  /** Absent when this is the first stop on the route. */
-  prevStopId?: string;
-  /** Absent when this is the first stop on the route. */
-  prevStopName?: string;
-  /** Absent when this is the last stop on the route. */
-  nextStopId?: string;
-  /** Absent when this is the last stop on the route. */
-  nextStopName?: string;
-  firstStopId: string;
-  firstStopName: string;
-  lastStopId: string;
-  lastStopName: string;
+  /** Absent when this is the first stop on the route. Index into sids. */
+  prevStopId?: number;
+  /** Absent when this is the first stop on the route. Index into snames. */
+  prevStopName?: number;
+  /** Absent when this is the last stop on the route. Index into sids. */
+  nextStopId?: number;
+  /** Absent when this is the last stop on the route. Index into snames. */
+  nextStopName?: number;
+  /** Index into sids. */
+  firstStopId: number;
+  /** Index into snames. */
+  firstStopName: number;
+  /** Index into sids. */
+  lastStopId: number;
+  /** Index into snames. */
+  lastStopName: number;
 }

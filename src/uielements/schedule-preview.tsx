@@ -95,7 +95,7 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
     }
 
     const regionStops = schedules.map(schedule => {
-        const {routes, periods, timetables} = schedule as Schedule;
+        const {routes, periods, timetables, snames, sids} = schedule as Schedule;
 
         const activeServices = servicePeriodIndexes(periods, today);
 
@@ -131,16 +131,16 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
             .sort((a, b) => a.route!.shortName.localeCompare(b.route!.shortName));
             
             const routeAndTrips = routeElements.map(({route, routeSchedule}, rInx) => {
-                const arrivalTimes = decodeIntArray(routeSchedule.arrivalTimes);
-                const departureTimes = decodeIntArray(routeSchedule.departureTimes);
                 const tripIds = decodeTripIds(routeSchedule.tripIds);
+                const arrivalTimes = decodeIntArray(routeSchedule.arrivalTimes);
+                //const departureTimes = decodeIntArray(routeSchedule.departureTimes);
 
                 const trips = [];
                 for (var i in tripIds) {
                     trips.push({
+                        tripId: tripIds[i],
                         arrivalTime: arrivalTimes[i],
-                        departureTimes: departureTimes[i],
-                        tripId: tripIds[i]
+                        // departureTimes: departureTimes[i],
                     });
                 }
 
@@ -172,12 +172,12 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
                     </span>
                 });
 
-                const lastStopName = routeSchedule.stopOnRoutePosition.lastStopName;
+                const lastStopName = snames[routeSchedule.stopOnRoutePosition.lastStopName];
                 var destSrcLabel = (lastStopName && <div> to {lastStopName}</div>);
 
                 // We are the last stop
-                if (routeSchedule.stopOnRoutePosition.lastStopId === stop.id) {
-                    const firstStopName = routeSchedule.stopOnRoutePosition.firstStopName;
+                if (sids[routeSchedule.stopOnRoutePosition.lastStopId] === stop.id) {
+                    const firstStopName = snames[routeSchedule.stopOnRoutePosition.firstStopName];
                     destSrcLabel = (firstStopName && <div> from {firstStopName}</div>);
                 }
 

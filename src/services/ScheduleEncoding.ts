@@ -19,6 +19,54 @@ export function decodeTripIds(base64: string): string[] {
 
   const n     = bytes[pos++];
   const flags = bytes[pos++];
+
+  if (flags & 0x02) { // FLAG_TEMPLATE
+    const decoder = new TextDecoder();
+    
+    const prefixLen = bytes[pos++];
+    const prefix = decoder.decode(bytes.subarray(pos, pos + prefixLen));
+    pos += prefixLen;
+    
+    const suffixLen = bytes[pos++];
+    const suffix = decoder.decode(bytes.subarray(pos, pos + suffixLen));
+    pos += suffixLen;
+    
+    const paddingWidth = bytes[pos++];
+    
+    const result: string[] = [];
+    let lastValue = 0n;
+    
+    const readVarInt = (): bigint => {
+      let value = 0n;
+      let shift = 0n;
+      while (true) {
+        const b = bytes[pos++];
+        value |= BigInt(b & 0x7F) << shift;
+        if ((b & 0x80) === 0) break;
+        shift += 7n;
+      }
+      return value;
+    };
+
+    const decodeZigZag = (n: bigint): bigint => {
+      return (n >> 1n) ^ (-(n & 1n));
+    };
+
+    for (let i = 0; i < n; i++) {
+      const zigZagged = readVarInt();
+      const delta = decodeZigZag(zigZagged);
+      const value = lastValue + delta;
+      
+      let mid = value.toString();
+      if (paddingWidth > 0) {
+        mid = mid.padStart(paddingWidth, "0");
+      }
+      result.push(prefix + mid + suffix);
+      lastValue = value;
+    }
+    return result;
+  }
+
   const reversed = (flags & 0x01) !== 0;
 
   const perm = new Uint8Array(n);
