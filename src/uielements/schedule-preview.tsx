@@ -13,7 +13,7 @@ const RTUpdatesAPIBase = import.meta.env.DEV ?
     "https://pt.organicmaps.app/api/v1/updates";
 
 
-type ScheduleApiResponseV2 = {
+type ScheduleApiResponseV3 = {
     formatVersion: string,
     
     schedules: Schedule[];
@@ -47,8 +47,8 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
             import.meta.env.DEV && 
                 console.log('Schedule response', data);
 
-            if (data.formatVersion === '2') {
-                setSchedules((data as ScheduleApiResponseV2).schedules);
+            if (data.formatVersion === '3') {
+                setSchedules((data as ScheduleApiResponseV3).schedules);
             }
             else {
                 console.error('Old timetable format is not supported');
