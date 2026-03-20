@@ -1,3 +1,178 @@
+import type { Route, Schedule, Stop } from "./schedule.types";
+
+export interface TripTimes {
+  /** Index into RouteSchedule.positions[] — which pos applies to each trip. */
+  pos: number[];
+  tripId: string[];
+  arrivalTime: number[];
+  departureTime: number[];
+}
+
+export interface ResolvedStopOnRoutePosition {
+  sequence: number;
+  /** Absent when this is the first stop on the route. */
+  prevStopId?: string;
+  prevStopName?: string;
+  /** Absent when this is the last stop on the route. */
+  nextStopId?: string;
+  nextStopName?: string;
+  firstStopId: string;
+  firstStopName: string;
+  lastStopId: string;
+  lastStopName: string;
+}
+
+export interface RouteSchedule {
+  route: Route;
+  /** Index into sids[] — identifies the route direction at this stop. */
+  direction: number;
+  positions: ResolvedStopOnRoutePosition[];
+  tripTimes: TripTimes;
+}
+
+function resolvePos(p: StopOnRoutePosition, sids: string[], snames: string[]): ResolvedStopOnRoutePosition {
+  return {
+    sequence:      p.sequence,
+    ...(p.prevStopId  !== -1 && { prevStopId:   sids[p.prevStopId],   prevStopName:  snames[p.prevStopName]  }),
+    ...(p.nextStopId  !== -1 && { nextStopId:   sids[p.nextStopId],   nextStopName:  snames[p.nextStopName]  }),
+    firstStopId:   sids[p.firstStopId],
+    firstStopName: snames[p.firstStopName],
+    lastStopId:    sids[p.lastStopId],
+    lastStopName:  snames[p.lastStopName],
+  };
+}
+
+export function decodeScheduleOnDate(
+  schedule: Schedule,
+  date: Date,
+): { stop: Stop; routes: RouteSchedule[] }[] {
+  const { routes: allRoutes, periods, timetables, stops, pos: allPos, sids, snames } = schedule;
+  const activeServices = new Set(servicePeriodIndexes(periods, date));
+
+  return timetables.map(tt => {
+    const stop = stops[tt.stop];
+    const currentSidIdx = sids.indexOf(stop.id);
+
+    const routeMap = new Map<string, RouteSchedule>();
+
+    for (const entry of tt.routes) {
+      const route = allRoutes[entry.route];
+
+      for (let i = 0; i < entry.periods.length; i++) {
+        if (!activeServices.has(entry.periods[i])) continue;
+
+        const decodedPos = decodePosArray(allPos[entry.pos[i]]);
+        const direction =
+          decodedPos.nextStopId !== -1 && decodedPos.nextStopId !== currentSidIdx
+            ? decodedPos.nextStopId
+            : decodedPos.prevStopId;
+
+        const key = `${route.routeId}=${direction}`;
+        let rs = routeMap.get(key);
+        if (!rs) {
+          rs = { route, direction, positions: [], tripTimes: { pos: [], tripId: [], arrivalTime: [], departureTime: [] } };
+          routeMap.set(key, rs);
+        }
+
+        const posIdx = rs.positions.length;
+        rs.positions.push(resolvePos(decodedPos, sids, snames));
+
+        const tripIds   = decodeTripIds(entry.tripIds[i]);
+        const arrivals  = decodeIntArray(entry.arrivalTimes[i]);
+        const depsBlob  = entry.departureTimes?.[i];
+        const departures = depsBlob ? decodeIntArray(depsBlob) : arrivals;
+
+        for (let t = 0; t < tripIds.length; t++) {
+          rs.tripTimes.pos.push(posIdx);
+          rs.tripTimes.tripId.push(tripIds[t]);
+          rs.tripTimes.arrivalTime.push(arrivals[t]);
+          rs.tripTimes.departureTime.push(departures[t]);
+        }
+      }
+    }
+
+    for (const rs of routeMap.values()) {
+      const { pos, tripId, arrivalTime, departureTime } = rs.tripTimes;
+      const order = arrivalTime.map((_, i) => i).sort((a, b) => arrivalTime[a] - arrivalTime[b]);
+      rs.tripTimes = {
+        pos:           order.map(i => pos[i]),
+        tripId:        order.map(i => tripId[i]),
+        arrivalTime:   order.map(i => arrivalTime[i]),
+        departureTime: order.map(i => departureTime[i]),
+      };
+    }
+
+    return { stop, routes: [...routeMap.values()] };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// pos[]  — stop-on-route position (VLQ base64url)
+// ---------------------------------------------------------------------------
+// Each entry in the top-level pos[] array is a base64url (no padding) blob
+// encoding 9 integers as VLQ (7 bits/byte, MSB=1 means more bytes follow):
+//   [sequence, prevStopId, prevStopName, nextStopId, nextStopName,
+//    firstStopId, firstStopName, lastStopId, lastStopName]
+// Convention: 0x00 → absent (-1); encoded byte sequence for value v → v-1.
+//
+// Fields prevStopId/prevStopName are absent (-1) at the first stop of a route.
+// Fields nextStopId/nextStopName are absent (-1) at the last stop of a route.
+// firstStop*/lastStop* are always present.
+// All *Id indexes reference sids[]; all *Name indexes reference snames[].
+
+export interface StopOnRoutePosition {
+  /** 0-based stop sequence index within the route shape. */
+  sequence: number;
+  /** Absent (-1) when this is the first stop on the route. Index into sids. */
+  prevStopId: number;
+  /** Absent (-1) when this is the first stop on the route. Index into snames. */
+  prevStopName: number;
+  /** Absent (-1) when this is the last stop on the route. Index into sids. */
+  nextStopId: number;
+  /** Absent (-1) when this is the last stop on the route. Index into snames. */
+  nextStopName: number;
+  /** Index into sids. */
+  firstStopId: number;
+  /** Index into snames. */
+  firstStopName: number;
+  /** Index into sids. */
+  lastStopId: number;
+  /** Index into snames. */
+  lastStopName: number;
+}
+
+/**
+ * Decodes a single entry from the top-level pos[] array.
+ * Returns the 9 position integers; absent fields are -1.
+ */
+export function decodePosArray(base64url: string): StopOnRoutePosition {
+  const bytes = base64UrlToBytes(base64url);
+  let pos = 0;
+
+  const readVlq = (): number => {
+    let value = 0;
+    let shift = 0;
+    let b: number;
+    do {
+      b = bytes[pos++];
+      value |= (b & 0x7F) << shift;
+      shift += 7;
+    } while (b & 0x80);
+    return value === 0 ? -1 : value - 1;
+  };
+
+  return {
+    sequence:      readVlq(),
+    prevStopId:    readVlq(),
+    prevStopName:  readVlq(),
+    nextStopId:    readVlq(),
+    nextStopName:  readVlq(),
+    firstStopId:   readVlq(),
+    firstStopName: readVlq(),
+    lastStopId:    readVlq(),
+    lastStopName:  readVlq(),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // tripIds  — TripIdEncoder
@@ -263,7 +438,7 @@ export interface ServiceDays {
   serviceDates: Set<number>;
 }
 
-function dateKey(date: Date): number {
+export function dateKey(date: Date): number {
   return (date.getUTCFullYear() % 100) * 10000 + (date.getUTCMonth() + 1) * 100 + date.getUTCDate();
 }
 

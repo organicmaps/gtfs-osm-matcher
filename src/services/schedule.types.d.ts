@@ -1,5 +1,5 @@
 // Type definitions for the schedule tile JSON produced by JsonEncoder.encodeTimetablesAsJson.
-// One file per OSM feature / OMIM id: { routes, periods, timetables }
+// Format version 4: stop-centric timetables with route entries as parallel arrays.
 
 // ---------------------------------------------------------------------------
 // Top-level tile
@@ -7,13 +7,25 @@
 
 export interface Schedule {
   feed: string;
-  /** List of unique stop names referenced by StopOnRoutePosition. */
-  snames: string[];
-  /** List of unique stop IDs referenced by StopOnRoutePosition. */
-  sids: string[];
-  /** Deduplicated route descriptors referenced by routeStopTimes entries. */
+  /** Deduplicated route descriptors, referenced by RouteEntry.route index. */
   routes: Route[];
+  /** Deduplicated stop objects, referenced by StopTimetable.stop index. */
+  stops: Stop[];
   periods: Periods;
+  /**
+   * Deduplicated stop-on-route position blobs.
+   * Each entry is a base64url (no padding) VLQ-encoded array of 9 integers:
+   *   [sequence, prevStopId, prevStopName, nextStopId, nextStopName,
+   *    firstStopId, firstStopName, lastStopId, lastStopName]
+   * where prevStopId/prevStopName/nextStopId/nextStopName are absent (−1) at
+   * the first/last stop of a route. Referenced by RouteEntry.pos entries.
+   * See decodePosArray() in ScheduleEncoding.ts for the decoding convention.
+   */
+  pos: string[];
+  /** List of unique stop names referenced by pos entries (index into snames). */
+  snames: string[];
+  /** List of unique stop IDs referenced by pos entries (index into sids). */
+  sids: string[];
   /** One entry per GTFS Stop matched with OSM entry or OMIM entry. */
   timetables: StopTimetable[];
 }
@@ -104,10 +116,6 @@ export interface Route {
 // ---------------------------------------------------------------------------
 
 /**
- * Service calendar, referenced by index from PeriodSection.period.
- * No id field — identity is the position in the periods array.
- */
-/**
  * Base64-URL (no padding) encoded binary blob. Absent when no date range
  * can be derived (rare — only for completely empty calendars).
  *
@@ -120,17 +128,8 @@ export interface Route {
 export type Period = string;
 
 // ---------------------------------------------------------------------------
-// Stop timetable
+// Stop
 // ---------------------------------------------------------------------------
-
-export interface StopTimetable {
-  stop: Stop;
-  /**
-   * Service-calendar sections for this stop.
-   * Each entry corresponds to one GTFS service_id / Period.
-   */
-  periods: PeriodSection[];
-}
 
 export interface Stop {
   /** Pass through from GTFS */
@@ -138,13 +137,13 @@ export interface Stop {
 
   /** Pass through from GTFS */
   stop_name: string;
-  
+
   /** [latitude, longitude] */
   lat_lon: [number, number];
-  
+
   /** Pass through from GTFS, Absent when null. */
   code?: string;
-  
+
   /** Pass through from GTFS, Absent when null. */
   platformCode?: string;
 
@@ -153,70 +152,60 @@ export interface Stop {
 }
 
 // ---------------------------------------------------------------------------
-// Period section  (one service-calendar slice within a stop timetable)
+// Stop timetable
 // ---------------------------------------------------------------------------
 
-export interface PeriodSection {
-  /** Index into the top-level periods array. */
-  period: number;
-  routeStopTimes: RouteStopTimes[];
+export interface StopTimetable {
+  /** Index into the top-level stops[] array. */
+  stop: number;
+  /** Route entries for this stop, one per (route, stop-sequence) pair. */
+  routes: RouteEntry[];
 }
 
 // ---------------------------------------------------------------------------
-// Route stop times
+// Route entry  (one route/direction serving this stop)
 // ---------------------------------------------------------------------------
 
-export interface RouteStopTimes {
-  stopOnRoutePosition: StopOnRoutePosition;
-  /** References Route.routeId in the top-level routes array. */
-  route: string;
+export interface RouteEntry {
+  /** Index into the top-level routes[] array. */
+  route: number;
+
   /**
-   * Compressed trip-ID array (TripIdEncoder).
+   * Parallel arrays — one element per service period served at this stop on
+   * this route.  All five arrays have the same length.
+   */
+
+  /** Period indexes into Periods.data[]. */
+  periods: number[];
+
+  /**
+   * Indexes into the top-level pos[] array — one per period.
+   * Decode each pos blob with decodePosArray() from ScheduleEncoding.ts.
+   */
+  pos: number[];
+
+  /**
+   * Compressed trip-ID arrays, one per period (TripIdEncoder).
    * Byte layout: [uint8:n][uint8:flags][n×uint8:permutation][entries…]
    * flags bit 0: sort order — 0 = lexicographic, 1 = reversed-lexicographic.
-   * Each entry: [uint8:prefixLen][uint8:suffixLen][suffixLen×uint8:suffix UTF-8].
+   * flags bit 1: template mode — prefix/suffix/paddingWidth then delta-coded numeric middles.
+   * Each entry (non-template): [uint8:prefixLen][uint8:suffixLen][suffixLen×uint8:suffix UTF-8].
    * Base64-standard encoded.
    */
-  tripIds: string;
+  tripIds: string[];
+
   /**
-   * Delta + variable-byte encoded arrival times in seconds since midnight.
+   * Delta + variable-byte encoded arrival times in seconds since midnight,
+   * one blob per period.
    * Sorted ascending. Delta-coded, then each delta encoded as 7 bits/byte
    * (MSB = more bytes follow). Base64-standard encoded.
    */
-  arrivalTimes: string;
-  /**
-   * Same encoding as arrivalTimes, for departure times.
-   * Absent when departure times are identical to arrival times.
-   */
-  departureTimes?: string;
-}
+  arrivalTimes: string[];
 
-// ---------------------------------------------------------------------------
-// Stop-on-route position
-// ---------------------------------------------------------------------------
-
-export interface StopOnRoutePosition {
-  /** 0-based stop sequence index within the route shape. */
-  sequence: number;
   /**
-   * Present and true when the stop time was interpolated rather than
-   * explicitly scheduled. Absent when false.
+   * Same encoding as arrivalTimes, for departure times, one blob per period.
+   * Absent when departure times are identical to arrival times for ALL periods.
+   * When present, a null entry means arrivals == departures for that period.
    */
-  interpolated?: true;
-  /** Absent when this is the first stop on the route. Index into sids. */
-  prevStopId?: number;
-  /** Absent when this is the first stop on the route. Index into snames. */
-  prevStopName?: number;
-  /** Absent when this is the last stop on the route. Index into sids. */
-  nextStopId?: number;
-  /** Absent when this is the last stop on the route. Index into snames. */
-  nextStopName?: number;
-  /** Index into sids. */
-  firstStopId: number;
-  /** Index into snames. */
-  firstStopName: number;
-  /** Index into sids. */
-  lastStopId: number;
-  /** Index into snames. */
-  lastStopName: number;
+  departureTimes?: (string | null)[];
 }

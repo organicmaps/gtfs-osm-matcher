@@ -1,9 +1,9 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import type { SelectionT } from "../app";
 import { LocateMe } from "./locate-me";
 import type { FeedMetaT } from "../types";
-import type { RouteStopTimes, Schedule, StopTimetable } from "../services/schedule.types";
-import { decodeIntArray, decodeTripIds, servicePeriodIndexes } from "../services/ScheduleEncoding";
+import type { Schedule, Stop } from "../services/schedule.types";
+import { dateKey, decodeScheduleOnDate } from "../services/ScheduleEncoding";
 
 const SchedulesAPIBase = import.meta.env.DEV ?
     "http://localhost:4567/v1/schedule" :
@@ -22,8 +22,6 @@ type ScheduleApiResponseV3 = {
         [region: string]: FeedMetaT 
     };
 }
-
-var moreThanOneScheduleReported = 0;
 
 export type SchedulePreviewProps = {
     selection: SelectionT | null
@@ -47,7 +45,7 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
             import.meta.env.DEV && 
                 console.log('Schedule response', data);
 
-            if (data.formatVersion === '3') {
+            if (data.formatVersion === '4') {
                 setSchedules((data as ScheduleApiResponseV3).schedules);
             }
             else {
@@ -82,10 +80,14 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
     }, [id, liveUpdates]);
 
     const today = new Date();
+    const i_today = dateKey(today);
     const i_time = today.getHours() * 3600 + today.getMinutes() * 60;
 
-    const stopIdCmp = (a: StopTimetable, b: StopTimetable) => {
-        const cmpPlatformCode = (a.stop.platformCode || '').localeCompare(b.stop.platformCode || '');
+    const stopPlatformCodeCmp = (a: {stop: Stop}, b: {stop: Stop}) => {
+        const padCode = (pc: string) => pc.replace(/(\d+)/, (m) => m.padStart(4, '0'));
+        const codeA = padCode(a.stop.platformCode || '');
+        const codeB = padCode(b.stop.platformCode || '');
+        const cmpPlatformCode = codeA.localeCompare(codeB);
         
         if (cmpPlatformCode !== 0) {
             return cmpPlatformCode;
@@ -94,60 +96,39 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
         return a.stop.id.localeCompare(b.stop.id);
     }
 
-    const regionStops = schedules.map(schedule => {
-        const {routes, periods, timetables, snames, sids} = schedule as Schedule;
+    const schedulesPerRegion = useMemo(() => {
+        return schedules.map(s => decodeScheduleOnDate(s as Schedule, today));
+    }, [id, schedules, i_today]);
 
-        const activeServices = servicePeriodIndexes(periods, today);
+    const regionStops = schedulesPerRegion.map(schedule => {
 
-        const scheduleElements = timetables.sort(stopIdCmp).map(tt => {
-            const stop = tt.stop;
+        schedule.sort(stopPlatformCodeCmp);
 
-            const routesWithTimesToday: {[rid: string]: RouteStopTimes[]} = {};
+        return schedule.filter(({routes}) => routes?.length).map(({stop, routes}) => {
 
-            tt.periods
-                .filter(p => !!activeServices.includes(p.period))
-                .forEach(p => p.routeStopTimes.forEach(rTimetable => {
-                    const rtts = routesWithTimesToday[rTimetable.route] || [];
-                    rtts.push(rTimetable);
-                    routesWithTimesToday[rTimetable.route] = rtts;
-                }));
-            
-            const routeElements = Object.entries(routesWithTimesToday).flatMap(([rid, stopTimes]) => {
-                const route = routes.find(r => r.routeId === rid);
-                
-                if (import.meta.env.DEV && stopTimes.length > 1 && moreThanOneScheduleReported++ < 10) {
-                    console.warn('More than one route schedule applicable for today', stopTimes);
-                }
+            const routeAndTrips = routes.sort((a, b) => {
+                const astr = a.route.shortName || '';
+                const bstr = b.route.shortName || '';
 
-                return stopTimes.map(routeSchedule => {
-                    return {
-                        route,
-                        routeSchedule
-                    }
-                });
-                
+                return astr.localeCompare(bstr);
             })
-            .filter(({route}) => !!route)
-            .sort((a, b) => a.route!.shortName.localeCompare(b.route!.shortName));
-            
-            const routeAndTrips = routeElements.map(({route, routeSchedule}, rInx) => {
-                const tripIds = decodeTripIds(routeSchedule.tripIds);
-                const arrivalTimes = decodeIntArray(routeSchedule.arrivalTimes);
-                //const departureTimes = decodeIntArray(routeSchedule.departureTimes);
+            .map(rSchedule => {
+                const {route, direction, positions, tripTimes } = rSchedule;
 
-                const trips = [];
-                for (var i in tripIds) {
-                    trips.push({
-                        tripId: tripIds[i],
-                        arrivalTime: arrivalTimes[i],
-                        // departureTimes: departureTimes[i],
-                    });
-                }
+                const pos = positions[0];
 
-                const visibleTrips = !showTheWholeDay ? trips.filter(t => t.arrivalTime > i_time).slice(0, 5) : trips;
-                
                 const stopTripUpdates = tripUpdates?.[stop.id]?.tripUpdates;
                 const updates = stopTripUpdates?.filter((tu: any) => tu.trip.routeId === route?.routeId);
+
+                const trips = tripTimes.arrivalTime.map((t, i) => {
+                    return {
+                        tti: i,
+                        tripId: tripTimes.tripId[i],
+                        arrivalTime: t
+                    }
+                });
+
+                const visibleTrips = showTheWholeDay ? trips : trips.filter(({arrivalTime}) => arrivalTime > i_time).slice(0, 5);
 
                 const ts = visibleTrips.map(t => {
                     const update = updates?.find((u: any) => u.trip.tripId === t.tripId);
@@ -172,20 +153,20 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
                     </span>
                 });
 
-                const lastStopName = snames[routeSchedule.stopOnRoutePosition.lastStopName];
+                const lastStopName = pos.lastStopName;
                 var destSrcLabel = (lastStopName && <div> to {lastStopName}</div>);
 
                 // We are the last stop
-                if (sids[routeSchedule.stopOnRoutePosition.lastStopId] === stop.id) {
-                    const firstStopName = snames[routeSchedule.stopOnRoutePosition.firstStopName];
+                if (pos.lastStopId === stop.id) {
+                    const firstStopName = pos.firstStopName;
                     destSrcLabel = (firstStopName && <div> from {firstStopName}</div>);
                 }
 
-                return <div key={route!.routeId + '-' + rInx}><div><b>{route!.routeType} {route!.shortName} </b>: {ts}</div>{destSrcLabel}</div>
+                return <div key={route!.routeId + "=" + direction}><div><b>{route!.routeType} {route!.shortName} </b>: {ts}</div>{destSrcLabel}</div>
 
             });
 
-            return <div>
+            return <div key={stop.id}>
                 <h5>Platform {stop.platformCode}</h5>
                 <div>
                     {routeAndTrips}
@@ -193,17 +174,13 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
             </div>
         });
 
-        return (
-            <div id={schedule.feed}>
-                <div>Region: {schedule.feed}</div>
-                {scheduleElements}
-            </div>
-        );
     });
+
+    const name = schedules[0] && schedules[0].stops[0].stop_name;
 
     return (<div id={"selection-info"}>
         {schedules.length === 0 && <div>loading {id}</div>}
-        {schedules.length > 0 && <h4>{schedules[0].timetables[0].stop.stop_name}</h4>} {lonlat && <LocateMe zoom={18} lonlatFeature={{ lon: lonlat[0], lat: lonlat[1] }} />}
+        {schedules.length > 0 && <h4>{name}</h4>} {lonlat && <LocateMe zoom={18} lonlatFeature={{ lon: lonlat[0], lat: lonlat[1] }} />}
         <div>
             <label> Show schedule for the whole day </label>
             <input type="checkbox" checked={showTheWholeDay} onChange={() => setShowTheWholeDay(!showTheWholeDay)}></input>
