@@ -130,6 +130,10 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
 
                 const visibleTrips = showTheWholeDay ? trips : trips.filter(({arrivalTime}) => arrivalTime > i_time).slice(0, 5);
 
+                if (visibleTrips.length === 0) {
+                    return null;
+                }
+
                 const ts = visibleTrips.map(t => {
                     const update = updates?.find((u: any) => u.trip.tripId === t.tripId);
 
