@@ -1,4 +1,4 @@
-import type { Route, Schedule, Stop } from "./schedule.types";
+import type { Periods, Route, Schedule, Stop } from "./schedule.types";
 
 const utf8Decoder = new TextDecoder();
 
@@ -306,14 +306,6 @@ export function decodeIntArray(base64: string): number[] {
 // Periods decompression
 // ---------------------------------------------------------------------------
 
-type PeriodsInput = {
-  encoding: string;
-  compression: string;
-  begin?: number;
-  end?: number;
-  data: Array<string> | string;
-};
-
 /**
  * Decompresses a Periods object into an array of raw bits strings, one per
  * period in index order. For encoding "begin:end:bits" each string includes
@@ -321,14 +313,14 @@ type PeriodsInput = {
  * For encoding "bits" the strings are headerless bit vectors; use
  * servicePeriodIndexes() to query by date in that case.
  */
-export function decompressPeriods(periods: PeriodsInput): string[] {
+export function decompressPeriods(periods: Periods): string[] {
   return decompressRaw(periods);
 }
 
 /**
  * Returns the indexes of periods that have service on the given date.
  */
-export function servicePeriodIndexes(periods: PeriodsInput, date: number): number[] {
+export function servicePeriodIndexes(periods: Periods, date: number): number[] {
   const result: number[] = [];
   const rawBits = decompressRaw(periods);
 
@@ -347,7 +339,7 @@ export function servicePeriodIndexes(periods: PeriodsInput, date: number): numbe
   return result;
 }
 
-function decompressRaw(periods: PeriodsInput): string[] {
+function decompressRaw(periods: Periods): string[] {
   if (periods.compression === "rle")
     return (periods.data as Array<string>).map(rleToRawBitsBase64);
   if (periods.compression === "transpose_rle")
@@ -412,6 +404,10 @@ function transposeRleToRawBitsArray(base64: string): string[] {
   return result;
 }
 
+
+const EPOCH_MS = Date.UTC(2000, 0, 1); // 2000-01-01 UTC
+const MS_PER_DAY = 86_400_000;
+
 // ---------------------------------------------------------------------------
 // Period.bits  — GtfsCalendarEncoder  (uncompressed / "rle" after decompression)
 // ---------------------------------------------------------------------------
@@ -445,13 +441,13 @@ export function dateAsNumber(date: Date) {
 }
 
 function bitsToServiceDays(beginDay: number, endDay: number, bitVector: Uint8Array): ServiceDays {
-  const begin = beginDay;
-  const end   = endDay;
+  const begin = dateAsNumber(new Date(EPOCH_MS + beginDay * MS_PER_DAY));
+  const end   = dateAsNumber(new Date(EPOCH_MS + endDay   * MS_PER_DAY));
   const span  = endDay - beginDay + 1;
   const serviceDates = new Set<number>();
   for (let n = 0; n < span; n++) {
     if ((bitVector[n >>> 3] & (1 << (n & 7))) !== 0) {
-      serviceDates.add(beginDay + n);
+      serviceDates.add(dateAsNumber(new Date(EPOCH_MS + (beginDay + n) * MS_PER_DAY)));
     }
   }
   return { begin, end, serviceDates };
