@@ -50,7 +50,7 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
             }
             else {
                 console.error('Old timetable format is not supported');
-                // setSchedule((data as ScheduleApiResponseT).timetables);
+                console.error('Old timetable format is not supported');
             }
 
             const liveUpdates = Object.values(data.feedMeta)
