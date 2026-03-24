@@ -44,7 +44,7 @@ function resolvePos(p: StopOnRoutePosition, sids: string[], snames: string[]): R
 
 export function decodeScheduleOnDate(
   schedule: Schedule,
-  date: Date,
+  date: number,
 ): { stop: Stop; routes: RouteSchedule[] }[] {
   const { routes: allRoutes, periods, timetables, stops, pos: allPos, sids, snames } = schedule;
   const activeServices = new Set(servicePeriodIndexes(periods, date));

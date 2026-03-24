@@ -97,7 +97,7 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
     }
 
     const schedulesPerRegion = useMemo(() => {
-        return schedules.map(s => decodeScheduleOnDate(s as Schedule, today));
+        return schedules.map(s => decodeScheduleOnDate(s as Schedule, i_today));
     }, [id, schedules, i_today]);
 
     const regionStops = schedulesPerRegion.map(schedule => {
