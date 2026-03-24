@@ -122,7 +122,10 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
 
                 const trips = tripTimes.arrivalTime.map((t, i) => {
                     return {
-                        tti: i,
+                    return {
+                        tripId: tripTimes.tripId[i],
+                        arrivalTime: t
+                    }
                         tripId: tripTimes.tripId[i],
                         arrivalTime: t
                     }
