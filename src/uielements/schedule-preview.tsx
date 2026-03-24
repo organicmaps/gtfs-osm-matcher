@@ -3,7 +3,7 @@ import type { SelectionT } from "../app";
 import { LocateMe } from "./locate-me";
 import type { FeedMetaT } from "../types";
 import type { Schedule, Stop } from "../services/schedule.types";
-import { dateKey, decodeScheduleOnDate } from "../services/ScheduleEncoding";
+import { dateAsNumber, decodeScheduleOnDate } from "../services/ScheduleEncoding";
 
 const SchedulesAPIBase = import.meta.env.DEV ?
     "http://localhost:4567/v1/schedule" :
@@ -80,7 +80,7 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
     }, [id, liveUpdates]);
 
     const today = new Date();
-    const i_today = dateKey(today);
+    const i_today = dateAsNumber(today);
     const i_time = today.getHours() * 3600 + today.getMinutes() * 60;
 
     const stopPlatformCodeCmp = (a: {stop: Stop}, b: {stop: Stop}) => {

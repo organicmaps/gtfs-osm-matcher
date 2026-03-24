@@ -328,10 +328,8 @@ export function decompressPeriods(periods: PeriodsInput): string[] {
 
 /**
  * Returns the indexes of periods that have service on the given date.
- * date must be at UTC midnight (e.g. new Date(Date.UTC(2025, 0, 6))).
  */
-export function servicePeriodIndexes(periods: PeriodsInput, date: Date): number[] {
-  const key = dateKey(date);
+export function servicePeriodIndexes(periods: PeriodsInput, date: number): number[] {
   const result: number[] = [];
   const rawBits = decompressRaw(periods);
 
@@ -339,12 +337,12 @@ export function servicePeriodIndexes(periods: PeriodsInput, date: Date): number[
     for (let i = 0; i < rawBits.length; i++) {
       if (!rawBits[i]) continue;
       const days = bitsToServiceDays(periods.begin, periods.end, base64UrlToBytes(rawBits[i]));
-      if (days.serviceDates.has(key)) result.push(i);
+      if (days.serviceDates.has(date)) result.push(i);
     }
   } else {
     for (let i = 0; i < rawBits.length; i++) {
       const days = decodePeriodBits(rawBits[i]);
-      if (days?.serviceDates.has(key)) result.push(i);
+      if (days?.serviceDates.has(date)) result.push(i);
     }
   }
   return result;
@@ -423,14 +421,14 @@ function transposeRleToRawBitsArray(base64: string): string[] {
 //   bytes [2..3] — end   date as uint16 big-endian (days since 2000-01-01)
 //   bytes [4+]   — bit-vector, LSB-first; bit N set = service on (begin + N days)
 
-const EPOCH_MS = Date.UTC(2000, 0, 1); // 2000-01-01 UTC
-const MS_PER_DAY = 86_400_000;
 
 export interface ServiceDays {
-  /** UTC midnight of the first day in the window. */
-  begin: Date;
-  /** UTC midnight of the last day in the window. */
-  end: Date;
+  /** yyMMdd */
+  begin: number;
+
+  /** yyMMdd */
+  end: number;
+  
   /**
    * Compact numeric date keys: (year % 100) * 10000 + month * 100 + day.
    * E.g. 2025-06-15 → 250615.
@@ -438,18 +436,23 @@ export interface ServiceDays {
   serviceDates: Set<number>;
 }
 
-export function dateKey(date: Date): number {
-  return (date.getUTCFullYear() % 100) * 10000 + (date.getUTCMonth() + 1) * 100 + date.getUTCDate();
+/**
+ * Returns yyMMdd number representing date.
+ * 
+ * It's defined here to keep date representation (yyyyMMdd vs yyMMdd) consistent
+ */
+export function dateAsNumber(date: Date) {
+  return (date.getFullYear() % 100) * 10000 + (date.getMonth() + 1) * 100 + date.getDate();
 }
 
 function bitsToServiceDays(beginDay: number, endDay: number, bitVector: Uint8Array): ServiceDays {
-  const begin = new Date(EPOCH_MS + beginDay * MS_PER_DAY);
-  const end   = new Date(EPOCH_MS + endDay   * MS_PER_DAY);
+  const begin = beginDay;
+  const end   = endDay;
   const span  = endDay - beginDay + 1;
   const serviceDates = new Set<number>();
   for (let n = 0; n < span; n++) {
     if ((bitVector[n >>> 3] & (1 << (n & 7))) !== 0) {
-      serviceDates.add(dateKey(new Date(EPOCH_MS + (beginDay + n) * MS_PER_DAY)));
+      serviceDates.add(beginDay + n);
     }
   }
   return { begin, end, serviceDates };
@@ -475,12 +478,14 @@ export function decodePeriodBits(bits: string): ServiceDays | null {
 /**
  * Returns true if service runs on the given date.
  * bits must be an uncompressed Base64-URL bits string (as returned by
- * decompressPeriods()). date must be at UTC midnight.
+ * decompressPeriods()).
+ * 
+ * Date is yyDDmm local date.
  */
-export function isServiceDay(bits: string, date: Date): boolean {
+export function isServiceDay(bits: string, date: number): boolean {
   const days = decodePeriodBits(bits);
   if (!days) return false;
-  return days.serviceDates.has(dateKey(date));
+  return days.serviceDates.has(date);
 }
 
 // ---------------------------------------------------------------------------
