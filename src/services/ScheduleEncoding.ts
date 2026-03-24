@@ -1,5 +1,7 @@
 import type { Route, Schedule, Stop } from "./schedule.types";
 
+const utf8Decoder = new TextDecoder();
+
 export interface TripTimes {
   /** Index into RouteSchedule.positions[] — which pos applies to each trip. */
   pos: number[];
@@ -196,14 +198,12 @@ export function decodeTripIds(base64: string): string[] {
   const flags = bytes[pos++];
 
   if (flags & 0x02) { // FLAG_TEMPLATE
-    const decoder = new TextDecoder();
-    
     const prefixLen = bytes[pos++];
-    const prefix = decoder.decode(bytes.subarray(pos, pos + prefixLen));
+    const prefix = utf8Decoder.decode(bytes.subarray(pos, pos + prefixLen));
     pos += prefixLen;
     
     const suffixLen = bytes[pos++];
-    const suffix = decoder.decode(bytes.subarray(pos, pos + suffixLen));
+    const suffix = utf8Decoder.decode(bytes.subarray(pos, pos + suffixLen));
     pos += suffixLen;
     
     const paddingWidth = bytes[pos++];
@@ -247,14 +247,13 @@ export function decodeTripIds(base64: string): string[] {
   const perm = new Uint8Array(n);
   for (let i = 0; i < n; i++) perm[i] = bytes[pos++];
 
-  const decoder = new TextDecoder();
   const sorted: string[] = [];
   let prev = "";
 
   for (let i = 0; i < n; i++) {
     const prefixLen = bytes[pos++];
     const suffixLen = bytes[pos++];
-    const suffix = decoder.decode(bytes.subarray(pos, pos + suffixLen));
+    const suffix = utf8Decoder.decode(bytes.subarray(pos, pos + suffixLen));
     pos += suffixLen;
     const cur = prev.slice(0, prefixLen) + suffix;
     sorted.push(cur);
