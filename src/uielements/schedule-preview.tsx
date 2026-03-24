@@ -158,7 +158,7 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
                 });
 
                 const lastStopName = pos.lastStopName;
-                var destSrcLabel = (lastStopName && <div> to {lastStopName}</div>);
+                let destSrcLabel = (lastStopName && <div> to {lastStopName}</div>);
 
                 // We are the last stop
                 if (pos.lastStopId === stop.id) {
