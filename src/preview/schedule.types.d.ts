@@ -28,6 +28,29 @@ export interface Schedule {
   sids: string[];
   /** One entry per GTFS Stop matched with OSM entry or OMIM entry. */
   timetables: StopTimetable[];
+  /**
+   * Route geometries, parallel to routes[]. Absent when no geometry is available.
+   * Each entry corresponds to routes[i]; null means no geometry for that route.
+   * Multiple variants cover routes that serve different stop sequences (e.g. short-turning).
+   */
+  geometries?: (GeometryVariant[] | null)[];
+}
+
+/**
+ * One unique stop sequence for a route.
+ * periods: indexes into Periods.data[] — which service calendars run this shape.
+ * coords: base64url zigzag-VLQ encoded Web Mercator (EPSG:3857) integer coordinate pairs.
+ * Decode with decodeCoords() from ScheduleEncoding.ts.
+ */
+export interface GeometryVariant {
+  /** Indexes into Periods.data[] for the service calendars that use this stop sequence. */
+  periods: number[];
+  /**
+   * Base64url (no padding) zigzag-VLQ encoded coordinate pairs [x0,y0, x1,y1, …]
+   * in Web Mercator integer units (EPSG:3857). Delta-coded: first pair is absolute,
+   * subsequent pairs store signed deltas. See decodeCoords() in ScheduleEncoding.ts.
+   */
+  coords: string;
 }
 
 export interface Periods {

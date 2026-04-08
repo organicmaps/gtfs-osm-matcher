@@ -34,6 +34,16 @@ export function parseUrlReportRegion(hashString: string) {
     }
 }
 
+export function parseUrlPreviewRegion(hashString: string) {
+    const m = hashString.match(/\/preview\/([\w0-9-_]+)/);
+    return m?.[1];
+}
+
+export function parseUrlPreviewStopId(hashString: string) {
+    const m = hashString.match(/\/preview\/[\w0-9-_]+\/([^/]+)/);
+    return m?.[1];
+}
+
 export function parseDsAndId(hashString: string, datasets: string[]) {
     const reportMatch = hashString.match(`/selection/(${datasets.join('|')})/([^/]+)`);
     if (reportMatch && reportMatch[1]) {

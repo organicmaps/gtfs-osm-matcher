@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import type { SelectionT } from "../app";
-import { LocateMe } from "./locate-me";
+import { LocateMe } from "../uielements/locate-me";
 import type { FeedMetaT } from "../types";
-import type { Schedule, Stop } from "../services/schedule.types";
-import { dateAsNumber, decodeScheduleOnDate } from "../services/ScheduleEncoding";
+import type { Schedule, Stop } from "./schedule.types";
+import { dateAsNumber, decodeScheduleOnDate } from "./ScheduleEncoding";
+import "./schedule-preview.css";
 
 const SchedulesAPIBase = import.meta.env.DEV ?
     "http://localhost:4567/v1/schedule" :

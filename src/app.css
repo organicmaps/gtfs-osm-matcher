@@ -102,6 +102,7 @@
   width: 50vw;
   flex-shrink: 0;
   overflow-y: auto;
+  scrollbar-width: thin;
   border-right: 1px solid #ddd;
   display: flex;
   flex-direction: column;

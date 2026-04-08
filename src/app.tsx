@@ -8,7 +8,7 @@ import { createMap } from './map/map';
 import { useEffect, useState } from 'preact/hooks';
 import { MatchReportSelector } from './uielements/report-selector';
 import { SelectionInfo } from './uielements/selection-info';
-import { SchedulePreview } from './uielements/schedule-preview';
+import { SchedulePreview } from './preview/schedule-preview';
 import { MapTools } from './uielements/map-tools';
 import { parseUrlReportRegion, useHashRoute } from './uielements/routing';
 import { cls } from './uielements/cls';

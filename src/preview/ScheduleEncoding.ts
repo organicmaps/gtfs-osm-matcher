@@ -270,6 +270,35 @@ export function decodeTripIds(base64: string): string[] {
 }
 
 // ---------------------------------------------------------------------------
+// coords  — route geometry (zigzag-VLQ delta pairs)
+// ---------------------------------------------------------------------------
+// Encoding: consecutive (x,y) pairs, delta-coded then zigzag + VLQ per value.
+//   Zigzag: n >= 0 → 2n,  n < 0 → -2n - 1.
+//   VLQ: 7 bits/byte, MSB=1 means more bytes follow.
+// Result: flat [x0, y0, x1, y1, …] array in Web Mercator integer units (EPSG:3857).
+
+export function decodeCoords(base64url: string): number[] {
+  if (!base64url) return [];
+  const bytes = base64UrlToBytes(base64url);
+  const result: number[] = [];
+  let pos = 0;
+  let x = 0, y = 0;
+
+  while (pos < bytes.length) {
+    let zx = 0, shift = 0, b: number;
+    do { b = bytes[pos++]; zx |= (b & 0x7F) << shift; shift += 7; } while (b & 0x80);
+    x += (zx & 1) ? -(zx >> 1) - 1 : zx >> 1;
+
+    let zy = 0; shift = 0;
+    do { b = bytes[pos++]; zy |= (b & 0x7F) << shift; shift += 7; } while (b & 0x80);
+    y += (zy & 1) ? -(zy >> 1) - 1 : zy >> 1;
+
+    result.push(x, y);
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // arrivalTimes / departureTimes  — IntArrayEncoder
 // ---------------------------------------------------------------------------
 // Encoding:

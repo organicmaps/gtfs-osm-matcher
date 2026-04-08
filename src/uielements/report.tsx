@@ -250,6 +250,12 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         ?.sort(matchDatasetOrderComparator)
         ?.map(({ name: dsName, featuresCount }) => {
             const title = dsTitles[dsName];
+            if (dsName === 'preview') {
+                return (<div key={dsName}>
+                    <a href={`#/preview/${reportRegion}`} title={title}>{dsName}</a>
+                    <span className={'match-dataset-count'}>{featuresCount}</span>
+                </div>)
+            }
             return (<div key={dsName}>
                 <input className={'match-dataset-select'} type={"checkbox"} checked={selectedDatasets[dsName]} onChange={(e) => {
                     updateSelectedDatasets({ ...selectedDatasets, [dsName]: (e.target as HTMLInputElement).checked });
@@ -302,7 +308,7 @@ type DatasetMapLayerProps = {
     data: GeojsonDataT
     onClick?: (datasetName: string, feature?: MapGeoJSONFeature, e?: MapLayerClickEvent) => void
 }
-function DatasetMapLayer({ name, data, onClick }: DatasetMapLayerProps) {
+export function DatasetMapLayer({ name, data, onClick }: DatasetMapLayerProps) {
 
     const mapContext = useContext(MapContext);
     const map = mapContext?.map;
