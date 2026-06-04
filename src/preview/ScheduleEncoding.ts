@@ -513,6 +513,55 @@ export function isServiceDay(bits: string, date: number): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Route geometry helpers
+// ---------------------------------------------------------------------------
+
+const MERCATOR_HALF_EXTENT = 20037508.342789244;
+
+function mercatorToLonLat(x: number, y: number): [number, number] {
+  const lon = (x / MERCATOR_HALF_EXTENT) * 180;
+  const lat = (Math.atan(Math.exp((y / MERCATOR_HALF_EXTENT) * Math.PI)) * 360 / Math.PI) - 90;
+  return [lon, lat];
+}
+
+/**
+ * Returns GeoJSON LineString features for all route geometry variants
+ * that are active on the given date.
+ */
+export function activeRouteGeometries(schedule: Schedule, date: number) {
+  if (!schedule.geometries) return [];
+
+  const activePeriods = new Set(servicePeriodIndexes(schedule.periods, date));
+  const features: {
+    type: 'Feature';
+    geometry: { type: 'LineString'; coordinates: [number, number][] };
+    properties: { routeId: string; shortName: string; color: string | null };
+  }[] = [];
+
+  schedule.routes.forEach((route, i) => {
+    const variants = schedule.geometries![i];
+    if (!variants) return;
+
+    for (const variant of variants) {
+      if (!variant.periods.some(p => activePeriods.has(p))) continue;
+      const raw = decodeCoords(variant.coords);
+      if (raw.length < 4) continue;
+      const coordinates: [number, number][] = [];
+      for (let j = 0; j < raw.length; j += 2) {
+        coordinates.push(mercatorToLonLat(raw[j], raw[j + 1]));
+      }
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates },
+        properties: { routeId: route.routeId, shortName: route.shortName ?? '', color: route.color ? `#${route.color}` : null },
+      });
+    }
+  });
+
+  return features;
+}
+
+// ---------------------------------------------------------------------------
 // Base64 helpers
 // ---------------------------------------------------------------------------
 

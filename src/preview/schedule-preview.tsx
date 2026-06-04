@@ -4,11 +4,13 @@ import { LocateMe } from "../uielements/locate-me";
 import type { FeedMetaT } from "../types";
 import type { Schedule, Stop } from "./schedule.types";
 import { dateAsNumber, decodeScheduleOnDate } from "./ScheduleEncoding";
+import { RouteGeometries } from "./route-geometries";
 import "./schedule-preview.css";
 
 const SchedulesAPIBase = import.meta.env.DEV ?
     "http://localhost:4567/v1/schedule" :
     "https://pt.organicmaps.app/api/v1/schedule";
+
 const RTUpdatesAPIBase = import.meta.env.DEV ?
     "http://localhost:4567/v1/updates" :
     "https://pt.organicmaps.app/api/v1/updates";
@@ -183,6 +185,7 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
     const name = schedules[0] && schedules[0].stops[0].stop_name;
 
     return (<div id={"selection-info"}>
+        <RouteGeometries schedules={schedules} />
         {schedules.length === 0 && <div>loading {id}</div>}
         {schedules.length > 0 && <h4>{name}</h4>} {lonlat && <LocateMe zoom={18} lonlatFeature={{ lon: lonlat[0], lat: lonlat[1] }} />}
         <div>

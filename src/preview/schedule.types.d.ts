@@ -132,6 +132,9 @@ export interface Route {
 
   /** Pass through from GTFS, Absent when null. */
   agency?: string;
+
+  /** 6-character RGB hex string without '#', e.g. "1a2b3c". Absent when null. */
+  color?: string;
 }
 
 // ---------------------------------------------------------------------------
