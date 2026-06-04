@@ -34,12 +34,19 @@ export function parseUrlReportRegion(hashString: string) {
     }
 }
 
-export function parseDsAndId(hashString: string, datasets: string[]) {
-    const reportMatch = hashString.match(`/selection/(${datasets.join('|')})/([^/]+)`);
-    if (reportMatch && reportMatch[1]) {
+export type SelectionHash = {
+    kind: 'preview' | 'selection';
+    id: string;
+};
+
+// `…/preview/{id}` for timetable preview, `…/selection/{id}` for everything else.
+// The category is no longer part of the URL — it is recovered from index.tsv.
+export function parseSelectionHash(hashString: string): SelectionHash | undefined {
+    const match = hashString.match(/\/(preview|selection)\/([^/]+)/);
+    if (match) {
         return {
-            dataset: reportMatch[1],
-            featureId: reportMatch[2],
+            kind: match[1] as 'preview' | 'selection',
+            id: match[2],
         };
     }
 }

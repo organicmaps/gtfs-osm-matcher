@@ -8,6 +8,21 @@
     font-size: 1em;
 }
 
+.match-group {
+    margin-top: 0.4em;
+}
+.match-group-header {
+    font-weight: bold;
+}
+.match-group-title {
+    display: inline-block;
+    margin-left: 0.5em;
+    margin-right: 0.5em;
+    vertical-align: middle;
+}
+.match-child {
+    margin-left: 1.2em;
+}
 .match-dataset {
     display: inline-block;
     width: 11em;

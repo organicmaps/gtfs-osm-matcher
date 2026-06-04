@@ -36,25 +36,25 @@ export function ReportHelpOverlay({ onClose }: { onClose: () => void }) {
                                 more than one GTFS stop matched to the same OSM element.
                             </p>
                         </li>
-                        <li>separated-clusters -
-                            This dataset contains matches that were successfuly separated from clusters.
+                        <li>separated-cluster -
+                            This sub-category contains matches that were successfuly separated from clusters.
 
                             At this moment cluster separation is done by distance.
                         </li>
-                        <li>transit-hub-clusters -
+                        <li>transit-hub -
                             This are clusters which contains one and only one OSM element representing trunsport hub,
                             such as amenity=bus_station, railway=station, etc. and any number of stops or platforms.
                         </li>
                         <li>many-to-one -
                             This are clusters where multiple GTFS stops were matched to excatly one OSM element.
                         </li>
-                        <li>clusters -
+                        <li>cluster -
                             This are clusters which the tool was unable to separate.
                         </li>
                         <li>no-match -
                             This are GTFS stops that were not matched to any OSM element.
                         </li>
-                        <li>no-osm-stops -
+                        <li>no-osm -
                             This are GTFS stops for which no OSM element of the appropiate type was found.
                         </li>
                     </ul>

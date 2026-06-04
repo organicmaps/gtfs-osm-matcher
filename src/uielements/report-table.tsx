@@ -21,9 +21,6 @@ export type ReportRow = {
     matchStats: {
         total: number;
         matchId: number;
-        nameMatch: number;
-        manyToOne: number;
-        transitHubs: number;
         noMatch: number;
         empty: number;
     } | undefined;
