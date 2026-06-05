@@ -135,8 +135,8 @@ export function App() {
     if (reportRegion) {
       var hash = `#/match-report/${reportRegion}`;
 
-      if (datasetName && id) {
-        hash += `/selection/${datasetName}/${id}`;
+      if (id) {
+        hash += datasetName === 'preview' ? `/preview/${id}` : `/selection/${id}`;
       }
 
       window.location.hash = hash;

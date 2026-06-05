@@ -481,27 +481,36 @@ function SpanSpacer({ w }: { w: string }) {
     return <span style={{ display: 'inline-block', width: w }} />
 }
 
+// datasetName is the index.tsv `status_detailed` 3-letter code.
 function DatasetHelp({ datasetName }: { datasetName?: string }) {
 
     var info = (<i>One day here will be info text for {datasetName}</i>);
 
-    if (datasetName === "no-match") {
+    if (datasetName === "nom") {
         info = (<i>None of the OSM stops matched GTFS stop by Id, Name or Code</i>);
     }
 
-    if (datasetName === "no-osm-stops") {
+    if (datasetName === "nos") {
         info = (<i>Can't find any OSM element recognized as a Public transport stop in vicinity</i>);
     }
 
-    if (datasetName === "match-id") {
+    if (datasetName === "mid") {
         info = (<i>Matched OSM stops by GTFS Id or Code</i>);
     }
 
-    if (datasetName === "match-name") {
+    if (datasetName === "mrt") {
+        info = (<i>Matched OSM stops by routes going through this stop</i>);
+    }
+
+    if (datasetName === "mnm" || datasetName === "nic") {
         info = (<i>Matched OSM stops by GTFS stop Name</i>);
     }
 
-    if (["clusters", "many-to-one", "transit-hub-clusters"].includes(datasetName || "")) {
+    if (datasetName === "gen") {
+        info = (<i>Matched to a stop without name or code nearby</i>);
+    }
+
+    if (["clu", "mto", "hub", "sep"].includes(datasetName || "")) {
         info = (<i>Multiple gtfs stops matched by name to the same group of OSM features.</i>);
     }
 
