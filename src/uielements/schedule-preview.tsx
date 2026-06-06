@@ -92,7 +92,7 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
                 }
             }
             catch {
-                if (!cancelled && errCounter++ > 2) {
+                if (!cancelled && ++errCounter >= 3) {
                     clearInterval(rt);
                 }
             }
