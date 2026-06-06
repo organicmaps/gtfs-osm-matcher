@@ -324,7 +324,11 @@ export function servicePeriodIndexes(periods: Periods, date: number): number[] {
   const result: number[] = [];
   const rawBits = decompressRaw(periods);
 
-  if (periods.encoding === "bits" && periods.begin != null && periods.end != null) {
+  // transpose_rle reconstructs per-period blobs WITH a 4-byte begin/end header
+  // (see transposeRleToRawBitsArray), so it must go through decodePeriodBits like
+  // the "begin:end:bits" encoding — not the headerless global-range branch below.
+  if (periods.encoding === "bits" && periods.compression !== "transpose_rle"
+      && periods.begin != null && periods.end != null) {
     for (let i = 0; i < rawBits.length; i++) {
       if (!rawBits[i]) continue;
       const days = bitsToServiceDays(periods.begin, periods.end, base64UrlToBytes(rawBits[i]));
@@ -440,14 +444,24 @@ export function dateAsNumber(date: Date) {
   return (date.getFullYear() % 100) * 10000 + (date.getMonth() + 1) * 100 + date.getDate();
 }
 
+/**
+ * Converts a day-number (days since 2000-01-01) to a yyMMdd number.
+ * Uses UTC getters because EPOCH_MS is UTC midnight — using local getters would
+ * shift the calendar date by one day in timezones behind UTC.
+ */
+function dayNumberAsYyMMdd(dayNumber: number): number {
+  const d = new Date(EPOCH_MS + dayNumber * MS_PER_DAY);
+  return (d.getUTCFullYear() % 100) * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
+}
+
 function bitsToServiceDays(beginDay: number, endDay: number, bitVector: Uint8Array): ServiceDays {
-  const begin = dateAsNumber(new Date(EPOCH_MS + beginDay * MS_PER_DAY));
-  const end   = dateAsNumber(new Date(EPOCH_MS + endDay   * MS_PER_DAY));
+  const begin = dayNumberAsYyMMdd(beginDay);
+  const end   = dayNumberAsYyMMdd(endDay);
   const span  = endDay - beginDay + 1;
   const serviceDates = new Set<number>();
   for (let n = 0; n < span; n++) {
     if ((bitVector[n >>> 3] & (1 << (n & 7))) !== 0) {
-      serviceDates.add(dateAsNumber(new Date(EPOCH_MS + (beginDay + n) * MS_PER_DAY)));
+      serviceDates.add(dayNumberAsYyMMdd(beginDay + n));
     }
   }
   return { begin, end, serviceDates };

@@ -39,6 +39,7 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
 
     useEffect(() => {
         setSchedules([]);
+        setTripUpdates(undefined);
 
         fetch(`${SchedulesAPIBase}/${id}`).then(r => r.json()).then((data: any) => {
             
@@ -66,16 +67,45 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
             return;
         }
 
-        const getUpdates = () => {
-            fetch(`${RTUpdatesAPIBase}/${id}`).then(r => r.json()).then(tripUpdates => {
-                setTripUpdates(tripUpdates);
-            });
+        let cancelled = false;
+        let inFlight = false;
+        let errCounter = 0;
+
+        const getUpdates = async () => {
+            if (inFlight) return;            // skip overlapping ticks
+            inFlight = true;
+            try {
+                const response = await fetch(`${RTUpdatesAPIBase}/${id}`);
+                if (cancelled) return;       // effect superseded — drop stale result
+
+                if (response.status === 200) {
+                    const data = await response.json();
+                    if (cancelled) return;
+                    if (data) {
+                        setTripUpdates(data);
+                    }
+                }
+                else if (errCounter++ > 2) {
+                    clearInterval(rt);
+                }
+            }
+            catch {
+                if (!cancelled && errCounter++ > 2) {
+                    clearInterval(rt);
+                }
+            }
+            finally {
+                inFlight = false;
+            }
         }
 
         const rt = setInterval(getUpdates, 5000);
         getUpdates();
 
-        return () => clearInterval(rt);
+        return () => {
+            cancelled = true;
+            clearInterval(rt);
+        };
 
     }, [id, liveUpdates]);
 
