@@ -85,8 +85,9 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
                     if (data) {
                         setTripUpdates(data);
                     }
+                    errCounter = 0;             // reset breaker: a 200 means the endpoint is healthy
                 }
-                else if (errCounter++ > 2) {
+                else if (++errCounter >= 3) {  // cancel after 3 consecutive failures
                     clearInterval(rt);
                 }
             }
