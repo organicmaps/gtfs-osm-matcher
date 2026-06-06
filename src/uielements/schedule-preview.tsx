@@ -42,7 +42,13 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
         setTripUpdates(undefined);
         setLiveUpdates(false);
 
-        fetch(`${SchedulesAPIBase}/${id}`).then(r => r.json()).then((data: any) => {
+        let cancelled = false
+        fetch(`${SchedulesAPIBase}/${id}`)
+            .then(r => r.json()).then((data: any) => {
+            
+            if (cancelled) {
+                return;
+            }
             
             import.meta.env.DEV && 
                 console.log('Schedule response', data);
@@ -61,6 +67,8 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
             setLiveUpdates(liveUpdates);
         });
 
+        return () => {cancelled = true};
+
     }, [id]);
 
     useEffect(() => {
@@ -73,11 +81,14 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
         let errCounter = 0;
 
         const getUpdates = async () => {
-            if (inFlight) return;            // skip overlapping ticks
+            // skip overlapping ticks
+            if (inFlight) return;
             inFlight = true;
+            
             try {
                 const response = await fetch(`${RTUpdatesAPIBase}/${id}`);
-                if (cancelled) return;       // effect superseded — drop stale result
+                // Effect superseded - drop stale result
+                if (cancelled) return;
 
                 if (response.status === 200) {
                     const data = await response.json();
@@ -85,9 +96,10 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
                     if (data) {
                         setTripUpdates(data);
                     }
-                    errCounter = 0;             // reset breaker: a 200 means the endpoint is healthy
+                    // Backend is OK, reset counter
+                    errCounter = 0;
                 }
-                else if (++errCounter >= 3) {  // cancel after 3 consecutive failures
+                else if (++errCounter >= 3) { 
                     clearInterval(rt);
                 }
             }
