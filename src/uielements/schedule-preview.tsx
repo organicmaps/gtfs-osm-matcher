@@ -40,6 +40,7 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
     useEffect(() => {
         setSchedules([]);
         setTripUpdates(undefined);
+        setLiveUpdates(false);
 
         fetch(`${SchedulesAPIBase}/${id}`).then(r => r.json()).then((data: any) => {
             
