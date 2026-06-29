@@ -233,11 +233,11 @@ function renderReportRow(report: ReportRow, onSelectReport: ReportSelectCb, info
                 {info && <span className="info-badge" onClick={() => onToggleInfo(region)}>ⓘ</span>}
                 <a onClick={() => onSelectReport?.(region)} href={`#/match-report/${region}`}>{region}</a>
                 {infoForRegion === region && <div className="info-badge-content">
-                    {info?.source && <div>Source: <a target="_blank" href={info.source}>{info.source}</a></div>}
-                    {info?.version && <div>Report version: {info.version}</div>}
-                    {info?.matcherVersion && <div>Matcher version: {info.matcherVersion}</div>}
-                    {info?.generationTimeStamp && <div>Report TS: {formatDateTime(new Date(info.generationTimeStamp))}</div>}
-                    {info?.gtfsTimeStamp && <div>GTFS TS: {formatDateTime(new Date(info.gtfsTimeStamp))}</div>}
+                    {info?.source && <div><b>Source:</b> <a target="_blank" href={info.source}>{info.source}</a></div>}
+                    {info?.version && <div><b>Report version:</b> {info.version}</div>}
+                    {info?.matcherVersion && <div><b>Matcher version:</b> {info.matcherVersion}</div>}
+                    {info?.generationTimeStamp && <div><b>Report TS:</b> {formatDateTime(new Date(info.generationTimeStamp))}</div>}
+                    {info?.gtfsTimeStamp && <div><b>GTFS TS:</b> {formatDateTime(new Date(info.gtfsTimeStamp))}</div>}
                 </div>}
             </td>
             <td>
