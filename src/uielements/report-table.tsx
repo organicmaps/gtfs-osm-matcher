@@ -235,6 +235,7 @@ function renderReportRow(report: ReportRow, onSelectReport: ReportSelectCb, info
                 {infoForRegion === region && <div className="info-badge-content">
                     {info?.source && <div>Source: <a target="_blank" href={info.source}>{info.source}</a></div>}
                     {info?.version && <div>Report version: {info.version}</div>}
+                    {info?.matcherVersion && <div>Matcher version: {info.matcherVersion}</div>}
                     {info?.generationTimeStamp && <div>Report TS: {formatDateTime(new Date(info.generationTimeStamp))}</div>}
                     {info?.gtfsTimeStamp && <div>GTFS TS: {formatDateTime(new Date(info.gtfsTimeStamp))}</div>}
                 </div>}
