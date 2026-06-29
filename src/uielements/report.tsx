@@ -62,6 +62,7 @@ const defaultSets = { nom: true, nos: true } as DatatsetsSelectonT;
 
 export type Report = {
     region: string;
+    version: string;
     source?: string;
 
     idTags: {
@@ -83,6 +84,7 @@ export type Report = {
             fileTimestamp: number
         }[]
         gtfsTimeStamp: number
+        generationTimeStamp: number
         matcherVersion: number | string
         gtfsBbox?: {
             left: number

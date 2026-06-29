@@ -87,8 +87,34 @@
     padding-left: 2em;
 }
 
-@media (max-width: 1200px) {
-    .col-source {
-        display: none;
-    }
+.info-badge {
+    display: inline-block;
+    margin-right: 0.35em;
+    cursor: pointer;
+    font-size: 1.1em;
+    color: #6c757d;
+    vertical-align: baseline;
+}
+
+.info-badge:hover {
+    color: #0056b3;
+}
+
+.info-badge-content {
+    margin-top: 0.25em;
+    padding: 0.3em 0.5em;
+    font-size: 0.85em;
+
+    color: #555;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+}
+
+.info-badge-content a {
+    display: inline-block;
+    max-width: 15em;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    vertical-align: top;
 }

@@ -27,10 +27,10 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
     }, [setMatchReports, setFoldByName]);
 
     const reports = matchReports.map((report) => {
-        const {region, source, liveUpdates} = report;
-        
-        const gtfsDate = report.matchMeta?.gtfsTimeStamp ? 
-                new Date(report.matchMeta.gtfsTimeStamp) : 
+        const {region, source, version, liveUpdates, matchMeta} = report;
+
+        const gtfsDate = matchMeta?.gtfsTimeStamp ? 
+                new Date(matchMeta.gtfsTimeStamp) : 
                 null;
 
         const matchStats = report?.matchStats;
@@ -39,7 +39,13 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
 
         return {
             region,
-            source,
+            info: { 
+                source,
+                version,
+                matcherVersion: String(matchMeta?.matcherVersion ?? ''),
+                gtfsTimeStamp: matchMeta.gtfsTimeStamp,
+                generationTimeStamp: matchMeta.generationTimeStamp,
+            },
             gtfsDate,
             matched,
             matchPercent,
