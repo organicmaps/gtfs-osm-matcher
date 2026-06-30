@@ -29,7 +29,7 @@
     vertical-align: -0.2em;
 }
 
-.warning span {
+.warning i {
     color: red;
     font-weight: bolder;
 }

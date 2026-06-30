@@ -358,8 +358,8 @@ type OsmListElementProps = {
 function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents }: OsmListElementProps) {
 
     const [edit, setEdit] = useState(editDefault || false);
-
     const [version, setVersion] = useState(0);
+    const [warnExpanded, setWarnExpanded] = useState(false);
 
     const type = f.id[0] === 'n' ? 'node' : 'way';
     const idn = f.id.slice(1);
@@ -380,8 +380,6 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
 
     const osmUrl = `https://osm.org/${type}/${idn}`;
     const osmHref = <a target="_blank" href={osmUrl}>{f.id}</a>;
-
-    const matchSet = f.matchSet;
 
     const osmFeature = OSM_DATA.getByTypeAndId(type, idn);
 
@@ -431,10 +429,18 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
         OSM_DATA.setNodeLatLng({ lng: lonLat[0], lat: lonLat[1] }, osmFeature);
     }, [osmFeature]);
 
-    const alreadyMatchWarning = matchSet && matchSet !== 'no-match' &&
-        <div className={'warning'}>
-            <span>&#9888;</span>This OSM Element is already matched as {matchSet}
-        </div>;
+    const alreadyMatchWarning = f.mtch && f.mtch.length > 0 && <>
+        <div className={'warning cursor-pointer'} onClick={() => setWarnExpanded(!warnExpanded)}>
+            <i>&#9888; </i>
+            <span>This OSM Element is already matched to another gtfs feature</span>
+        </div>
+        {
+            warnExpanded && <ul>{
+                f.mtch.map((m: string) => {return (<li><a href={`/#/match-report/swiss-opendata/selection/${m}`}>{m}</a></li>)})
+            }
+            </ul>
+        }
+    </>
 
     const distanceInfo = parentLonLat[0] && parentLonLat[1] &&
         <span>
