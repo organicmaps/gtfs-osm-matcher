@@ -8,10 +8,16 @@ export type RouteDisplayEntry = {
     routes: { [k: string]: { nextStopLonLat: number[], prevStopLonLat: number[] } };
 }
 
-type RoutesMapProps = {
-    entries: RouteDisplayEntry[];
+export type FullRouteDisplayEntry = {
+    routeKey: string;
+    coordinates: [number, number][];
 }
-export function RoutesMap({ entries }: RoutesMapProps) {
+
+type RoutesMapProps = {
+    entries?: RouteDisplayEntry[];
+    fullRoutes?: FullRouteDisplayEntry[];
+}
+export function RoutesMap({ entries = [], fullRoutes = [] }: RoutesMapProps) {
 
     if (import.meta.env.DEV) {
         console.log('Render routes', entries);
@@ -66,6 +72,20 @@ export function RoutesMap({ entries }: RoutesMapProps) {
         });
     }).flat();
 
+    const fullRouteFeatures = fullRoutes.map(({ routeKey, coordinates }) => ({
+        type: 'Feature',
+        geometry: {
+            type: 'LineString',
+            coordinates
+        },
+        properties: {
+            name: routeKey,
+            color: 'green'
+        }
+    }));
+
+    const allFeatures = [...features, ...fullRouteFeatures].flat();
+
     useEffect(() => {
         if (!map) return;
 
@@ -103,7 +123,7 @@ export function RoutesMap({ entries }: RoutesMapProps) {
             return;
         }
 
-        if (!map || !features) {
+        if (!map || !allFeatures) {
             import.meta.env.DEV &&
                 console.warn('Routes: map or route features is not ready');
 
@@ -114,7 +134,7 @@ export function RoutesMap({ entries }: RoutesMapProps) {
             (map.getSource('routes') as GeoJSONSource).setData({
                 type: 'FeatureCollection',
                 // @ts-ignore
-                features: features.flat()
+                features: allFeatures
             });
         }
         else {
@@ -130,7 +150,7 @@ export function RoutesMap({ entries }: RoutesMapProps) {
             }
         };
 
-    }, [map, features, mapStylesReady]);
+    }, [map, allFeatures, mapStylesReady]);
 
     return <></>
 }

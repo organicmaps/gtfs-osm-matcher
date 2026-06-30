@@ -8,7 +8,7 @@ import { LocateMe } from "./locate-me";
 import { TagEditor } from "./editor/osm-tags";
 
 import { cls } from "./cls";
-import { RoutesMap } from "./routes";
+import { RouteList } from "./route-list";
 import { OSM_DATA } from "../services/OSMData";
 import { useSyncExternalStore } from "preact/compat";
 import { getTileXYZ } from "../services/tile-utils";
@@ -51,7 +51,7 @@ type MatchInfoProps = {
     datasetName?: string
     idTags?: { [k: string]: number }
 }
-function MatchInfo({ datasetName, properties, geometry, idTags }: MatchInfoProps) {
+function MatchInfo({ datasetName, properties, geometry, idTags, reportRegion }: MatchInfoProps) {
 
     const [loading, setLoading] = useState(false);
 
@@ -63,6 +63,12 @@ function MatchInfo({ datasetName, properties, geometry, idTags }: MatchInfoProps
     const [lon, lat] = geometry?.coordinates || [];
 
     const gtfsFeatures = useMemo(() => getGtfsFeatures(properties), [properties]);
+    const gtfsStopIds = useMemo(() => {
+        if (gtfsFeatures.length > 1) {
+            return gtfsFeatures.map((f: any) => f.id).filter(Boolean);
+        }
+        return properties.gtfsStopId ? [properties.gtfsStopId] : [];
+    }, [gtfsFeatures, properties.gtfsStopId]);
     const osmFeatures = useMemo(() => parseJsonSafe(properties['osmFeatures'], []), [properties]);
     const routes = useMemo(() => parseJsonSafe(properties['gtfsRoutes'], null), [properties]);
 
@@ -91,13 +97,6 @@ function MatchInfo({ datasetName, properties, geometry, idTags }: MatchInfoProps
     if (properties.gtfsStopCode && properties.gtfsStopCode != 'null' && properties.gtfsStopCode.length > 0) {
         tagActions.setCode = [gtfsIdTag, properties.gtfsStopCode] as [string, string];
     }
-
-    // For single gtfs stop display routes is a property 
-    // of the subject feature
-    // For clusetrs routes are a property of gtfs features
-    const routesDisplayEntries = routes ?
-        [{ stopLonLat: [lon, lat], routes }] :
-        gtfsFeatures.map((f: any) => ({ stopLonLat: [f.lon, f.lat], routes: f.gtfsRoutes }));
 
     const routeTypes = properties.gtfsRouteTypes;
 
@@ -146,18 +145,7 @@ function MatchInfo({ datasetName, properties, geometry, idTags }: MatchInfoProps
             {markersGtfs}
         </div>}
 
-        <RoutesMap entries={routesDisplayEntries} />
-
-        <div>
-            {(properties.gtfsRouteTypes?.length || 0) > 0 &&
-                <div>Gtfs route types: <b>{properties.gtfsRouteTypes}</b></div>
-            }
-            {routes && <div><b>Routes: </b>
-                {Object.entries(routes || {}).map(([routeId, _route]) =>
-                    <span key={routeId}>{routeId} </span>
-                )}
-            </div>}
-        </div>
+        <RouteList reportRegion={reportRegion} routeIds={routes || {}} routeTypes={routeTypes} gtfsStopIds={gtfsStopIds} />
 
         <div className={"edit-actions"}>
             <AddOsmStopController id={properties.gtfsStopId} code={properties.gtfsStopCode} routeTypes={routeTypes} {...{ name, idTags }} />
