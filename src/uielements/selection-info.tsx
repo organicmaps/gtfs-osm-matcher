@@ -1,7 +1,7 @@
 import "./selection-info.css";
 
-import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
-import { type SelectionT } from "../app";
+import { useCallback, useContext, useEffect, useMemo, useState } from "preact/hooks";
+import { SelectionContext, type SelectionT } from "../app";
 
 import { getDistanceLonLat } from "../map/distance";
 import { LocateMe } from "./locate-me";
@@ -429,6 +429,9 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
         OSM_DATA.setNodeLatLng({ lng: lonLat[0], lat: lonLat[1] }, osmFeature);
     }, [osmFeature]);
 
+    const { selection } = useContext(SelectionContext);
+    const reportRegion = selection?.reportRegion;
+
     const alreadyMatchWarning = f.mtch && f.mtch.length > 0 && <>
         <div className={'warning cursor-pointer'} onClick={() => setWarnExpanded(!warnExpanded)}>
             <i>&#9888; </i>
@@ -436,7 +439,7 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
         </div>
         {
             warnExpanded && <ul>{
-                f.mtch.map((m: string) => {return (<li><a href={`/#/match-report/swiss-opendata/selection/${m}`}>{m}</a></li>)})
+                f.mtch.map((m: string) => {return (<li key={m}><a href={`/#/match-report/${reportRegion}/selection/${m}`}>{m}</a></li>)})
             }
             </ul>
         }
