@@ -34,6 +34,10 @@
     font-weight: bolder;
 }
 
+.edit-actions {
+    margin-top: 1em;
+}
+
 .tags-table td.important {
     font-weight: bold;
 }
@@ -64,5 +68,13 @@ span.loading-indicator {
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+.hide-label {
+    margin-left: 8px;
+    font-size: 0.75em;
+    font-weight: normal;
+    cursor: pointer;
+    user-select: none;
 }
 

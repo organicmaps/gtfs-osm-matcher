@@ -30,28 +30,69 @@ function getRouteIndex(reportRegion: string): Promise<RouteIndexEntry[]> {
     if (!routeIndexCache[reportRegion]) {
         routeIndexCache[reportRegion] = fetch(`${DATA_BASE_URL}/${reportRegion}/routes.ndjson`)
             .then(r => r.text())
-            .then(text => text.trim().split('\n').map(line => JSON.parse(line)));
+            .then(text => {
+                const entries = text.trim().split('\n').map(line => JSON.parse(line));
+                if (import.meta.env.DEV) console.log(`Route index loaded: ${entries.length} routes for ${reportRegion}`);
+                return entries;
+            });
     }
     return routeIndexCache[reportRegion];
 }
 
+// Cache keyed by region+routeId — independent of which stop/selection triggered
+// the fetch, so re-selecting a previously-seen route never hits the network again.
+const routeVariantCache: { [key: string]: Promise<RouteVariant[]> } = {};
+
+function getRouteVariants(reportRegion: string, entry: RouteIndexEntry): Promise<RouteVariant[]> {
+    const key = `${reportRegion}:${entry.routeId}`;
+    if (!routeVariantCache[key]) {
+        routeVariantCache[key] = fetch(`${DATA_BASE_URL}/${reportRegion}/route-stops.ndjson`, {
+            headers: { Range: `bytes=${entry.byteOffset}-${entry.byteOffset + entry.byteLength - 1}` },
+        })
+            .then(r => r.text())
+            .then(text => {
+                const variants = text.trim().split('\n').filter(l => l).map(l => JSON.parse(l));
+                if (import.meta.env.DEV) {
+                    console.log(`Variants loaded for ${entry.routeId}: ${variants.length} variant(s)`);
+                    variants.forEach((v, i) => console.log(`  Variant #${i + 1}: ${v.gtfsIds.length} stops, ${v.latlon.length / 2} coordinates`));
+                }
+                return variants;
+            });
+    }
+    return routeVariantCache[key];
+}
+
 type RouteListProps = {
     reportRegion: string;
-    routeIds: { [routeId: string]: any };
+    routeIds: string[];
     routeTypes?: string;
     gtfsStopIds: string[];
 };
 
 export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: RouteListProps) {
-    const routeIdList = useMemo(() => Object.keys(routeIds || {}), [routeIds]);
-    const stopIdSet = useMemo(() => new Set(gtfsStopIds), [gtfsStopIds]);
-
     const [routeIndex, setRouteIndex] = useState<RouteIndexEntry[]>([]);
     const [routesWithVariants, setRoutesWithVariants] = useState<RouteWithVariants[]>([]);
     const [loading, setLoading] = useState(false);
 
+    // Stable string keys so the effect only re-runs when the actual selection
+    // changes, not whenever the parent passes a new array reference.
+    const routeIdsKey = routeIds.join(',');
+    const gtfsStopIdsKey = gtfsStopIds.join(',');
+
+    useEffect(() => {
+        if (!reportRegion) return;
+
+        let cancelled = false;
+
+        getRouteIndex(reportRegion).then(index => {
+            if (!cancelled) setRouteIndex(index);
+        });
+
+        return () => { cancelled = true; };
+    }, [reportRegion]);
+
     const fullRouteEntries = useMemo<FullRouteDisplayEntry[]>(() => {
-        return routesWithVariants.flatMap(({ index: idx, variants }) =>
+        const entries = routesWithVariants.flatMap(({ index: idx, variants }) =>
             variants.map((v, i) => {
                 const coordinates: [number, number][] = [];
                 for (let j = 0; j < v.latlon.length; j += 2) {
@@ -63,10 +104,15 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
                 };
             })
         );
+        if (import.meta.env.DEV && entries.length > 0) {
+            console.log('Full route entries (GeoJSON [lng, lat]):');
+            entries.forEach(e => console.log(`  ${e.routeKey}: ${e.coordinates.length} coords, first: [${e.coordinates[0]}], last: [${e.coordinates[e.coordinates.length - 1]}]`));
+        }
+        return entries;
     }, [routesWithVariants]);
 
     useEffect(() => {
-        if (!reportRegion || routeIdList.length === 0) return;
+        if (routeIndex.length === 0 || routeIds.length === 0) return;
 
         let cancelled = false;
 
@@ -74,40 +120,22 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
             setLoading(true);
 
             try {
-                const index = await getRouteIndex(reportRegion);
-                if (cancelled) return;
-                setRouteIndex(index);
+                const entriesToFetch = routeIndex.filter(e => routeIds.includes(e.routeId));
 
-                const routeIdSet = new Set(routeIdList);
-                const matched: RouteWithVariants[] = [];
-
-                const entriesToFetch = index.filter(e => routeIdSet.has(e.routeId));
-
-                for (const entry of entriesToFetch) {
-                    if (cancelled) break;
-
-                    const variantRes = await fetch(`${DATA_BASE_URL}/${reportRegion}/route-stops.ndjson`, {
-                        headers: { Range: `bytes=${entry.byteOffset}-${entry.byteOffset + entry.byteLength - 1}` },
-                    });
-
-                    const variantText = await variantRes.text();
-                    const variantLines = variantText.trim().split('\n');
-
-                    const allVariants: RouteVariant[] = variantLines
-                        .filter(l => l)
-                        .map(l => JSON.parse(l));
-
-                    const variants = allVariants.filter(v =>
-                        v.gtfsIds.some(id => stopIdSet.has(id)));
-
-                    if (variants.length > 0) {
-                        matched.push({ index: entry, variants });
-                    }
-                }
+                // Parallel + cached: repeat selections resolve from cache instantly,
+                // new selections fan out concurrently instead of one-at-a-time.
+                const results = await Promise.all(
+                    entriesToFetch.map(async (entry): Promise<RouteWithVariants | null> => {
+                        const allVariants = await getRouteVariants(reportRegion, entry);
+                        const variants = allVariants.filter(v =>
+                            v.gtfsIds.some(id => gtfsStopIds.includes(id)));
+                        return variants.length > 0 ? { index: entry, variants } : null;
+                    })
+                );
 
                 if (!cancelled) {
+                    const matched = results.filter((r): r is RouteWithVariants => r !== null);
                     setRoutesWithVariants(matched);
-                    console.log('Routes for stop', routeIdList, matched);
                 }
             } catch (e) {
                 console.error('Failed to load routes', e);
@@ -117,7 +145,7 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
         })();
 
         return () => { cancelled = true; };
-    }, [reportRegion, routeIdList]);
+    }, [routeIndex, routeIdsKey, gtfsStopIdsKey, reportRegion]);
 
     if (loading) {
         return <div>Loading routes...</div>;
@@ -134,8 +162,21 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
                 <div>Gtfs route types: <b>{routeTypes}</b></div>
             }
             {routesWithVariants.length > 0 && <div><b>Routes: </b>
-                {routesWithVariants.map(({ index: r }) =>
-                    <span key={r.routeId}>{r.shortName || r.routeId} </span>
+                {routesWithVariants.map(({ index: r, variants }) =>
+                    <span key={r.routeId} style={{ display: 'inline-block', borderRadius: '999px', backgroundColor: '#e0e0e0', padding: '2px 8px', margin: '2px', fontSize: '0.9em' }}>
+                        {r.shortName || r.routeId}
+                        {variants.length > 1 &&
+                            <span>
+                                {' Variants ['}
+                                {variants.map((_, i) =>
+                                    <span key={i}>
+                                        {i > 0 && ' '}#{i + 1}
+                                    </span>
+                                )}
+                                {']'}
+                            </span>
+                        }
+                    </span>
                 )}
             </div>}
         </div>
