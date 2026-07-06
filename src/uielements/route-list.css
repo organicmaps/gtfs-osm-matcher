@@ -1,0 +1,23 @@
+.route-pill {
+    cursor: pointer;
+    display: inline-block;
+    border-radius: 999px;
+    border: 1px solid #666;
+    background: transparent;
+    padding: 2px 8px;
+    margin: 2px;
+    font-size: 0.9em;
+    user-select: none;
+}
+
+.route-pill--selected {
+    background: #e0e0e0;
+}
+
+.route-variant {
+    cursor: pointer;
+}
+
+.route-variant--selected {
+    font-weight: bold;
+}

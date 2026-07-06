@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { DATA_BASE_URL } from "../config";
 import { RoutesMap, type FullRouteDisplayEntry } from "./routes";
+import { cls } from "./cls";
+
+import "./route-list.css";
 
 type RouteIndexEntry = {
     routeId: string;
@@ -17,6 +20,7 @@ type RouteVariant = {
     route: number;
     latlon: number[];
     gtfsIds: string[];
+    inx: number;
 };
 
 type RouteWithVariants = {
@@ -51,7 +55,7 @@ function getRouteVariants(reportRegion: string, entry: RouteIndexEntry): Promise
         })
             .then(r => r.text())
             .then(text => {
-                const variants = text.trim().split('\n').filter(l => l).map(l => JSON.parse(l));
+                const variants = text.trim().split('\n').filter(l => l).map((l, i) => ({ ...JSON.parse(l), inx: i }));
                 if (import.meta.env.DEV) {
                     console.log(`Variants loaded for ${entry.routeId}: ${variants.length} variant(s)`);
                     variants.forEach((v, i) => console.log(`  Variant #${i + 1}: ${v.gtfsIds.length} stops, ${v.latlon.length / 2} coordinates`));
@@ -60,6 +64,38 @@ function getRouteVariants(reportRegion: string, entry: RouteIndexEntry): Promise
             });
     }
     return routeVariantCache[key];
+}
+
+type RoutePillProps = {
+    route: RouteIndexEntry;
+    variants: RouteVariant[];
+    selectedRouteId: string | null;
+    selectedVariantInx: number | null;
+    onSelectRoute: (routeId: string) => void;
+    onSelectVariant: (routeId: string, variantInx: number) => void;
+};
+
+function RoutePill({ route: r, variants, selectedRouteId, selectedVariantInx, onSelectRoute, onSelectVariant }: RoutePillProps) {
+    const isSelected = selectedRouteId === r.routeId;
+    return (
+        <span
+            onClick={() => onSelectRoute(r.routeId)}
+            className={cls('route-pill', (!selectedRouteId || isSelected) && 'route-pill--selected')}>
+            {r.shortName || r.routeId}
+            {variants.length > 1 &&
+                <span>
+                    {' Variants: '}
+                    {variants.map((v, i) =>
+                        <span key={v.inx}
+                            onClick={e => { e.stopPropagation(); onSelectVariant(r.routeId, v.inx); }}
+                            className={cls('route-variant', selectedVariantInx === v.inx && isSelected && 'route-variant--selected')}>
+                            {i > 0 && ' '}#{v.inx + 1}
+                        </span>
+                    )}
+                </span>
+            }
+        </span>
+    );
 }
 
 type RouteListProps = {
@@ -73,6 +109,8 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
     const [routeIndex, setRouteIndex] = useState<RouteIndexEntry[]>([]);
     const [routesWithVariants, setRoutesWithVariants] = useState<RouteWithVariants[]>([]);
     const [loading, setLoading] = useState(false);
+    const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+    const [selectedVariantInx, setSelectedVariantInx] = useState<number | null>(null);
 
     // Stable string keys so the effect only re-runs when the actual selection
     // changes, not whenever the parent passes a new array reference.
@@ -92,8 +130,12 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
     }, [reportRegion]);
 
     const fullRouteEntries = useMemo<FullRouteDisplayEntry[]>(() => {
-        const entries = routesWithVariants.flatMap(({ index: idx, variants }) =>
-            variants.map((v, i) => {
+        const entries = routesWithVariants.flatMap(({ index: idx, variants }) => {
+            if (selectedRouteId && idx.routeId !== selectedRouteId) return [];
+            const relevantVariants = selectedRouteId && selectedVariantInx !== null
+                ? variants.filter(v => v.inx === selectedVariantInx)
+                : variants;
+            return relevantVariants.map((v, i) => {
                 const coordinates: [number, number][] = [];
                 for (let j = 0; j < v.latlon.length; j += 2) {
                     coordinates.push([v.latlon[j + 1], v.latlon[j]]);
@@ -102,14 +144,14 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
                     routeKey: i === 0 ? idx.shortName || idx.routeId : `${idx.shortName || idx.routeId} #${i + 1}`,
                     coordinates
                 };
-            })
-        );
+            });
+        });
         if (import.meta.env.DEV && entries.length > 0) {
             console.log('Full route entries (GeoJSON [lng, lat]):');
             entries.forEach(e => console.log(`  ${e.routeKey}: ${e.coordinates.length} coords, first: [${e.coordinates[0]}], last: [${e.coordinates[e.coordinates.length - 1]}]`));
         }
         return entries;
-    }, [routesWithVariants]);
+    }, [routesWithVariants, selectedRouteId, selectedVariantInx]);
 
     useEffect(() => {
         if (routeIndex.length === 0 || routeIds.length === 0) return;
@@ -136,6 +178,8 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
                 if (!cancelled) {
                     const matched = results.filter((r): r is RouteWithVariants => r !== null);
                     setRoutesWithVariants(matched);
+                    setSelectedRouteId(prev => matched.some(r => r.index.routeId === prev) ? prev : null);
+                    setSelectedVariantInx(null);
                 }
             } catch (e) {
                 console.error('Failed to load routes', e);
@@ -163,20 +207,23 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
             }
             {routesWithVariants.length > 0 && <div><b>Routes: </b>
                 {routesWithVariants.map(({ index: r, variants }) =>
-                    <span key={r.routeId} style={{ display: 'inline-block', borderRadius: '999px', backgroundColor: '#e0e0e0', padding: '2px 8px', margin: '2px', fontSize: '0.9em' }}>
-                        {r.shortName || r.routeId}
-                        {variants.length > 1 &&
-                            <span>
-                                {' Variants ['}
-                                {variants.map((_, i) =>
-                                    <span key={i}>
-                                        {i > 0 && ' '}#{i + 1}
-                                    </span>
-                                )}
-                                {']'}
-                            </span>
-                        }
-                    </span>
+                    <RoutePill key={r.routeId}
+                        route={r}
+                        variants={variants}
+                        selectedRouteId={selectedRouteId}
+                        selectedVariantInx={selectedVariantInx}
+                        onSelectRoute={routeId => {
+                            setSelectedRouteId(prev => prev === routeId ? null : routeId);
+                            setSelectedVariantInx(null);
+                        }}
+                        onSelectVariant={(routeId, variantInx) => {
+                            if (selectedRouteId === routeId && selectedVariantInx === variantInx) {
+                                setSelectedVariantInx(null);
+                            } else {
+                                setSelectedRouteId(routeId);
+                                setSelectedVariantInx(variantInx);
+                            }
+                        }} />
                 )}
             </div>}
         </div>
