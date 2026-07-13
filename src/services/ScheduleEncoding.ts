@@ -26,8 +26,10 @@ export interface ResolvedStopOnRoutePosition {
 
 export interface RouteSchedule {
   route: Route;
-  /** Index into sids[] — identifies the route direction at this stop. */
+  /** GTFS direction_id (0 or 1, 0 by default). */
   direction: number;
+  /** Index into sids[] — identifies the route direction at this stop (inferred from pos). */
+  directionSid?: number;
   positions: ResolvedStopOnRoutePosition[];
   tripTimes: TripTimes;
 }
@@ -64,7 +66,12 @@ export function decodeScheduleOnDate(
         if (!activeServices.has(entry.periods[i])) continue;
 
         const decodedPos = decodePosArray(allPos[entry.pos[i]]);
-        const direction =
+        const direction = entry.dir !== undefined ? entry.dir : (
+          decodedPos.nextStopId !== -1 && decodedPos.nextStopId !== currentSidIdx
+            ? decodedPos.nextStopId
+            : decodedPos.prevStopId
+        );
+        const directionSid =
           decodedPos.nextStopId !== -1 && decodedPos.nextStopId !== currentSidIdx
             ? decodedPos.nextStopId
             : decodedPos.prevStopId;
@@ -72,7 +79,7 @@ export function decodeScheduleOnDate(
         const key = `${route.routeId}=${direction}`;
         let rs = routeMap.get(key);
         if (!rs) {
-          rs = { route, direction, positions: [], tripTimes: { pos: [], tripId: [], arrivalTime: [], departureTime: [] } };
+          rs = { route, direction, directionSid, positions: [], tripTimes: { pos: [], tripId: [], arrivalTime: [], departureTime: [] } };
           routeMap.set(key, rs);
         }
 

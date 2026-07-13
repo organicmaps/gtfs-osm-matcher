@@ -20,6 +20,7 @@ type RouteVariant = {
     route: number;
     latlon: number[];
     gtfsIds: string[];
+    dir?: number;
     inx: number;
 };
 
@@ -55,7 +56,13 @@ function getRouteVariants(reportRegion: string, entry: RouteIndexEntry): Promise
         })
             .then(r => r.text())
             .then(text => {
-                const variants = text.trim().split('\n').filter(l => l).map((l, i) => ({ ...JSON.parse(l), inx: i }));
+                const variants = text.trim().split('\n').filter(l => l).map(l => JSON.parse(l));
+                variants.sort((a, b) => {
+                    const dirCmp = (a.dir ?? -1) - (b.dir ?? -1);
+                    if (dirCmp !== 0) return dirCmp;
+                    return b.gtfsIds.length - a.gtfsIds.length;
+                });
+                variants.forEach((v, i) => { v.inx = i; });
                 if (import.meta.env.DEV) {
                     console.log(`Variants loaded for ${entry.routeId}: ${variants.length} variant(s)`);
                     variants.forEach((v, i) => console.log(`  Variant #${i + 1}: ${v.gtfsIds.length} stops, ${v.latlon.length / 2} coordinates`));
@@ -89,7 +96,7 @@ function RoutePill({ route: r, variants, selectedRouteId, selectedVariantInx, on
                         <span key={v.inx}
                             onClick={e => { e.stopPropagation(); onSelectVariant(r.routeId, v.inx); }}
                             className={cls('route-variant', selectedVariantInx === v.inx && isSelected && 'route-variant--selected')}>
-                            {i > 0 && ' '}#{v.inx + 1}
+                            {i > 0 && ' '}#{v.inx + 1}{v.dir != null ? (v.dir === 0 ? '\u2191' : '\u2193') : ''}
                         </span>
                     )}
                 </span>

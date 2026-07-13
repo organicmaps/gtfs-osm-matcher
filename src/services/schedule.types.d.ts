@@ -170,6 +170,9 @@ export interface RouteEntry {
   /** Index into the top-level routes[] array. */
   route: number;
 
+  /** GTFS direction_id (0 or 1). Absent when not set in the source feed. */
+  dir?: number;
+
   /**
    * Parallel arrays — one element per service period served at this stop on
    * this route.  All five arrays have the same length.
