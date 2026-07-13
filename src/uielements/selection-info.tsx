@@ -17,6 +17,7 @@ import { AddOsmStopController } from "./editor/add-stop-controller";
 import { MoveController } from "./editor/move-stop-controller";
 import { OSM_QUERY_QUEUE } from "../services/OsmQuerryQueue";
 import type { LonLatTuple, OSMElementTags } from "../services/OSMData.types";
+import { MatchArrowLayer } from "./match-arrow";
 
 type LonLatOrNull = [number, number] | [null, null];
 
@@ -117,10 +118,21 @@ function MatchInfo({ datasetName, properties, geometry, idTags, reportRegion }: 
     const markersGtfs = gtfsFeatures.map((f: any, i: number) =>
         <HtmlMapMarker key={f.id} name={"gtfs " + letterCode(i)} lon={f.lon} lat={f.lat} />);
 
+    const matched = datasetName ? !['nom', 'nos'].includes(datasetName) : false;
+    const osmPoints = useMemo(() => {
+        if (!matched) return [];
+        const features = parseJsonSafe<OsmFeatureRef[]>(properties['osmFeatures'], []);
+        return features
+            .filter(f => f.lon != null && f.lat != null)
+            .map(f => ({ lon: f.lon!, lat: f.lat! }));
+    }, [properties, matched]);
+
     return (<div>
         <h2>{name}</h2>
 
         <DatasetHelp datasetName={datasetName} />
+
+        <MatchArrowLayer gtfsLon={lon} gtfsLat={lat} osmPoints={osmPoints} visible={matched} />
 
         {gtfsFeatures.length === 1 && <div>
             <div>Gtfs stop Id: <b>{properties.gtfsStopId}</b></div>
