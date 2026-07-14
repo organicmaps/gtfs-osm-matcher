@@ -55,6 +55,20 @@ export function SelectionInfo({ selection }: SelectionInfoProps) {
 }
 
 
+const MATCH_LABELS: { [code: string]: { label: string; help: string } } = {
+    mid: { label: 'match-id', help: 'Stop matched by GTFS ID or Code' },
+    mrt: { label: 'match-routes', help: 'Stop matched by routes going through it' },
+    mnm: { label: 'match-name', help: 'Stop matched by name' },
+    nic: { label: 'name-id-conflict', help: 'Stop matched by name but mismatched by ID' },
+    gen: { label: 'match-generic', help: 'Matched to a stop without name or code nearby' },
+    sep: { label: 'separated-cluster', help: 'Many OSM stops matched one or many GTFS stops, but successfully separated' },
+    clu: { label: 'cluster', help: 'Many OSM stops matched one or many GTFS stops by name' },
+    mto: { label: 'many-to-one', help: 'Many OSM stops matched exactly one GTFS stop by name' },
+    hub: { label: 'transit-hub', help: 'Many OSM platforms or stops matched to one station by name' },
+    nom: { label: 'no-match', help: 'No OSM element matched' },
+    nos: { label: 'no-osm', help: 'No OSM elements of matching transport mode found in the area' },
+};
+
 type MatchInfoProps = {
     properties: { [k: string]: any }
     geometry: GeoJSON.Geometry | undefined
@@ -127,8 +141,10 @@ function MatchInfo({ datasetName, properties, geometry, idTags, reportRegion }: 
             .map(f => ({ lon: f.lon!, lat: f.lat! }));
     }, [properties, matched]);
 
+    const matchInfo = datasetName ? MATCH_LABELS[datasetName] : null;
+
     return (<div>
-        <h2>{name}</h2>
+        <h2>{name}{matchInfo && <span className="match-type-tag" title={matchInfo.help}>{matchInfo.label}</span>}</h2>
 
         <DatasetHelp datasetName={datasetName} />
 

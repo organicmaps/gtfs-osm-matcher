@@ -78,3 +78,16 @@ span.loading-indicator {
     user-select: none;
 }
 
+.match-type-tag {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    font-size: 0.65em;
+    font-weight: 600;
+    vertical-align: middle;
+    border-radius: 4px;
+    background: #e0e0e0;
+    color: #333;
+    cursor: help;
+}
+
