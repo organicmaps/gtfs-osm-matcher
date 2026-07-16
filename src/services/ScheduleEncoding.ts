@@ -26,10 +26,10 @@ export interface ResolvedStopOnRoutePosition {
 
 export interface RouteSchedule {
   route: Route;
-  /** GTFS direction_id (0 or 1, 0 by default). */
-  direction: number;
-  /** Index into sids[] — identifies the route direction at this stop (inferred from pos). */
-  directionSid?: number;
+  /** GTFS direction_id (0 or 1) for the route. */
+  routeDirection?: number;
+  /** Index into sids[] (stop ids array) pointing to the next (previous for the last stop) stop */
+  adjacentStopSid?: number;
   positions: ResolvedStopOnRoutePosition[];
   tripTimes: TripTimes;
 }
@@ -66,16 +66,17 @@ export function decodeScheduleOnDate(
         if (!activeServices.has(entry.periods[i])) continue;
 
         const decodedPos = decodePosArray(allPos[entry.pos[i]]);
-        const directionSid =
+        const adjacentStopSid =
           decodedPos.nextStopId !== -1 && decodedPos.nextStopId !== currentSidIdx
             ? decodedPos.nextStopId
             : decodedPos.prevStopId;
-        const direction = entry.dir !== undefined ? entry.dir : directionSid;
+            
+        const routeDirection = entry.dir;
 
-        const key = `${route.routeId}=${directionSid}`;
+        const key = `${route.routeId}=${adjacentStopSid}`;
         let rs = routeMap.get(key);
         if (!rs) {
-          rs = { route, direction, directionSid, positions: [], tripTimes: { pos: [], tripId: [], arrivalTime: [], departureTime: [] } };
+          rs = { route, adjacentStopSid, routeDirection, positions: [], tripTimes: { pos: [], tripId: [], arrivalTime: [], departureTime: [] } };
           routeMap.set(key, rs);
         }
 
@@ -450,7 +451,7 @@ export function dateAsNumber(date: Date) {
 /**
  * Converts a day-number (days since 2000-01-01) to a yyMMdd number.
  * Uses UTC getters because EPOCH_MS is UTC midnight — using local getters would
- * shift the calendar date by one day in timezones behind UTC.
+ * shift the calendar date by one day in timezones behind UTC (e.g. America/Halifax).
  */
 function dayNumberAsYyMMdd(dayNumber: number): number {
   const d = new Date(EPOCH_MS + dayNumber * MS_PER_DAY);

@@ -219,7 +219,6 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
             }
             {routesWithVariants.length > 0 && (() => {
                 const routePillProps = ({ index: r, variants }: RouteWithVariants) => ({
-                    key: r.routeId,
                     route: r,
                     variants,
                     selectedRouteId,
@@ -250,13 +249,13 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
                     return <div>
                         {[...grouped.entries()].map(([type, routes]) => <div key={type} className="route-type-group">
                             <span className="route-type-group-header"><b>{type}:</b> </span>
-                            {routes.map(r => <RoutePill {...routePillProps(r)} />)}
+                            {routes.map(r => <RoutePill key={r.index.routeId} {...routePillProps(r)} />)}
                         </div>)}
                     </div>;
                 }
 
                 return <div><b>Routes: </b>
-                    {routesWithVariants.map(r => <RoutePill {...routePillProps(r)} />)}
+                    {routesWithVariants.map(r => <RoutePill key={r.index.routeId} {...routePillProps(r)} />)}
                 </div>;
             })()}
         </div>

@@ -157,7 +157,7 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
                 return astr.localeCompare(bstr);
             })
             .map(rSchedule => {
-                const {route, direction, positions, tripTimes } = rSchedule;
+                const {route, adjacentStopSid, positions, tripTimes } = rSchedule;
 
                 const pos = positions[0];
 
@@ -209,7 +209,7 @@ export function SchedulePreview({ selection }: SchedulePreviewProps) {
                     destSrcLabel = (firstStopName && <div> from {firstStopName}</div>);
                 }
 
-                return <div key={route!.routeId + "=" + direction}><div><b>{route!.routeType} {route!.shortName} </b>: {ts}</div>{destSrcLabel}</div>
+                return <div key={route!.routeId + "=" + adjacentStopSid}><div><b>{route!.routeType} {route!.shortName} </b>: {ts}</div>{destSrcLabel}</div>
 
             });
 
