@@ -3,74 +3,20 @@ import { MapContext } from "../app";
 import { routesStyling } from "./routes-styling";
 import type { GeoJSONSource } from "maplibre-gl";
 
-export type RouteDisplayEntry = {
-    stopLonLat: number[];
-    routes: { [k: string]: { nextStopLonLat: number[], prevStopLonLat: number[] } };
-}
-
 export type FullRouteDisplayEntry = {
     routeKey: string;
     coordinates: [number, number][];
 }
 
 type RoutesMapProps = {
-    entries?: RouteDisplayEntry[];
     fullRoutes?: FullRouteDisplayEntry[];
 }
-export function RoutesMap({ entries = [], fullRoutes = [] }: RoutesMapProps) {
-
-    if (import.meta.env.DEV) {
-        console.log('Render routes', entries);
-    }
+export function RoutesMap({ fullRoutes = [] }: RoutesMapProps) {
 
     const map = useContext(MapContext)?.map;
     const layerControls = useContext(MapContext)?.layerControls;
 
     const [mapStylesReady, setMapStylesReady] = useState<boolean>(!!map?.getSource('routes'));
-
-    const features = entries.map(({ stopLonLat, routes }) => {
-        return Object.entries(routes || {}).map(([routeKey, route]) => {
-            const { nextStopLonLat, prevStopLonLat } = route;
-
-            const features = [];
-
-            if (nextStopLonLat) {
-                features.push({
-                    type: 'Feature',
-                    geometry: {
-                        type: 'LineString',
-                        coordinates: [
-                            [...stopLonLat],
-                            [...nextStopLonLat]
-                        ]
-                    },
-                    properties: {
-                        name: routeKey,
-                        color: 'red'
-                    }
-                });
-            }
-
-            if (prevStopLonLat) {
-                features.push({
-                    type: 'Feature',
-                    geometry: {
-                        type: 'LineString',
-                        coordinates: [
-                            [...prevStopLonLat],
-                            [...stopLonLat],
-                        ]
-                    },
-                    properties: {
-                        name: routeKey,
-                        color: 'blue'
-                    }
-                });
-            }
-
-            return features;
-        });
-    }).flat();
 
     const fullRouteFeatures = fullRoutes.map(({ routeKey, coordinates }) => ({
         type: 'Feature',
@@ -84,7 +30,7 @@ export function RoutesMap({ entries = [], fullRoutes = [] }: RoutesMapProps) {
         }
     }));
 
-    const allFeatures = [...features, ...fullRouteFeatures].flat();
+    const allFeatures = fullRouteFeatures;
 
     useEffect(() => {
         if (!map) return;

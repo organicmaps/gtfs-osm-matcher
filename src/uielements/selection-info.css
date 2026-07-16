@@ -3,6 +3,31 @@
     flex: 1;
     min-height: 0;
     border-top: 1px solid #ddd;
+    position: relative;
+}
+
+.close-button {
+    position: absolute;
+    z-index: 1;
+
+    top: 8px;
+    right: 8px;
+
+    color: #666;
+    background: none;
+    border: 1px solid #ccc;
+    border-radius: 50%;
+
+    font-size: 1.2em;
+    line-height: 1;
+    padding: 0px 6px 4px;
+    
+    cursor: pointer;
+}
+
+.close-button:hover {
+    background: #eee;
+    color: #333;
 }
 
 #selection-info.hidden {

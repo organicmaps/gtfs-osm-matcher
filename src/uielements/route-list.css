@@ -1,7 +1,7 @@
 .route-pill {
     cursor: pointer;
     display: inline-block;
-    border-radius: 999px;
+    border-radius: 1em;
     border: 1px solid #666;
     background: transparent;
     padding: 2px 8px;
@@ -20,4 +20,12 @@
 
 .route-variant--selected {
     font-weight: bold;
+}
+
+.route-type-group {
+    margin-bottom: 4px;
+}
+
+.route-type-group-header {
+    margin-right: 4px;
 }

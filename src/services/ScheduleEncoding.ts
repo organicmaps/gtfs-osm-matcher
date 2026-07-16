@@ -66,17 +66,13 @@ export function decodeScheduleOnDate(
         if (!activeServices.has(entry.periods[i])) continue;
 
         const decodedPos = decodePosArray(allPos[entry.pos[i]]);
-        const direction = entry.dir !== undefined ? entry.dir : (
-          decodedPos.nextStopId !== -1 && decodedPos.nextStopId !== currentSidIdx
-            ? decodedPos.nextStopId
-            : decodedPos.prevStopId
-        );
         const directionSid =
           decodedPos.nextStopId !== -1 && decodedPos.nextStopId !== currentSidIdx
             ? decodedPos.nextStopId
             : decodedPos.prevStopId;
+        const direction = entry.dir !== undefined ? entry.dir : directionSid;
 
-        const key = `${route.routeId}=${direction}`;
+        const key = `${route.routeId}=${directionSid}`;
         let rs = routeMap.get(key);
         if (!rs) {
           rs = { route, direction, directionSid, positions: [], tripTimes: { pos: [], tripId: [], arrivalTime: [], departureTime: [] } };

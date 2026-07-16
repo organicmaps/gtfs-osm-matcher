@@ -161,7 +161,12 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
     }, [routesWithVariants, selectedRouteId, selectedVariantInx]);
 
     useEffect(() => {
-        if (routeIndex.length === 0 || routeIds.length === 0) return;
+        if (routeIndex.length === 0 || routeIds.length === 0) {
+            setRoutesWithVariants([]);
+            setSelectedRouteId(null);
+            setSelectedVariantInx(null);
+            return;
+        }
 
         let cancelled = false;
 
@@ -212,27 +217,48 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
             {(routeTypes?.length || 0) > 0 &&
                 <div>Gtfs route types: <b>{routeTypes}</b></div>
             }
-            {routesWithVariants.length > 0 && <div><b>Routes: </b>
-                {routesWithVariants.map(({ index: r, variants }) =>
-                    <RoutePill key={r.routeId}
-                        route={r}
-                        variants={variants}
-                        selectedRouteId={selectedRouteId}
-                        selectedVariantInx={selectedVariantInx}
-                        onSelectRoute={routeId => {
-                            setSelectedRouteId(prev => prev === routeId ? null : routeId);
+            {routesWithVariants.length > 0 && (() => {
+                const routePillProps = ({ index: r, variants }: RouteWithVariants) => ({
+                    key: r.routeId,
+                    route: r,
+                    variants,
+                    selectedRouteId,
+                    selectedVariantInx,
+                    onSelectRoute: (routeId: string) => {
+                        setSelectedRouteId(prev => prev === routeId ? null : routeId);
+                        setSelectedVariantInx(null);
+                    },
+                    onSelectVariant: (routeId: string, variantInx: number) => {
+                        if (selectedRouteId === routeId && selectedVariantInx === variantInx) {
                             setSelectedVariantInx(null);
-                        }}
-                        onSelectVariant={(routeId, variantInx) => {
-                            if (selectedRouteId === routeId && selectedVariantInx === variantInx) {
-                                setSelectedVariantInx(null);
-                            } else {
-                                setSelectedRouteId(routeId);
-                                setSelectedVariantInx(variantInx);
-                            }
-                        }} />
-                )}
-            </div>}
+                        } else {
+                            setSelectedRouteId(routeId);
+                            setSelectedVariantInx(variantInx);
+                        }
+                    },
+                });
+
+                const grouped = new Map<string, RouteWithVariants[]>();
+                for (const rwv of routesWithVariants) {
+                    const t = rwv.index.routeType;
+                    let arr = grouped.get(t);
+                    if (!arr) { arr = []; grouped.set(t, arr); }
+                    arr.push(rwv);
+                }
+
+                if (grouped.size > 1) {
+                    return <div>
+                        {[...grouped.entries()].map(([type, routes]) => <div key={type} className="route-type-group">
+                            <span className="route-type-group-header"><b>{type}:</b> </span>
+                            {routes.map(r => <RoutePill {...routePillProps(r)} />)}
+                        </div>)}
+                    </div>;
+                }
+
+                return <div><b>Routes: </b>
+                    {routesWithVariants.map(r => <RoutePill {...routePillProps(r)} />)}
+                </div>;
+            })()}
         </div>
     );
 }

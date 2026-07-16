@@ -45,8 +45,11 @@ export function SelectionInfo({ selection }: SelectionInfoProps) {
 
     const geometry = selection?.feature.geometry;
 
+    const { onReportSelect } = useContext(SelectionContext);
+
     return (<>
         <div id={"selection-info"} className={cls(!selection && "hidden")}>
+            {selection && <button className="close-button" onClick={() => onReportSelect(null)} title="Close selection">&times;</button>}
             {properties && reportRegion &&
                 <MatchInfo {...{ datasetName, properties, geometry, reportRegion, idTags }} />}
         </div>
@@ -94,7 +97,16 @@ function MatchInfo({ datasetName, properties, geometry, idTags, reportRegion }: 
     }, [gtfsFeatures, properties.gtfsStopId]);
     
     const routes = useMemo(() => parseJsonSafe(properties['gtfsRoutes'], null), [properties]);
-    const routeIdList = useMemo(() => Object.keys(routes || {}), [routes]);
+    const routeIdList = useMemo(() => {
+        if (routes) return Object.keys(routes);
+        const allRouteIds = new Set<string>();
+        for (const f of gtfsFeatures as any[]) {
+            if (f.gtfsRoutes) {
+                for (const id of Object.keys(f.gtfsRoutes)) allRouteIds.add(id);
+            }
+        }
+        return [...allRouteIds];
+    }, [routes, gtfsFeatures]);
 
     if (import.meta.env.DEV) {
         console.log('render selection', {
@@ -172,7 +184,7 @@ function MatchInfo({ datasetName, properties, geometry, idTags, reportRegion }: 
         {loading && <div>Loading OSM data...</div>}
 
         <OsmElements setLoading={setLoading} properties={properties} idTags={idTags} parentLonLat={[lon, lat]}
-            matched={datasetName ? !['nom', 'nos'].includes(datasetName) : false} />
+            matched={matched} />
 
     </div>)
 }
