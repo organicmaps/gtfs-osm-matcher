@@ -18,7 +18,7 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
     const reportRegion = useHashRoute(parseUrlReportRegion);
 
     useEffect(() => {
-        fetch(`${DATA_BASE_URL}/match-report.json`)
+        fetch(`${DATA_BASE_URL}/match-report.json?t=${Date.now()}`)
             .then(r => r.json())
             .then(data => {
                 setMatchReports(data.matchedRegions);

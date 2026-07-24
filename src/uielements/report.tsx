@@ -206,7 +206,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         if (import.meta.env.DEV) {
             console.log('Loading index', reportRegion);
         }
-        fetch(`${DATA_BASE_URL}/${reportRegion}/index.tsv`)
+        fetch(`${DATA_BASE_URL}/${reportRegion}/index.tsv?t=${Date.now()}`)
             .then(r => r.text())
             .then(t => { if (!cancelled) setRows(parseIndex(t)); });
         return () => { cancelled = true; };
