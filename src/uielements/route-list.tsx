@@ -116,6 +116,7 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
     const [routeIndex, setRouteIndex] = useState<RouteIndexEntry[]>([]);
     const [routesWithVariants, setRoutesWithVariants] = useState<RouteWithVariants[]>([]);
     const [loading, setLoading] = useState(false);
+    const [indexLoading, setIndexLoading] = useState(false);
     const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
     const [selectedVariantInx, setSelectedVariantInx] = useState<number | null>(null);
 
@@ -128,9 +129,13 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
         if (!reportRegion) return;
 
         let cancelled = false;
+        setIndexLoading(true);
 
         getRouteIndex(reportRegion).then(index => {
-            if (!cancelled) setRouteIndex(index);
+            if (!cancelled) {
+                setRouteIndex(index);
+                setIndexLoading(false);
+            }
         });
 
         return () => { cancelled = true; };
@@ -165,6 +170,7 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
             setRoutesWithVariants([]);
             setSelectedRouteId(null);
             setSelectedVariantInx(null);
+            setLoading(false);
             return;
         }
 
@@ -203,67 +209,85 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
         return () => { cancelled = true; };
     }, [routeIndex, routeIdsKey, gtfsStopIdsKey, reportRegion]);
 
-    if (routesWithVariants.length === 0) {
-        if (!loading && routeIds.length === 0) return null;
+    const resolvedRouteIds = useMemo(() => new Set(routesWithVariants.map(r => r.index.routeId)), [routesWithVariants]);
+    const unresolvedIds = useMemo(() => routeIds.filter(id => !resolvedRouteIds.has(id)), [routeIds, resolvedRouteIds]);
 
-        const pillClass = cls('route-pill--skeleton', loading && "route-pill--loading");
+    const stillLoading = loading || indexLoading;
+
+    if (!stillLoading && routeIds.length === 0 && !routeTypes) {
+        return null;
+    }
+
+    if (!stillLoading && routesWithVariants.length === 0 && unresolvedIds.length === 0 && !(routeTypes?.length)) {
+        return null;
+    }
+
+    const routeTypeHeader = (routeTypes?.length || 0) > 0 &&
+        <div>Gtfs route types: <b>{routeTypes}</b></div>;
+
+    if (stillLoading && routesWithVariants.length === 0) {
         return <div>
-            {(routeTypes?.length || 0) > 0 &&
-                <div>Gtfs route types: <b>{routeTypes}</b></div>
-            }
-            <div><b>Routes: </b>
-                {routeIds.map(id => <span key={id} className={`route-pill ${pillClass}`}>{id}</span>)}
-            </div>
+            {routeTypeHeader}
+            {routeIds.length > 0 && <div><b>Routes: </b>
+                {routeIds.map(id => <span key={id} className="route-pill route-pill--loading">{id}</span>)}
+            </div>}
         </div>;
     }
 
+    const makePillProps = (r: RouteWithVariants) => ({
+        route: r.index,
+        variants: r.variants,
+        selectedRouteId,
+        selectedVariantInx,
+        onSelectRoute: (routeId: string) => {
+            setSelectedRouteId(prev => prev === routeId ? null : routeId);
+            setSelectedVariantInx(null);
+        },
+        onSelectVariant: (routeId: string, variantInx: number) => {
+            if (selectedRouteId === routeId && selectedVariantInx === variantInx) {
+                setSelectedVariantInx(null);
+            } else {
+                setSelectedRouteId(routeId);
+                setSelectedVariantInx(variantInx);
+            }
+        },
+    });
+
+    const unresolvedPills = unresolvedIds.map(id =>
+        <span key={id} className="route-pill route-pill--loading">{id}</span>
+    );
+
+    const grouped = new Map<string, preact.ComponentChildren[]>();
+    for (const rwv of routesWithVariants) {
+        const t = rwv.index.routeType;
+        let arr = grouped.get(t);
+        if (!arr) { arr = []; grouped.set(t, arr); }
+        arr.push(<RoutePill key={rwv.index.routeId} {...makePillProps(rwv)} />);
+    }
+    if (unresolvedIds.length > 0) {
+        let arr = grouped.get('Unknown');
+        if (!arr) { arr = []; grouped.set('Unknown', arr); }
+        arr.push(...unresolvedPills);
+    }
+
+    const allPills = [...routesWithVariants.map(r => <RoutePill key={r.index.routeId} {...makePillProps(r)} />), ...unresolvedPills];
+
     return (
         <div>
-            <RoutesMap fullRoutes={fullRouteEntries} />
-            {(routeTypes?.length || 0) > 0 &&
-                <div>Gtfs route types: <b>{routeTypes}</b></div>
-            }
-            {routesWithVariants.length > 0 && (() => {
-                const routePillProps = ({ index: r, variants }: RouteWithVariants) => ({
-                    route: r,
-                    variants,
-                    selectedRouteId,
-                    selectedVariantInx,
-                    onSelectRoute: (routeId: string) => {
-                        setSelectedRouteId(prev => prev === routeId ? null : routeId);
-                        setSelectedVariantInx(null);
-                    },
-                    onSelectVariant: (routeId: string, variantInx: number) => {
-                        if (selectedRouteId === routeId && selectedVariantInx === variantInx) {
-                            setSelectedVariantInx(null);
-                        } else {
-                            setSelectedRouteId(routeId);
-                            setSelectedVariantInx(variantInx);
-                        }
-                    },
-                });
-
-                const grouped = new Map<string, RouteWithVariants[]>();
-                for (const rwv of routesWithVariants) {
-                    const t = rwv.index.routeType;
-                    let arr = grouped.get(t);
-                    if (!arr) { arr = []; grouped.set(t, arr); }
-                    arr.push(rwv);
-                }
-
-                if (grouped.size > 1) {
-                    return <div>
-                        {[...grouped.entries()].map(([type, routes]) => <div key={type} className="route-type-group">
-                            <span className="route-type-group-header"><b>{type}:</b> </span>
-                            {routes.map(r => <RoutePill key={r.index.routeId} {...routePillProps(r)} />)}
-                        </div>)}
-                    </div>;
-                }
-
-                return <div><b>Routes: </b>
-                    {routesWithVariants.map(r => <RoutePill key={r.index.routeId} {...routePillProps(r)} />)}
-                </div>;
-            })()}
+            {routesWithVariants.length > 0 && <RoutesMap fullRoutes={fullRouteEntries} />}
+            {routeTypeHeader}
+            {grouped.size > 1 ? (
+                <div>
+                    {[...grouped.entries()].map(([type, pills]) => <div key={type} className="route-type-group">
+                        <span className="route-type-group-header"><b>{type}:</b> </span>
+                        {pills}
+                    </div>)}
+                </div>
+            ) : (
+                <div><b>Routes: </b>
+                    {allPills}
+                </div>
+            )}
         </div>
     );
 }
