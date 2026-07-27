@@ -203,12 +203,18 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
         return () => { cancelled = true; };
     }, [routeIndex, routeIdsKey, gtfsStopIdsKey, reportRegion]);
 
-    if (loading) {
-        return <div>Loading routes...</div>;
-    }
+    if (routesWithVariants.length === 0) {
+        if (!loading && routeIds.length === 0) return null;
 
-    if (routesWithVariants.length === 0 && !routeTypes) {
-        return null;
+        const pillClass = cls('route-pill--skeleton', loading && "route-pill--loading");
+        return <div>
+            {(routeTypes?.length || 0) > 0 &&
+                <div>Gtfs route types: <b>{routeTypes}</b></div>
+            }
+            <div><b>Routes: </b>
+                {routeIds.map(id => <span key={id} className={`route-pill ${pillClass}`}>{id}</span>)}
+            </div>
+        </div>;
     }
 
     return (
