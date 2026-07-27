@@ -98,11 +98,12 @@ function MatchInfo({ datasetName, properties, geometry, idTags, reportRegion }: 
     
     const routes = useMemo(() => parseJsonSafe(properties['gtfsRoutes'], null), [properties]);
     const routeIdList = useMemo(() => {
-        if (routes) return Object.keys(routes);
+        const stripDir = (id: string) => id.replace(/ d\d+$/, '');
+        if (routes) return [...new Set(Object.keys(routes).map(stripDir))];
         const allRouteIds = new Set<string>();
         for (const f of gtfsFeatures as any[]) {
             if (f.gtfsRoutes) {
-                for (const id of Object.keys(f.gtfsRoutes)) allRouteIds.add(id);
+                for (const id of Object.keys(f.gtfsRoutes)) allRouteIds.add(stripDir(id));
             }
         }
         return [...allRouteIds];

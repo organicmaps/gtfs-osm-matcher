@@ -14,6 +14,31 @@
     background: #e0e0e0;
 }
 
+.route-pill--skeleton {
+    opacity: 0.75;
+    cursor: default;
+}
+
+.route-pill--loading {
+    cursor: default;
+
+    background: linear-gradient(90deg, #e1e1e1, #5b5b5b);
+    background-size: 200% 200%;
+    animation: gradient-shift 4s linear infinite;
+}
+
+@keyframes gradient-shift {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
 .route-variant {
     cursor: pointer;
 }
