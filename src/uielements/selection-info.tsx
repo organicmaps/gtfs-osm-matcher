@@ -10,6 +10,8 @@ import { TagEditor } from "./editor/osm-tags";
 import { cls } from "./cls";
 import { RouteList } from "./route-list";
 import { OSM_DATA } from "../services/OSMData";
+import { STRATEGIES, strategiesForCode } from "../services/matchIndex";
+import type { Strategy } from "../services/matchIndex";
 import { useSyncExternalStore } from "preact/compat";
 import { getTileXYZ } from "../services/tile-utils";
 import { HtmlMapMarker } from "./editor/map-marker";
@@ -57,6 +59,24 @@ export function SelectionInfo({ selection }: SelectionInfoProps) {
     )
 }
 
+
+/**
+ * Which strategies a stop was matched by, from the detail body when it carries them
+ * and from the category code otherwise. The category says what the stop is; these say
+ * what was true about it.
+ */
+function strategiesOf(properties: { [key: string]: any }, datasetName?: string): Strategy[] {
+    const written = properties['strategies'];
+    if (written) {
+        const keys = typeof written === 'string' ? parseJsonSafe<any>(written, null) : written;
+        // Accepts either shape: a list of names, or an object keyed by name whose
+        // values carry each strategy's detail.
+        const names: string[] = Array.isArray(keys) ? keys : (keys ? Object.keys(keys) : []);
+        const known = names.filter(n => STRATEGIES.some(s => s.key === n)) as Strategy[];
+        if (known.length > 0) return known;
+    }
+    return datasetName ? strategiesForCode(datasetName) : [];
+}
 
 const MATCH_LABELS: { [code: string]: { label: string; help: string } } = {
     mid: { label: 'match-id', help: 'Stop matched by GTFS ID or Code' },
@@ -155,9 +175,17 @@ function MatchInfo({ datasetName, properties, geometry, idTags, reportRegion }: 
     }, [properties, matched]);
 
     const matchInfo = datasetName ? MATCH_LABELS[datasetName] : null;
+    const strategies = strategiesOf(properties, datasetName);
 
     return (<div>
         <h2>{name}{matchInfo && <span className="match-type-tag" title={matchInfo.help}>{matchInfo.label}</span>}</h2>
+
+        {strategies.length > 0 && <div className="match-strategies">
+            {strategies.map(key => {
+                const s = STRATEGIES.find(s => s.key === key)!;
+                return <span className="match-type-tag" key={key} title={s.help}>{s.label}</span>;
+            })}
+        </div>}
 
         <DatasetHelp datasetName={datasetName} />
 

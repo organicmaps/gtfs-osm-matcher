@@ -6,6 +6,8 @@ import type { MapGeoJSONFeature, MapMouseEvent } from "maplibre-gl";
 import "./report.css"
 import { parseSelectionHash, useHash } from "./routing";
 import { DATA_BASE_URL } from "../config";
+import { detailFileFor, parseIndex } from "../services/matchIndex";
+import type { IndexRow } from "../services/matchIndex";
 
 var shouldUpdateBoundsSignal = {
     value: false
@@ -45,13 +47,6 @@ const GROUPS: { group: Group; title: string }[] = [
     { group: 'matched', title: 'Matched' },
     { group: 'not-matched', title: 'Not matched' },
 ];
-
-// index.tsv `type` column -> detail NDJSON file
-const fileFor: { [type: string]: string } = {
-    mat: 'matches.ndjson',
-    clu: 'clusters.ndjson',
-    nos: 'no-osm.ndjson',
-};
 
 const PREVIEW_COLOR = '#2c2ca5ff';
 
@@ -96,19 +91,6 @@ export type Report = {
 
 }
 
-// One parsed row of index.tsv (search_terms column 9 is intentionally ignored —
-// it will power a future search feature and is not part of the map data).
-type IndexRow = {
-    id: string
-    status: string
-    code: string
-    type: string
-    lon: number
-    lat: number
-    byteStart: number
-    byteEnd: number
-}
-
 type StopLocator = {
     type: string
     byteStart: number
@@ -123,27 +105,10 @@ type GeojsonDataT = {
     [key: string]: any
 };
 
-function parseIndex(tsv: string): IndexRow[] {
-    const lines = tsv.split('\n');
-    const rows: IndexRow[] = [];
-    // line 0 is the header
-    for (let i = 1; i < lines.length; i++) {
-        const line = lines[i];
-        if (!line) continue;
-        const c = line.split('\t');
-        if (c.length < 8) continue;
-        rows.push({
-            id: c[0],
-            status: c[1],
-            code: c[2],
-            type: c[3],
-            lon: parseFloat(c[4]),
-            lat: parseFloat(c[5]),
-            byteStart: parseInt(c[6], 10),
-            byteEnd: parseInt(c[7], 10),
-        });
-    }
-    return rows;
+/** The `status` column says so directly; the category model answers when it is absent. */
+function matchedGroup(r: IndexRow): boolean {
+    if (r.status) return r.status === 'm';
+    return CATEGORIES[r.code]?.group === 'matched';
 }
 
 function buildFeatureCollection(rows: IndexRow[]): GeojsonDataT {
@@ -154,7 +119,7 @@ function buildFeatureCollection(rows: IndexRow[]): GeojsonDataT {
             geometry: { type: 'Point', coordinates: [r.lon, r.lat] },
             properties: {
                 gtfsStopId: r.id,
-                category: r.status === 'm' ? 'matched' : 'not-matched',
+                category: matchedGroup(r) ? 'matched' : 'not-matched',
                 subcategory: r.code,
                 type: r.type,
                 byteStart: r.byteStart,
@@ -212,8 +177,6 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         return () => { cancelled = true; };
     }, [reportRegion]);
 
-    const featureCollection = useMemo(() => buildFeatureCollection(rows), [rows]);
-
     const counts = useMemo(() => {
         const m: { [code: string]: number } = {};
         for (const r of rows) {
@@ -222,10 +185,11 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         return m;
     }, [rows]);
 
+    const featureCollection = useMemo(() => buildFeatureCollection(rows), [rows]);
+
     // Range-fetch a single stop's detail object and turn it into a selection.
     const selectStop = useCallback(async (loc: StopLocator, source: 'map-click' | 'url-hash') => {
-        const file = fileFor[loc.type];
-        if (!file) return;
+        const file = detailFileFor(loc.type);
 
         const res = await fetch(`${DATA_BASE_URL}/${reportRegion}/${file}`, {
             headers: { Range: `bytes=${loc.byteStart}-${loc.byteEnd}` },
