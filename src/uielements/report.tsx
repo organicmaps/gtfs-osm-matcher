@@ -28,6 +28,9 @@ type Category = {
 };
 
 const CATEGORIES: { [code: string]: Category } = {
+    mat: { group: 'matched', label: 'match', color: 'green', help: 'Matched to one or more OSM features. How it matched is the strategies column' },
+    // Older reports split a match across these four by strategy, one row each; current
+    // ones use `mat` plus the strategies bit field. Kept so an old report still renders.
     mid: { group: 'matched', label: 'match-id', color: 'green', help: 'Stops matched by GTFS Id or Code' },
     mrt: { group: 'matched', label: 'match-routes', color: 'green', help: 'Stops matched by routes going through this stop' },
     mnm: { group: 'matched', label: 'match-name', color: 'green', help: 'Stops matched by Name' },

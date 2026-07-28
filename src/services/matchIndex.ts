@@ -5,28 +5,39 @@
 // a shifted column is read as a coordinate or a byte offset and produces a bad
 // range request instead of an error.
 //
-// Only `gtfs:id`, `status_detailed`, `type`, `lon`, `lat`, `byte_start` and
-// `byte_end` are required. `status` is optional — it repeats what `status_detailed`
-// already implies — and so is `strategies`. `line` and `search_terms` are there for
-// reading the file by hand and are not used here.
+// Only `gtfs:id`, `type`, `lon`, `lat`, `byte_start`, `byte_end` and a category column
+// are required. `status` is optional — it repeats what the category already implies —
+// and so is `strategies`. `line` and `search_terms` are there for reading the file by
+// hand and are not used here.
+//
+// The category column is `kind` in current reports and was `status_detailed` in older
+// ones, which also folded the match strategies into it (`mid`, `mrt`, `mnm`, `nic`).
+// Both are accepted: a report is one row per stop either way, and reading an older one
+// should not need an older build.
 
 /** What was true about a match. Several can hold for one stop. */
-export type Strategy = 'id' | 'routes' | 'name' | 'conflict';
+export type Strategy = 'id' | 'routes' | 'name' | 'conflict' | 'narrowed';
 
 export const STRATEGIES: { key: Strategy; label: string; help: string }[] = [
     { key: 'id', label: 'by id', help: 'Matched by GTFS id or code' },
     { key: 'routes', label: 'by routes', help: 'Matched by routes going through the stop' },
     { key: 'name', label: 'by name', help: 'Matched by name' },
     { key: 'conflict', label: 'id conflict', help: 'Matched by name, but an id on the OSM feature disagrees' },
+    { key: 'narrowed', label: 'narrowed by routes', help: 'The routes cut the answer down to the features they serve' },
 ];
 
-/** Letters of the optional `strategies` column, kept short: the index loads eagerly. */
-const STRATEGY_LETTERS: { [letter: string]: Strategy } = {
-    i: 'id',
-    r: 'routes',
-    n: 'name',
-    c: 'conflict',
-};
+/**
+ * Bits of the `strategies` column. An integer, because several strategies hold at once
+ * and the index is the one file loaded eagerly — a stop matched by id, routes and name
+ * costs three bits rather than three rows.
+ */
+const STRATEGY_BITS: { bit: number; key: Strategy }[] = [
+    { bit: 1, key: 'id' },
+    { bit: 2, key: 'routes' },
+    { bit: 4, key: 'name' },
+    { bit: 8, key: 'conflict' },
+    { bit: 16, key: 'narrowed' },
+];
 
 /**
  * Without that column the strategy is recoverable from the `status_detailed` code.
@@ -60,20 +71,20 @@ export type IndexRow = {
     strategies: Strategy[]
 }
 
-const REQUIRED = ['gtfs:id', 'status_detailed', 'type', 'lon', 'lat', 'byte_start', 'byte_end'];
+const REQUIRED = ['gtfs:id', 'type', 'lon', 'lat', 'byte_start', 'byte_end'];
+
+/** `kind` in current reports, `status_detailed` in older ones. */
+const CATEGORY_COLUMNS = ['kind', 'status_detailed'];
 
 function parseStrategies(cell: string | undefined, code: string): Strategy[] {
-    if (cell === undefined || cell === '') {
+    const bits = cell === undefined ? NaN : parseInt(cell, 10);
+
+    if (!Number.isFinite(bits)) {
+        // No strategies column: an older report folded the strategy into the category.
         return CODE_STRATEGIES[code] || [];
     }
-    const found: Strategy[] = [];
-    for (const letter of cell) {
-        const strategy = STRATEGY_LETTERS[letter];
-        if (strategy && !found.includes(strategy)) {
-            found.push(strategy);
-        }
-    }
-    return found;
+
+    return STRATEGY_BITS.filter(s => (bits & s.bit) !== 0).map(s => s.key);
 }
 
 export function parseIndex(tsv: string): IndexRow[] {
@@ -85,10 +96,16 @@ export function parseIndex(tsv: string): IndexRow[] {
     header.forEach((name, i) => at[name.trim()] = i);
 
     const missing = REQUIRED.filter(name => at[name] === undefined);
-    if (missing.length > 0) {
-        console.error('index.tsv is missing required columns:', missing.join(', '));
+    const categoryColumn = CATEGORY_COLUMNS.find(name => at[name] !== undefined);
+
+    if (missing.length > 0 || categoryColumn === undefined) {
+        const wanted = missing.concat(categoryColumn === undefined ? [CATEGORY_COLUMNS.join('|')] : []);
+        console.error('index.tsv is missing required columns:', wanted.join(', '));
         return [];
     }
+
+    // The furthest column any row must reach to be usable.
+    const lastNeeded = Math.max(...REQUIRED.map(name => at[name]), at[categoryColumn]);
 
     const rows: IndexRow[] = [];
     for (let i = 1; i < lines.length; i++) {
@@ -96,9 +113,9 @@ export function parseIndex(tsv: string): IndexRow[] {
         if (!line) continue;
         const c = line.split('\t');
         // A row truncated before a required column cannot be placed or fetched.
-        if (c.length <= at[REQUIRED[REQUIRED.length - 1]]) continue;
+        if (c.length <= lastNeeded) continue;
 
-        const code = c[at['status_detailed']];
+        const code = c[at[categoryColumn]];
         rows.push({
             id: c[at['gtfs:id']],
             status: at['status'] !== undefined ? c[at['status']] : '',
