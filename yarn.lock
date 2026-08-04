@@ -63,9 +63,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/core@npm:^8.0.0":
-  version: 8.0.0
-  resolution: "@babel/core@npm:8.0.0"
+"@babel/core@npm:^8.0.1":
+  version: 8.0.1
+  resolution: "@babel/core@npm:8.0.1"
   dependencies:
     "@babel/code-frame": "npm:^8.0.0"
     "@babel/generator": "npm:^8.0.0"
@@ -83,7 +83,7 @@ __metadata:
     json5: "npm:^2.2.3"
     obug: "npm:^2.1.1"
     semver: "npm:^7.7.3"
-  checksum: 10c0/55c131fb9d1413a3963e748edd56274168e8bea5dd4fcff1c0483ee6e0df4077818dd229011d014b3fe0218a2b563066476ce815f512327ff59c106d8be79b77
+  checksum: 10c0/e7fd9266d22906132fb052383a624358f54268dade31d50264416afeab6e5648cd23c7e845a89a501d270b80601d6e89abc67de0a9f1f55133f4abd8ac745be7
   languageName: node
   linkType: hard
 
@@ -2186,9 +2186,9 @@ __metadata:
   linkType: hard
 
 "ip-address@npm:^10.0.1":
-  version: 10.2.0
-  resolution: "ip-address@npm:10.2.0"
-  checksum: 10c0/5a00aada6e922c9c69dfc800ed5d0fa3348675ebdeed0e1575f503f27ca385b5f534363c9af7ad1daf64c1f1409388cdd3cc2e9b9b0fe1c924a431378d55075a
+  version: 10.4.0
+  resolution: "ip-address@npm:10.4.0"
+  checksum: 10c0/d7b0bd2624fd861afbae6e49036a9b56f9506eaff7ff38592b7b4492dd5c272b53f5356dc8cc019e318acf29a96c90a3d1af1df761960267d23efa96858270fa
   languageName: node
   linkType: hard
 
@@ -3146,7 +3146,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "webui@workspace:."
   dependencies:
-    "@babel/core": "npm:^8.0.0"
+    "@babel/core": "npm:^8.0.1"
     "@preact/preset-vite": "npm:^2.10.2"
     "@types/node": "npm:^25.2.0"
     baseline-browser-mapping: "npm:^2.9.15"
