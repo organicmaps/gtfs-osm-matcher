@@ -169,7 +169,7 @@ function MatchInfo({ datasetName, properties, geometry, idTags, reportRegion }: 
         </div>}
 
         {gtfsFeatures.length > 1 && <div>
-            <h4>Gtfs Feautures</h4>
+            <h4>Gtfs Features</h4>
             <ol type="A">
                 {gtfsLi}
             </ol>
@@ -341,14 +341,14 @@ function OsmElements({ properties, idTags, parentLonLat, setLoading, matched }: 
     return (
         <div>
             {newOverpassLi.length > 0 && <>
-                <h4>New OSM Feautures</h4>
+                <h4>New OSM Features</h4>
                 <div><i>This features were just created</i></div>
                 <ul>
                     {newOverpassLi}
                 </ul>
             </>}
 
-            <h4>OSM Feautures</h4>
+            <h4>OSM Features</h4>
             {idTagsStatistics &&
                 <details><summary className="cursor-pointer">Id or Code osm tags</summary>
                     <ul>{Object.entries(idTagsStatistics)
@@ -360,7 +360,7 @@ function OsmElements({ properties, idTags, parentLonLat, setLoading, matched }: 
             </ol>
 
             {overpassElements.length > 0 && <>
-                <h4>Surrounding OSM Feautures
+                <h4>Surrounding OSM Features
                     <label className="hide-label">
                         Hide <input type="checkbox" checked={hideSurroundOsm}
                             onChange={(e) => setHideSurroundOsm((e.target as HTMLInputElement).checked)} />
