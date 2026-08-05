@@ -116,3 +116,14 @@ span.loading-indicator {
     cursor: help;
 }
 
+
+/* Strategy badges: what was true about a match, under the category tag that says
+   what the stop is. Reuses .match-type-tag, less the heading's left margin. */
+.match-strategies {
+    margin: 4px 0 8px 0;
+}
+
+.match-strategies .match-type-tag {
+    margin-left: 0;
+    margin-right: 6px;
+}
