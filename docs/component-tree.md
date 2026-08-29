@@ -14,23 +14,27 @@ App  (src/app.tsx)
         │   │   │   (src/uielements/schedule-preview.tsx)
         │   │   └── SelectionInfo  [otherwise]
         │   │       (src/uielements/selection-info.tsx)
-        │   │       ├── MatchInfo  [per selected feature]
-        │   │       │   ├── RoutesMap  (src/uielements/routes.tsx)
-        │   │       │   ├── OsmElements
-        │   │       │   │   └── OsmListElement  [per OSM element]
-        │   │       │   │       └── TagsTable
-        │   │       │   ├── TagEditor  (src/uielements/editor/osm-tags.tsx)
-        │   │       │   └── DatasetHelp
-        │   │       ├── HtmlMapMarker  (src/uielements/editor/map-marker.tsx)
-        │   │       ├── AddOsmStopController  (src/uielements/editor/add-stop-controller.tsx)
-        │   │       └── MoveController  (src/uielements/editor/move-stop-controller.tsx)
+        │   │       └── MatchInfo  [per selected feature]
+        │   │           ├── DatasetHelp
+        │   │           ├── MatchArrowLayer  (src/uielements/match-arrow.tsx)  [GTFS→OSM arrows on map, matched categories only]
+        │   │           ├── HtmlMapMarker  (src/uielements/editor/map-marker.tsx)  [per GTFS feature, clusters only]
+        │   │           ├── RouteList  (src/uielements/route-list.tsx)  [route pills + variants]
+        │   │           │   └── RoutesMap  (src/uielements/routes.tsx)  [setData into persistent 'routes' map source]
+        │   │           ├── AddOsmStopController  (src/uielements/editor/add-stop-controller.tsx)
+        │   │           └── OsmElements  [matched + new + surrounding (Overpass, <500 m) elements]
+        │   │               ├── OsmListElement  [per OSM element]
+        │   │               │   ├── TagsTable  [view mode]
+        │   │               │   └── TagEditor  (src/uielements/editor/osm-tags.tsx)  [edit mode]
+        │   │               │       └── [Set Name | Set Id | Set Code | MoveController (editor/move-stop-controller.tsx)]
+        │   │               └── HtmlMapMarker  [per OSM / Overpass element]
         │   │
         │   ├── [tab: report]  (always mounted to keep map layers active)
         │   │   └── MatchReportSelector  (src/uielements/report-selector.tsx)
         │   │       ├── RegionMarkersLayer  [when no report selected — region circles/bboxes on map]
-        │   │       ├── ReportTable  [when no report selected]
+        │   │       ├── ReportTable  [when no report selected]  (src/uielements/report-table.tsx)
         │   │       └── MatchReport  [when report region in URL hash]  (src/uielements/report.tsx)
-        │   │           └── DatasetMapLayer  [per loaded dataset, renders into map via MapContext]
+        │   │           ├── StopsLayer  [all index.tsv stops in one symbol layer; sub-categories toggled via map.setFilter]
+        │   │           └── DatasetMapLayer  [preview.geojson overlay, only when Preview is enabled]
         │   │
         │   └── [tab: changes]
         │       └── Changes  (src/uielements/editor/changes.tsx)
@@ -39,7 +43,7 @@ App  (src/app.tsx)
             ├── MapTools  (src/uielements/map-tools.tsx)  [floating panel, top-right of map]
             │   ├── map-tools-toggle  ◀/▶ fold button
             │   ├── [map-tools-content: Help | Map Style | Location input + Goto OSM]
-            │   └── ReportHelpOverlay  [conditional: showHelp]
+            │   └── ReportHelpOverlay  [conditional: showHelp, portals into document.body]
             └── #map-view  (MapLibre GL canvas)
 ```
 
@@ -66,8 +70,8 @@ App  (src/app.tsx)
 
 | Context | Provider | Consumers |
 |---|---|---|
-| `MapContext` | `App` | `MatchReport`, `DatasetMapLayer`, `RegionMarkersLayer`, `RoutesMap`, `SelectionInfo` |
-| `SelectionContext` | `App` | `MatchReportSelector`, `MatchReport` |
+| `MapContext` | `App` | `MatchReport`, `StopsLayer`, `DatasetMapLayer`, `RegionMarkersLayer`, `RoutesMap`, `MatchArrowLayer`, `HtmlMapMarker`, `LocateMe`, `AddOsmStopController`, `MoveController` |
+| `SelectionContext` | `App` | `MatchReport`, `SelectionInfo`, `OsmListElement` |
 
 ## OSMData event system
 
