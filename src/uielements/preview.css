@@ -39,3 +39,12 @@
 .station-children li {
     margin: 0.1em 0;
 }
+
+/*
+ * The preview lists a route's variants as labels, not as controls. RouteList's
+ * .route-variant carries cursor: pointer because there they select a variant;
+ * borrowing it here advertised a click that does nothing.
+ */
+.preview-route-variant {
+    margin-right: 0.5em;
+}

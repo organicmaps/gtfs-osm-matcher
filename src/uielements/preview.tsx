@@ -316,7 +316,7 @@ export function Preview({ selection }: IrPreviewProps) {
                                     {variants.length > 1 && (
                                         <div>
                                             {variants.map((v, i) => (
-                                                <span key={v.inx} className={cls('route-variant')}>
+                                                <span key={v.inx} className={"preview-route-variant"}>
                                                     #{i + 1}{v.dir != null ? (v.dir === 0 ? ' \u2191' : ' \u2193') : ''}
                                                 </span>
                                             ))}

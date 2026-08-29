@@ -129,8 +129,13 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
     const [rows, setRows] = useState<IndexRow[]>([]);
     const [selectedDatasets, updateSelectedDatasets] = useState<DatatsetsSelectonT>(defaultSets);
     const [previewData, setPreviewData] = useState<GeojsonDataT | null>(null);
-    // A report this build cannot read looks exactly like a region with no stops. Say which.
-    const [loadError, setLoadError] = useState<string | null>(null);
+    // Two channels, because the two messages live on different clocks. The index
+    // message is a property of the loaded region and stays true until the region
+    // changes; the action message describes one click. Sharing one state let a
+    // click erase the banner explaining why stops were missing, with the stops
+    // still missing.
+    const [indexError, setIndexError] = useState<string | null>(null);
+    const [actionError, setActionError] = useState<string | null>(null);
 
     // Load the search index once per region.
     useEffect(() => {
@@ -140,7 +145,8 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         if (import.meta.env.DEV) {
             console.log('Loading index', reportRegion);
         }
-        setLoadError(null);
+        setIndexError(null);
+        setActionError(null);
         fetch(`${DATA_BASE_URL}/${reportRegion}/index.tsv?t=${Date.now()}`)
             .then(r => {
                 if (!r.ok) throw new Error(`${r.status} for index.tsv`);
@@ -148,19 +154,26 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
             })
             .then(t => {
                 if (cancelled) return;
-                const parsed = parseIndex(t);
+                const { rows: parsed, skipped } = parseIndex(t);
                 // A code this build has no entry for gets no icon, no checkbox and no
                 // count, so its stops are simply absent from the map -- which looks
                 // exactly like a region that has none. Say so instead.
                 const unknown = [...new Set(parsed.map(r => r.code))].filter(c => !CATEGORIES[c]);
+                const problems = [];
                 if (unknown.length > 0) {
-                    setLoadError(`index.tsv has categories this build does not know: ${unknown.join(', ')}`);
+                    problems.push(`categories this build does not know: ${unknown.join(', ')}`);
+                }
+                if (skipped > 0) {
+                    problems.push(`${skipped} row${skipped === 1 ? '' : 's'} could not be read`);
+                }
+                if (problems.length > 0) {
+                    setIndexError(`index.tsv: ${problems.join('; ')}`);
                 }
                 setRows(parsed);
             })
             .catch(e => {
                 console.error('Could not read index.tsv for', reportRegion, e);
-                if (!cancelled) setLoadError(`Could not read index.tsv: ${e.message}`);
+                if (!cancelled) setIndexError(`Could not read index.tsv: ${e.message}`);
             });
         return () => { cancelled = true; };
     }, [reportRegion]);
@@ -204,7 +217,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         const [lon, lat] = (feature.geometry as { coordinates: number[] } & any)?.coordinates || [p.lon, p.lat];
         // The banner describes the attempt in progress, not every attempt since the
         // region loaded; a stale one reads as if the report itself were broken.
-        setLoadError(null);
+        setActionError(null);
         selectStop({
             type: p.type,
             byteStart: p.byteStart,
@@ -213,14 +226,14 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
             subcategory: p.subcategory,
         }, 'map-click').catch(e => {
             console.error('Could not load stop detail', e);
-            setLoadError(`Could not load the stop: ${e.message}`);
+            setActionError(`Could not load the stop: ${e.message}`);
         });
     }, [selectStop]);
 
     // The preview source is clustered, so below clusterMaxZoom a click lands on a cluster:
     // no id, no coordinates, but truthy enough to open a panel full of undefined. Zoom into
     // it instead — that is what a click on a cluster means anywhere else on a map.
-    const handlePreviewSelect = useCallback((_name: string, feature?: any) => {
+    const handlePreviewSelect = useCallback((feature?: any) => {
         if (!feature) return;
         if (feature.properties?.cluster) {
             const coords = (feature.geometry as { coordinates: [number, number] } & any)?.coordinates;
@@ -238,7 +251,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
     useEffect(() => {
         let cancelled = false;
         if (selectedDatasets['preview'] && !previewData) {
-            setLoadError(null);
+            setActionError(null);
             fetch(`${DATA_BASE_URL}/${reportRegion}/ir-preview.ndjson`)
                 .then(r => {
                     if (!r.ok) throw new Error(`${r.status} for ir-preview.ndjson`);
@@ -260,7 +273,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
                 })
                 .catch(e => {
                     console.error('Could not read ir-preview.ndjson for', reportRegion, e);
-                    if (!cancelled) setLoadError(`Could not read the preview: ${e.message}`);
+                    if (!cancelled) setActionError(`Could not read the preview: ${e.message}`);
                 });
         }
         return () => { cancelled = true; };
@@ -283,7 +296,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         // Make sure the stop's sub-category layer is visible.
         updateSelectedDatasets(prev => prev[row.code] ? prev : { ...prev, [row.code]: true });
 
-        setLoadError(null);
+        setActionError(null);
         selectStop({
             type: row.type,
             byteStart: row.byteStart,
@@ -293,7 +306,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
             subcategory: row.code,
         }, 'url-hash').catch(e => {
             console.error('Could not load the deep-linked stop', id, e);
-            setLoadError(`Could not load the stop: ${e.message}`);
+            setActionError(`Could not load the stop: ${e.message}`);
         });
     }, [hashSelection?.kind, hashSelection?.id, rows]);
 
@@ -385,8 +398,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
             selectedCodes={selectedCodes} onClick={handleStopClick} />;
 
     const previewLayer = previewOn && previewData &&
-        <DatasetMapLayer key={`${reportRegion}:preview`} name={'preview'} color={PREVIEW_COLOR}
-            data={previewData} onClick={handlePreviewSelect} />;
+        <PreviewLayer key={`${reportRegion}:preview`} data={previewData} onClick={handlePreviewSelect} />;
 
     const gtfsTS = new Date(matchMeta.gtfsTimeStamp).toUTCString();
     const osmSourcesTS = matchMeta.coveredPbfSources.map(({ path, fileTimestamp }) => {
@@ -397,7 +409,8 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
 
     return (<div>
         <h2 className={"report-header"}>{reportRegion}</h2>
-        {loadError && <div className={"report-load-error"} role={"alert"}>{loadError}</div>}
+        {indexError && <div className={"report-load-error"} role={"alert"}>{indexError}</div>}
+        {actionError && <div className={"report-load-error"} role={"alert"}>{actionError}</div>}
         {stopsLayer}
         {previewLayer}
         {previewControl}
@@ -530,15 +543,17 @@ function StopsLayer({ layerKey, data, selectedCodes, onClick }: StopsLayerProps)
     return <></>;
 }
 
-type DatasetMapLayerProps = {
-    name: string
-    color: string
+type PreviewLayerProps = {
     data: GeojsonDataT
-    onClick?: (datasetName: string, feature?: MapGeoJSONFeature, e?: MapLayerClickEvent) => void
+    onClick?: (feature?: MapGeoJSONFeature, e?: MapLayerClickEvent) => void
 }
 // The preview overlay: one clustered symbol layer over ir-preview.ndjson. Clustered
 // because it holds every stop of the region at once, matched or not.
-function DatasetMapLayer({ name, color, data, onClick }: DatasetMapLayerProps) {
+//
+// The ids and the colour are literals rather than props: there is one overlay of this
+// kind, and a name prop only bought string-concatenated ids and a callback argument
+// every caller ignored.
+function PreviewLayer({ data, onClick }: PreviewLayerProps) {
 
     const mapContext = useContext(MapContext);
     const map = mapContext?.map;
@@ -548,15 +563,15 @@ function DatasetMapLayer({ name, color, data, onClick }: DatasetMapLayerProps) {
     useEffect(() => {
         if (!map || !stylingControls) return;
 
-        const sourceId = `stops-${name}`;
-        const layerId = `stops-${name}`;
+        const sourceId = 'stops-preview';
+        const layerId = 'stops-preview';
 
         const stopsLayer = {
             'id': layerId,
             'type': 'symbol',
             'source': sourceId,
             'layout': {
-                'icon-image': `stop-${name}`,
+                'icon-image': 'stop-preview',
                 'icon-size': 0.2,
                 'icon-allow-overlap': true,
             }
@@ -576,13 +591,13 @@ function DatasetMapLayer({ name, color, data, onClick }: DatasetMapLayerProps) {
         };
 
         const handleClick = (e: MapLayerClickEvent) => {
-            onClick && onClick(name, e.features?.[0], e);
+            onClick && onClick(e.features?.[0], e);
         }
 
-        const iconImageId = `stop-${name}`;
+        const iconImageId = 'stop-preview';
         const imageColors = {
-            ".stroke-fg": ["stroke", color] as [string, string],
-            ".fill-fg": ["fill", color] as [string, string],
+            ".stroke-fg": ["stroke", PREVIEW_COLOR] as [string, string],
+            ".fill-fg": ["fill", PREVIEW_COLOR] as [string, string],
         };
 
         const subscription = {
@@ -622,7 +637,7 @@ function DatasetMapLayer({ name, color, data, onClick }: DatasetMapLayerProps) {
             }
         };
 
-    }, [map, stylingControls, name, data]);
+    }, [map, stylingControls, data]);
 
     return <></>;
 }

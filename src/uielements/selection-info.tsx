@@ -177,7 +177,8 @@ function MatchInfo({ datasetName, properties, geometry, idTags, reportRegion }: 
     const strategies = strategiesOf(properties, datasetName);
 
     return (<div>
-        <h2>{name}{matchInfo && <span className="match-type-tag" title={matchInfo.help}>{matchInfo.label}</span>}</h2>
+        {/* No title here: DatasetHelp below prints the same string visibly. */}
+        <h2>{name}{matchInfo && <span className="match-type-tag">{matchInfo.label}</span>}</h2>
 
         {strategies.length > 0 && <div className="match-strategies">
             {strategies.map(key => {
@@ -191,12 +192,12 @@ function MatchInfo({ datasetName, properties, geometry, idTags, reportRegion }: 
         <MatchArrowLayer gtfsLon={lon} gtfsLat={lat} osmPoints={osmPoints} visible={matched} />
 
         {gtfsFeatures.length === 1 && <div>
-            <div>Gtfs stop Id: <b>{properties.gtfsStopId}</b></div>
-            <div>Gtfs stop Code: {properties.gtfsStopCode ? <b>{properties.gtfsStopCode}</b> : <i>N/A</i>}</div>
+            <div>GTFS stop ID: <b>{properties.gtfsStopId}</b></div>
+            <div>GTFS stop code: {properties.gtfsStopCode ? <b>{properties.gtfsStopCode}</b> : <i>N/A</i>}</div>
         </div>}
 
         {gtfsFeatures.length > 1 && <div>
-            <h4>Gtfs Features</h4>
+            <h4>GTFS Features</h4>
             <ol type="A">
                 {gtfsLi}
             </ol>
@@ -511,7 +512,10 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
         </div>
         {
             warnExpanded && <ul>{
-                f.mtch.map((m: string) => {return (<li key={m}><a href={`/#/match-report/${reportRegion}/selection/${m}`}>{m}</a></li>)})
+                // GTFS ids are free-form UTF-8: a `#` truncates the link and a `/`
+                // is cut by parseSelectionHash's [^/]+, same as the two writers in
+                // app.tsx and preview.tsx that already encode.
+                f.mtch.map((m: string) => {return (<li key={m}><a href={`/#/match-report/${reportRegion}/selection/${encodeURIComponent(m)}`}>{m}</a></li>)})
             }
             </ul>
         }

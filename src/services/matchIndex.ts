@@ -8,8 +8,8 @@
 // range request instead of an error.
 //
 // Only `gtfs:id`, `type`, `lon`, `lat`, `byte_start`, `byte_end` and a category column
-// are required. `status` is optional — it repeats what the category already implies.
-// `line`, `search_terms` and `strategies` are there for reading the file by hand and for
+// are required. `status`, `line`, `search_terms` and `strategies` are there for reading
+// the file by hand and for
 // a facet that does not exist yet; the panel's strategy badges come from the detail body,
 // which names them, so nothing here decodes the column.
 //
@@ -75,7 +75,7 @@ export const CATEGORIES: { [code: string]: Category } = {
     mnm: { group: 'matched', label: 'match-name', color: 'green', help: 'Stop matched by name' },
     nic: { group: 'matched', label: 'name-id-conflict', color: 'green', help: 'Stop matched by name but mismatched by id' },
     gen: { group: 'matched', label: 'match-generic', color: 'green', help: 'Matched to a nearby OSM stop that has neither a name nor a code' },
-    sep: { group: 'matched', label: 'separated-cluster', color: '#467d18', help: 'Many OSM stops matched one or many GTFS stops, but successfully separated' },
+    sep: { group: 'matched', label: 'separated-cluster', color: '#467d18', help: 'Many OSM stops matched one or many GTFS stops, and were successfully separated' },
     clu: { group: 'matched', label: 'cluster', color: '#80520e', help: 'Many OSM stops matched one or many GTFS stops by name' },
     mto: { group: 'matched', label: 'many-to-one', color: '#93cf32ff', help: 'Many OSM stops matched exactly one GTFS stop by name' },
     hub: { group: 'matched', label: 'transit-hub', color: '#b5b20bff', help: 'Many OSM platforms or stops matched one station by name' },
@@ -87,8 +87,6 @@ export const CATEGORY_CODES = Object.keys(CATEGORIES);
 
 export type IndexRow = {
     id: string
-    /** `m` | `n`, or empty when the report omits the column. */
-    status: string
     /** The category code. */
     code: string
     type: string
@@ -103,11 +101,24 @@ const REQUIRED = ['gtfs:id', 'type', 'lon', 'lat', 'byte_start', 'byte_end'];
 /** `kind` in current reports, `status_detailed` in older ones. */
 const CATEGORY_COLUMNS = ['kind', 'status_detailed'];
 
+/** Rows this build could use, and how many it could not. */
+export type ParsedIndex = {
+    rows: IndexRow[]
+    /** Rows dropped as truncated or unparseable. See {@link parseIndex}. */
+    skipped: number
+}
+
 /**
  * Throws on a header this build cannot read. An unreadable index and a region with no
  * stops produce the same empty map, so the caller is given something to say instead.
+ *
+ * <p>Individual rows are counted rather than thrown on: one bad row should not cost the
+ * region, but it must not vanish either. A row whose `lon` is not a number becomes a NaN
+ * coordinate MapLibre silently drops, and one whose `byte_start` is not a number becomes
+ * a `bytes=NaN-NaN` range request that 416s on click -- both look exactly like a report
+ * that is simply missing stops.
  */
-export function parseIndex(tsv: string): IndexRow[] {
+export function parseIndex(tsv: string): ParsedIndex {
     const lines = tsv.split('\n');
     if (lines.length === 0 || !lines[0]) {
         throw new Error('index.tsv is empty');
@@ -129,25 +140,39 @@ export function parseIndex(tsv: string): IndexRow[] {
     const lastNeeded = Math.max(...REQUIRED.map(name => at[name]), at[categoryColumn]);
 
     const rows: IndexRow[] = [];
+    let skipped = 0;
     for (let i = 1; i < lines.length; i++) {
         const line = lines[i];
         if (!line) continue;
         const c = line.split('\t');
         // A row truncated before a required column cannot be placed or fetched.
-        if (c.length <= lastNeeded) continue;
+        if (c.length <= lastNeeded) {
+            skipped++;
+            continue;
+        }
+
+        const lon = parseFloat(c[at['lon']]);
+        const lat = parseFloat(c[at['lat']]);
+        const byteStart = parseInt(c[at['byte_start']], 10);
+        const byteEnd = parseInt(c[at['byte_end']], 10);
+
+        if (!Number.isFinite(lon) || !Number.isFinite(lat)
+            || !Number.isFinite(byteStart) || !Number.isFinite(byteEnd)) {
+            skipped++;
+            continue;
+        }
 
         rows.push({
             id: c[at['gtfs:id']],
-            status: at['status'] !== undefined ? c[at['status']] : '',
             code: c[at[categoryColumn]],
             type: c[at['type']],
-            lon: parseFloat(c[at['lon']]),
-            lat: parseFloat(c[at['lat']]),
-            byteStart: parseInt(c[at['byte_start']], 10),
-            byteEnd: parseInt(c[at['byte_end']], 10),
+            lon,
+            lat,
+            byteStart,
+            byteEnd,
         });
     }
-    return rows;
+    return { rows, skipped };
 }
 
 /**
