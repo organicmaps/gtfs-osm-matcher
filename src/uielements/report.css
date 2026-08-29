@@ -48,3 +48,13 @@
 .match-report-meta .ts-value {
     font-size: 0.8em;
 }
+
+/* A report this build could not read. Loud on purpose: the alternative is a map that
+   looks like a region with no stops. */
+.report-load-error {
+    margin: 0.5em 0;
+    padding: 0.5em 0.7em;
+    border-left: 3px solid #b00020;
+    background: rgba(176, 0, 32, 0.08);
+    font-size: 0.9em;
+}

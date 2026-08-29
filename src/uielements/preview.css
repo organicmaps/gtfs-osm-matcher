@@ -1,0 +1,41 @@
+/* ── IR preview: anchor state and station hierarchy ─────────────────────────── */
+
+.anchor-state {
+    margin: 0.6em 0;
+    padding: 0.5em 0.6em;
+    border-left: 3px solid transparent;
+    border-radius: 3px;
+    line-height: 1.35;
+}
+
+.anchor-state--anchored {
+    border-left-color: #2e7d32;
+    background: rgba(46, 125, 50, 0.08);
+}
+
+.anchor-state--none {
+    border-left-color: #b26500;
+    background: rgba(178, 101, 0, 0.08);
+}
+
+.anchor-state__note {
+    margin-top: 0.25em;
+    opacity: 0.75;
+    font-size: 0.9em;
+}
+
+.platform-code {
+    font-weight: normal;
+    opacity: 0.75;
+}
+
+.station-children {
+    margin: 0.3em 0;
+    padding-left: 1.2em;
+    max-height: 16em;
+    overflow-y: auto;
+}
+
+.station-children li {
+    margin: 0.1em 0;
+}

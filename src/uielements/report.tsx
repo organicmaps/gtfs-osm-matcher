@@ -6,6 +6,8 @@ import type { MapGeoJSONFeature, MapMouseEvent } from "maplibre-gl";
 import "./report.css"
 import { parseSelectionHash, useHash } from "./routing";
 import { DATA_BASE_URL } from "../config";
+import { CATEGORIES, CATEGORY_CODES, detailFileFor, parseIndex } from "../services/matchIndex";
+import type { Group, IndexRow } from "../services/matchIndex";
 
 var shouldUpdateBoundsSignal = {
     value: false
@@ -15,43 +17,10 @@ window.addEventListener('ShouldUpdateBounds',
     () => shouldUpdateBoundsSignal.value = true
 );
 
-// Category model, keyed by the index.tsv `status_detailed` 3-letter code.
-// Two top-level groups (matched / not-matched); the rest are sub-categories.
-type Group = 'matched' | 'not-matched';
-type Category = {
-    group: Group;
-    label: string;
-    color: string;
-    help: string;
-};
-
-const CATEGORIES: { [code: string]: Category } = {
-    mid: { group: 'matched', label: 'match-id', color: 'green', help: 'Stops matched by GTFS Id or Code' },
-    mrt: { group: 'matched', label: 'match-routes', color: 'green', help: 'Stops matched by routes going through this stop' },
-    mnm: { group: 'matched', label: 'match-name', color: 'green', help: 'Stops matched by Name' },
-    nic: { group: 'matched', label: 'name-id-conflict', color: 'green', help: 'Stops matched by Name but mismatched by id' },
-    gen: { group: 'matched', label: 'match-generic', color: 'green', help: 'Matched to a stop without name or code nearby' },
-    sep: { group: 'matched', label: 'separated-cluster', color: '#467d18', help: 'Many OSM stops matched one or many GTFS, but successfuly separated' },
-    clu: { group: 'matched', label: 'cluster', color: '#80520e', help: 'Many OSM stops matched one or many GTFS by name' },
-    mto: { group: 'matched', label: 'many-to-one', color: '#93cf32ff', help: 'Many OSM stops matched exactly one GTFS by name' },
-    hub: { group: 'matched', label: 'transit-hub', color: '#b5b20bff', help: 'Many OSM platforms or stops matched to one Station by name' },
-    nom: { group: 'not-matched', label: 'no-match', color: 'red', help: 'No osm element matched' },
-    nos: { group: 'not-matched', label: 'no-osm', color: 'black', help: 'No OSM elements of matching transport mode found in the area' },
-};
-
-const CATEGORY_CODES = Object.keys(CATEGORIES);
-
 const GROUPS: { group: Group; title: string }[] = [
     { group: 'matched', title: 'Matched' },
     { group: 'not-matched', title: 'Not matched' },
 ];
-
-// index.tsv `type` column -> detail NDJSON file
-const fileFor: { [type: string]: string } = {
-    mat: 'matches.ndjson',
-    clu: 'clusters.ndjson',
-    nos: 'no-osm.ndjson',
-};
 
 const PREVIEW_COLOR = '#2c2ca5ff';
 
@@ -96,19 +65,6 @@ export type Report = {
 
 }
 
-// One parsed row of index.tsv (search_terms column 9 is intentionally ignored —
-// it will power a future search feature and is not part of the map data).
-type IndexRow = {
-    id: string
-    status: string
-    code: string
-    type: string
-    lon: number
-    lat: number
-    byteStart: number
-    byteEnd: number
-}
-
 type StopLocator = {
     type: string
     byteStart: number
@@ -123,29 +79,6 @@ type GeojsonDataT = {
     [key: string]: any
 };
 
-function parseIndex(tsv: string): IndexRow[] {
-    const lines = tsv.split('\n');
-    const rows: IndexRow[] = [];
-    // line 0 is the header
-    for (let i = 1; i < lines.length; i++) {
-        const line = lines[i];
-        if (!line) continue;
-        const c = line.split('\t');
-        if (c.length < 8) continue;
-        rows.push({
-            id: c[0],
-            status: c[1],
-            code: c[2],
-            type: c[3],
-            lon: parseFloat(c[4]),
-            lat: parseFloat(c[5]),
-            byteStart: parseInt(c[6], 10),
-            byteEnd: parseInt(c[7], 10),
-        });
-    }
-    return rows;
-}
-
 function buildFeatureCollection(rows: IndexRow[]): GeojsonDataT {
     return {
         type: 'FeatureCollection',
@@ -154,7 +87,6 @@ function buildFeatureCollection(rows: IndexRow[]): GeojsonDataT {
             geometry: { type: 'Point', coordinates: [r.lon, r.lat] },
             properties: {
                 gtfsStopId: r.id,
-                category: r.status === 'm' ? 'matched' : 'not-matched',
                 subcategory: r.code,
                 type: r.type,
                 byteStart: r.byteStart,
@@ -197,6 +129,8 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
     const [rows, setRows] = useState<IndexRow[]>([]);
     const [selectedDatasets, updateSelectedDatasets] = useState<DatatsetsSelectonT>(defaultSets);
     const [previewData, setPreviewData] = useState<GeojsonDataT | null>(null);
+    // A report this build cannot read looks exactly like a region with no stops. Say which.
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     // Load the search index once per region.
     useEffect(() => {
@@ -206,13 +140,30 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         if (import.meta.env.DEV) {
             console.log('Loading index', reportRegion);
         }
+        setLoadError(null);
         fetch(`${DATA_BASE_URL}/${reportRegion}/index.tsv?t=${Date.now()}`)
-            .then(r => r.text())
-            .then(t => { if (!cancelled) setRows(parseIndex(t)); });
+            .then(r => {
+                if (!r.ok) throw new Error(`${r.status} for index.tsv`);
+                return r.text();
+            })
+            .then(t => {
+                if (cancelled) return;
+                const parsed = parseIndex(t);
+                // A code this build has no entry for gets no icon, no checkbox and no
+                // count, so its stops are simply absent from the map -- which looks
+                // exactly like a region that has none. Say so instead.
+                const unknown = [...new Set(parsed.map(r => r.code))].filter(c => !CATEGORIES[c]);
+                if (unknown.length > 0) {
+                    setLoadError(`index.tsv has categories this build does not know: ${unknown.join(', ')}`);
+                }
+                setRows(parsed);
+            })
+            .catch(e => {
+                console.error('Could not read index.tsv for', reportRegion, e);
+                if (!cancelled) setLoadError(`Could not read index.tsv: ${e.message}`);
+            });
         return () => { cancelled = true; };
     }, [reportRegion]);
-
-    const featureCollection = useMemo(() => buildFeatureCollection(rows), [rows]);
 
     const counts = useMemo(() => {
         const m: { [code: string]: number } = {};
@@ -222,14 +173,20 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         return m;
     }, [rows]);
 
+    const featureCollection = useMemo(() => buildFeatureCollection(rows), [rows]);
+
     // Range-fetch a single stop's detail object and turn it into a selection.
     const selectStop = useCallback(async (loc: StopLocator, source: 'map-click' | 'url-hash') => {
-        const file = fileFor[loc.type];
-        if (!file) return;
+        const file = detailFileFor(loc.type);
 
         const res = await fetch(`${DATA_BASE_URL}/${reportRegion}/${file}`, {
             headers: { Range: `bytes=${loc.byteStart}-${loc.byteEnd}` },
         });
+        // detailFileFor falls back to the combined file for an unknown type, so a report
+        // that does not have one answers 404 — and the error body parses as nothing.
+        if (!res.ok) {
+            throw new Error(`${res.status} for ${file} ${loc.byteStart}-${loc.byteEnd}`);
+        }
         const detail = JSON.parse(await res.text());
 
         const feature = stringifyProperties({
@@ -245,27 +202,68 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         if (!feature) return;
         const p = feature.properties;
         const [lon, lat] = (feature.geometry as { coordinates: number[] } & any)?.coordinates || [p.lon, p.lat];
+        // The banner describes the attempt in progress, not every attempt since the
+        // region loaded; a stale one reads as if the report itself were broken.
+        setLoadError(null);
         selectStop({
             type: p.type,
             byteStart: p.byteStart,
             byteEnd: p.byteEnd,
             lon, lat,
             subcategory: p.subcategory,
-        }, 'map-click');
+        }, 'map-click').catch(e => {
+            console.error('Could not load stop detail', e);
+            setLoadError(`Could not load the stop: ${e.message}`);
+        });
     }, [selectStop]);
 
+    // The preview source is clustered, so below clusterMaxZoom a click lands on a cluster:
+    // no id, no coordinates, but truthy enough to open a panel full of undefined. Zoom into
+    // it instead — that is what a click on a cluster means anywhere else on a map.
     const handlePreviewSelect = useCallback((_name: string, feature?: any) => {
         if (!feature) return;
-        updateSelection({ feature, datasetName: 'preview', reportRegion, idTags }, 'map-click');
-    }, [reportRegion, idTags, updateSelection]);
-
-    // Load preview.geojson lazily when the preview toggle is on.
-    useEffect(() => {
-        if (selectedDatasets['preview'] && !previewData) {
-            fetch(`${DATA_BASE_URL}/${reportRegion}/preview.geojson`)
-                .then(r => r.json())
-                .then(setPreviewData);
+        if (feature.properties?.cluster) {
+            const coords = (feature.geometry as { coordinates: [number, number] } & any)?.coordinates;
+            // Past clusterMaxZoom, so one click always opens the cluster rather than
+            // landing on another one.
+            if (map && coords) {
+                map.easeTo({ center: coords, zoom: Math.max(map.getZoom() + 2, 11) });
+            }
+            return;
         }
+        updateSelection({ feature, datasetName: 'preview', reportRegion, idTags }, 'map-click');
+    }, [map, reportRegion, idTags, updateSelection]);
+
+    // Load ir-preview.ndjson lazily when the preview toggle is on.
+    useEffect(() => {
+        let cancelled = false;
+        if (selectedDatasets['preview'] && !previewData) {
+            setLoadError(null);
+            fetch(`${DATA_BASE_URL}/${reportRegion}/ir-preview.ndjson`)
+                .then(r => {
+                    if (!r.ok) throw new Error(`${r.status} for ir-preview.ndjson`);
+                    return r.text();
+                })
+                .then(text => {
+                    const features = text.trim().split('\n').filter(l => l).map(line => {
+                        const stop = JSON.parse(line);
+                        return {
+                            type: 'Feature',
+                            geometry: { type: 'Point', coordinates: [stop.lon, stop.lat] },
+                            properties: stop
+                        };
+                    });
+                    // This is the slowest fetch in the panel and covers a whole
+                    // region, so a region switch mid-flight would otherwise drop the
+                    // previous region's stops onto the new region's map.
+                    if (!cancelled) setPreviewData({ type: 'FeatureCollection', features });
+                })
+                .catch(e => {
+                    console.error('Could not read ir-preview.ndjson for', reportRegion, e);
+                    if (!cancelled) setLoadError(`Could not read the preview: ${e.message}`);
+                });
+        }
+        return () => { cancelled = true; };
     }, [selectedDatasets['preview'], previewData, reportRegion]);
 
     // Deep-link restore for a stop selection: the category is recovered from the
@@ -285,6 +283,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         // Make sure the stop's sub-category layer is visible.
         updateSelectedDatasets(prev => prev[row.code] ? prev : { ...prev, [row.code]: true });
 
+        setLoadError(null);
         selectStop({
             type: row.type,
             byteStart: row.byteStart,
@@ -292,7 +291,10 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
             lon: row.lon,
             lat: row.lat,
             subcategory: row.code,
-        }, 'url-hash');
+        }, 'url-hash').catch(e => {
+            console.error('Could not load the deep-linked stop', id, e);
+            setLoadError(`Could not load the stop: ${e.message}`);
+        });
     }, [hashSelection?.kind, hashSelection?.id, rows]);
 
     // Deep-link restore for a preview selection.
@@ -321,7 +323,11 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         }
     }, [map, selection, selectionSource]);
 
-    const selectedCodes = CATEGORY_CODES.filter(c => selectedDatasets[c]);
+    const previewOn = !!selectedDatasets['preview'];
+    // Preview replaces the report's stops rather than overlaying them. Filtering them all
+    // out says so without unmounting the layer, which would drop and re-ingest the whole
+    // source on every toggle — and the checkboxes keep their state for when it goes off.
+    const selectedCodes = previewOn ? [] : CATEGORY_CODES.filter(c => selectedDatasets[c]);
 
     const datasetControls = GROUPS.map(({ group, title }) => {
         const codes = CATEGORY_CODES.filter(c => CATEGORIES[c].group === group && (counts[c] || 0) > 0);
@@ -343,6 +349,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
             <div className={'match-group'} key={group}>
                 <div className={'match-group-header'}>
                     <input className={'match-dataset-select'} type={'checkbox'} checked={allOn}
+                        disabled={previewOn}
                         ref={el => { if (el) el.indeterminate = !allOn && someOn; }}
                         onChange={e => toggleGroup((e.target as HTMLInputElement).checked)} />
                     <span className={'match-group-title'}>{title}</span>
@@ -351,6 +358,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
                 {codes.map(code => (
                     <div className={'match-child'} key={code}>
                         <input className={'match-dataset-select'} type={'checkbox'} checked={!!selectedDatasets[code]}
+                            disabled={previewOn}
                             onChange={e => updateSelectedDatasets({ ...selectedDatasets, [code]: (e.target as HTMLInputElement).checked })} />
                         <span className={'match-dataset'} title={CATEGORIES[code].help}>{CATEGORIES[code].label}</span>
                         <span className={'match-dataset-count'}>{counts[code] || 0}</span>
@@ -363,9 +371,11 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
     const previewControl = (
         <div className={'match-group'} key={'preview'}>
             <div className={'match-group-header'}>
-                <input className={'match-dataset-select'} type={'checkbox'} checked={!!selectedDatasets['preview']}
-                    onChange={e => updateSelectedDatasets({ ...selectedDatasets, preview: (e.target as HTMLInputElement).checked })} />
-                <span className={'match-dataset'} title={'Preview timetables for all matched'}>Preview</span>
+                <input className={'match-dataset-select'} type={'checkbox'} checked={previewOn}
+                    onChange={e => updateSelectedDatasets({
+                        ...selectedDatasets, preview: (e.target as HTMLInputElement).checked,
+                    })} />
+                <span className={'match-dataset'} title={'Show the stop positions and routes the matcher wrote'}>Preview</span>
             </div>
         </div>
     );
@@ -374,7 +384,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         <StopsLayer key={reportRegion} layerKey={reportRegion} data={featureCollection}
             selectedCodes={selectedCodes} onClick={handleStopClick} />;
 
-    const previewLayer = selectedDatasets['preview'] && previewData &&
+    const previewLayer = previewOn && previewData &&
         <DatasetMapLayer key={`${reportRegion}:preview`} name={'preview'} color={PREVIEW_COLOR}
             data={previewData} onClick={handlePreviewSelect} />;
 
@@ -387,6 +397,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
 
     return (<div>
         <h2 className={"report-header"}>{reportRegion}</h2>
+        {loadError && <div className={"report-load-error"} role={"alert"}>{loadError}</div>}
         {stopsLayer}
         {previewLayer}
         {previewControl}
@@ -525,8 +536,8 @@ type DatasetMapLayerProps = {
     data: GeojsonDataT
     onClick?: (datasetName: string, feature?: MapGeoJSONFeature, e?: MapLayerClickEvent) => void
 }
-// Used only for the preview overlay (preview.geojson), which is unchanged by the
-// index/NDJSON migration.
+// The preview overlay: one clustered symbol layer over ir-preview.ndjson. Clustered
+// because it holds every stop of the region at once, matched or not.
 function DatasetMapLayer({ name, color, data, onClick }: DatasetMapLayerProps) {
 
     const mapContext = useContext(MapContext);

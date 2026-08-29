@@ -1,6 +1,22 @@
 import { getDistanceLonLat } from "../map/distance";
 import type { LonLatTuple, OSMElement, OSMElementTags, OSMNode, OSMRelation, OSMWay } from "./OSMData.types";
 
+/**
+ * The element type an nwr id names: `n1236383343` is a node, `w1420729449` a way,
+ * `r5832475` a relation. Everything in the report is keyed this way.
+ */
+export function nwrType(nwrId: string): 'node' | 'way' | 'relation' {
+    return nwrId[0] === 'n' ? 'node' : nwrId[0] === 'w' ? 'way' : 'relation';
+}
+
+/**
+ * The osm.org page for an nwr id. The path needs the type spelled out —
+ * `osm.org/node/5609695632`, not `osm.org/n5609695632`, which is a 404.
+ */
+export function osmFeatureUrl(nwrId: string): string {
+    return `https://osm.org/${nwrType(nwrId)}/${nwrId.substring(1)}`;
+}
+
 export function lonLatToLatLng(lonLat: LonLatTuple) {
     if (!lonLat) {
         return undefined;
@@ -179,9 +195,7 @@ export default class OSMData {
     }
 
     getByNWRId(nwrid: string) {
-        const type = nwrid[0] === 'n' ? 'node' : nwrid[0] === 'w' ? 'way' : 'relation';
-        const id = parseInt(nwrid.substring(1));
-        return this.getByTypeAndId(type, id);
+        return this.getByTypeAndId(nwrType(nwrid), parseInt(nwrid.substring(1)));
     }
 
     getByTypeAndId(type: string, id: number) {

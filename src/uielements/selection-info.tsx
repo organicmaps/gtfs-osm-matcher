@@ -9,7 +9,9 @@ import { TagEditor } from "./editor/osm-tags";
 
 import { cls } from "./cls";
 import { RouteList } from "./route-list";
-import { OSM_DATA } from "../services/OSMData";
+import { OSM_DATA, nwrType, osmFeatureUrl } from "../services/OSMData";
+import { CATEGORIES, STRATEGIES, strategiesForCode } from "../services/matchIndex";
+import type { Strategy } from "../services/matchIndex";
 import { useSyncExternalStore } from "preact/compat";
 import { getTileXYZ } from "../services/tile-utils";
 import { HtmlMapMarker } from "./editor/map-marker";
@@ -58,19 +60,36 @@ export function SelectionInfo({ selection }: SelectionInfoProps) {
 }
 
 
-const MATCH_LABELS: { [code: string]: { label: string; help: string } } = {
-    mid: { label: 'match-id', help: 'Stop matched by GTFS ID or Code' },
-    mrt: { label: 'match-routes', help: 'Stop matched by routes going through it' },
-    mnm: { label: 'match-name', help: 'Stop matched by name' },
-    nic: { label: 'name-id-conflict', help: 'Stop matched by name but mismatched by ID' },
-    gen: { label: 'match-generic', help: 'Matched to a stop without name or code nearby' },
-    sep: { label: 'separated-cluster', help: 'Many OSM stops matched one or many GTFS stops, but successfully separated' },
-    clu: { label: 'cluster', help: 'Many OSM stops matched one or many GTFS stops by name' },
-    mto: { label: 'many-to-one', help: 'Many OSM stops matched exactly one GTFS stop by name' },
-    hub: { label: 'transit-hub', help: 'Many OSM platforms or stops matched to one station by name' },
-    nom: { label: 'no-match', help: 'No OSM element matched' },
-    nos: { label: 'no-osm', help: 'No OSM elements of matching transport mode found in the area' },
-};
+/**
+ * The keys the detail body writes, mapped to the UI's names — they agree everywhere except
+ * the conflict, which the body calls `idConflict`. A key not in STRATEGIES is dropped
+ * silently.
+ */
+const alias = (n: string): Strategy => n === 'idConflict' ? 'conflict' : n as Strategy;
+
+/**
+ * Which strategies a stop was matched by, from the detail body when it carries them
+ * and from the category code otherwise. The category says what the stop is; these say
+ * what was true about it.
+ */
+function strategiesOf(properties: { [key: string]: any }, datasetName?: string): Strategy[] {
+    const written = properties['strategies'];
+    if (written) {
+        const keys = typeof written === 'string' ? parseJsonSafe<any>(written, null) : written;
+        // Accepts either shape: a list of names, or an object keyed by name whose
+        // values carry each strategy's detail.
+        const names: string[] = Array.isArray(keys) ? keys : (keys ? Object.keys(keys) : []);
+        const known = names.map(alias).filter(n => STRATEGIES.some(s => s.key === n)) as Strategy[];
+
+        // Narrowing is reported beside the strategies rather than among them, since it is
+        // something routes did to the answer rather than a way the stop was found.
+        if (properties['narrowedByRoutes']) {
+            known.push('narrowed');
+        }
+        if (known.length > 0) return known;
+    }
+    return datasetName ? strategiesForCode(datasetName) : [];
+}
 
 type MatchInfoProps = {
     properties: { [k: string]: any }
@@ -154,10 +173,18 @@ function MatchInfo({ datasetName, properties, geometry, idTags, reportRegion }: 
             .map(f => ({ lon: f.lon!, lat: f.lat! }));
     }, [properties, matched]);
 
-    const matchInfo = datasetName ? MATCH_LABELS[datasetName] : null;
+    const matchInfo = datasetName ? CATEGORIES[datasetName] : null;
+    const strategies = strategiesOf(properties, datasetName);
 
     return (<div>
         <h2>{name}{matchInfo && <span className="match-type-tag" title={matchInfo.help}>{matchInfo.label}</span>}</h2>
+
+        {strategies.length > 0 && <div className="match-strategies">
+            {strategies.map(key => {
+                const s = STRATEGIES.find(s => s.key === key)!;
+                return <span className="match-type-tag" key={key} title={s.help}>{s.label}</span>;
+            })}
+        </div>}
 
         <DatasetHelp datasetName={datasetName} />
 
@@ -342,7 +369,7 @@ function OsmElements({ properties, idTags, parentLonLat, setLoading, matched }: 
         <div>
             {newOverpassLi.length > 0 && <>
                 <h4>New OSM Features</h4>
-                <div><i>This features were just created</i></div>
+                <div><i>These features were just created</i></div>
                 <ul>
                     {newOverpassLi}
                 </ul>
@@ -367,7 +394,7 @@ function OsmElements({ properties, idTags, parentLonLat, setLoading, matched }: 
                     </label>
                 </h4>
                 {!hideSurroundOsm && <>
-                <div><i>This features were not considered as match candidates during server matching</i></div>
+                <div><i>These features were not considered as match candidates during server matching</i></div>
                 <ul>
                     {overpassLi}
                 </ul>
@@ -405,7 +432,8 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
     const [version, setVersion] = useState(0);
     const [warnExpanded, setWarnExpanded] = useState(false);
 
-    const type = f.id[0] === 'n' ? 'node' : 'way';
+    // A relation used to be linked as a way here — the id's first letter is n, w or r.
+    const type = nwrType(f.id);
     const idn = f.id.slice(1);
 
     const { onClick, onHoverUpdate } = mouseEvents || {};
@@ -422,7 +450,7 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
 
     const name = f.tags.name;
 
-    const osmUrl = `https://osm.org/${type}/${idn}`;
+    const osmUrl = osmFeatureUrl(f.id);
     const osmHref = <a target="_blank" href={osmUrl}>{f.id}</a>;
 
     const osmFeature = OSM_DATA.getByTypeAndId(type, +idn);
@@ -537,40 +565,10 @@ function SpanSpacer({ w }: { w: string }) {
     return <span style={{ display: 'inline-block', width: w }} />
 }
 
-// datasetName is the index.tsv `status_detailed` 3-letter code.
+// datasetName is the index.tsv `kind` 3-letter code (or `status_detailed` for older reports).
 function DatasetHelp({ datasetName }: { datasetName?: string }) {
-
-    var info = (<i>One day here will be info text for {datasetName}</i>);
-
-    if (datasetName === "nom") {
-        info = (<i>None of the OSM stops matched GTFS stop by Id, Name or Code</i>);
-    }
-
-    if (datasetName === "nos") {
-        info = (<i>Can't find any OSM element recognized as a Public transport stop in vicinity</i>);
-    }
-
-    if (datasetName === "mid") {
-        info = (<i>Matched OSM stops by GTFS Id or Code</i>);
-    }
-
-    if (datasetName === "mrt") {
-        info = (<i>Matched OSM stops by routes going through this stop</i>);
-    }
-
-    if (datasetName === "mnm" || datasetName === "nic") {
-        info = (<i>Matched OSM stops by GTFS stop Name</i>);
-    }
-
-    if (datasetName === "gen") {
-        info = (<i>Matched to a stop without name or code nearby</i>);
-    }
-
-    if (["clu", "mto", "hub", "sep"].includes(datasetName || "")) {
-        info = (<i>Multiple gtfs stops matched by name to the same group of OSM features.</i>);
-    }
-
-    return <p>{info}</p>
+    const help = datasetName ? CATEGORIES[datasetName]?.help : undefined;
+    return help ? <p><i>{help}</i></p> : null;
 }
 
 

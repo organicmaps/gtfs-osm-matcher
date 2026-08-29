@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import { DATA_BASE_URL } from "../config";
 import { RoutesMap, type FullRouteDisplayEntry } from "./routes";
 import { cls } from "./cls";
+import { getRouteVariants, type RouteVariant } from "../services/routeVariants";
+import { memoFetch } from "../services/memoFetch";
 
 import "./route-list.css";
 
@@ -16,14 +18,6 @@ type RouteIndexEntry = {
     byteLength: number;
 };
 
-type RouteVariant = {
-    route: number;
-    latlon: number[];
-    gtfsIds: string[];
-    dir?: number;
-    inx: number;
-};
-
 type RouteWithVariants = {
     index: RouteIndexEntry;
     variants: RouteVariant[];
@@ -32,45 +26,18 @@ type RouteWithVariants = {
 const routeIndexCache: { [region: string]: Promise<RouteIndexEntry[]> } = {};
 
 function getRouteIndex(reportRegion: string): Promise<RouteIndexEntry[]> {
-    if (!routeIndexCache[reportRegion]) {
-        routeIndexCache[reportRegion] = fetch(`${DATA_BASE_URL}/${reportRegion}/routes.ndjson`)
-            .then(r => r.text())
+    return memoFetch(routeIndexCache, reportRegion, () =>
+        fetch(`${DATA_BASE_URL}/${reportRegion}/routes.ndjson`)
+            .then(r => {
+                if (!r.ok) throw new Error(`${r.status} for routes.ndjson`);
+                return r.text();
+            })
             .then(text => {
                 const entries = text.trim().split('\n').map(line => JSON.parse(line));
                 if (import.meta.env.DEV) console.log(`Route index loaded: ${entries.length} routes for ${reportRegion}`);
                 return entries;
-            });
-    }
-    return routeIndexCache[reportRegion];
-}
-
-// Cache keyed by region+routeId — independent of which stop/selection triggered
-// the fetch, so re-selecting a previously-seen route never hits the network again.
-const routeVariantCache: { [key: string]: Promise<RouteVariant[]> } = {};
-
-function getRouteVariants(reportRegion: string, entry: RouteIndexEntry): Promise<RouteVariant[]> {
-    const key = `${reportRegion}:${entry.routeId}`;
-    if (!routeVariantCache[key]) {
-        routeVariantCache[key] = fetch(`${DATA_BASE_URL}/${reportRegion}/route-stops.ndjson`, {
-            headers: { Range: `bytes=${entry.byteOffset}-${entry.byteOffset + entry.byteLength - 1}` },
-        })
-            .then(r => r.text())
-            .then(text => {
-                const variants = text.trim().split('\n').filter(l => l).map(l => JSON.parse(l));
-                variants.sort((a, b) => {
-                    const dirCmp = (a.dir ?? -1) - (b.dir ?? -1);
-                    if (dirCmp !== 0) return dirCmp;
-                    return b.gtfsIds.length - a.gtfsIds.length;
-                });
-                variants.forEach((v, i) => { v.inx = i; });
-                if (import.meta.env.DEV) {
-                    console.log(`Variants loaded for ${entry.routeId}: ${variants.length} variant(s)`);
-                    variants.forEach((v, i) => console.log(`  Variant #${i + 1}: ${v.gtfsIds.length} stops, ${v.latlon.length / 2} coordinates`));
-                }
-                return variants;
-            });
-    }
-    return routeVariantCache[key];
+            })
+    );
 }
 
 type RoutePillProps = {
@@ -131,12 +98,17 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
         let cancelled = false;
         setIndexLoading(true);
 
-        getRouteIndex(reportRegion).then(index => {
-            if (!cancelled) {
-                setRouteIndex(index);
-                setIndexLoading(false);
-            }
-        });
+        getRouteIndex(reportRegion)
+            .then(index => {
+                if (!cancelled) {
+                    setRouteIndex(index);
+                    setIndexLoading(false);
+                }
+            })
+            .catch(e => {
+                console.error('Failed to load the route index', e);
+                if (!cancelled) setIndexLoading(false);
+            });
 
         return () => { cancelled = true; };
     }, [reportRegion]);
@@ -158,10 +130,7 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
                 };
             });
         });
-        if (import.meta.env.DEV && entries.length > 0) {
-            console.log('Full route entries (GeoJSON [lng, lat]):');
-            entries.forEach(e => console.log(`  ${e.routeKey}: ${e.coordinates.length} coords, first: [${e.coordinates[0]}], last: [${e.coordinates[e.coordinates.length - 1]}]`));
-        }
+
         return entries;
     }, [routesWithVariants, selectedRouteId, selectedVariantInx]);
 
@@ -186,7 +155,8 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
                 // new selections fan out concurrently instead of one-at-a-time.
                 const results = await Promise.all(
                     entriesToFetch.map(async (entry): Promise<RouteWithVariants | null> => {
-                        const allVariants = await getRouteVariants(reportRegion, entry);
+                        const allVariants = await getRouteVariants(
+                            reportRegion, entry.routeId, entry.byteOffset, entry.byteLength);
                         const variants = allVariants.filter(v =>
                             v.gtfsIds.some(id => gtfsStopIds.includes(id)));
                         return variants.length > 0 ? { index: entry, variants } : null;

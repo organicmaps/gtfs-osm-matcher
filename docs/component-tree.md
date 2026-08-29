@@ -10,8 +10,8 @@ App  (src/app.tsx)
         │   │       subscribes to OSM_DATA for anyOsmChanges
         │   │
         │   ├── [tab: selection]
-        │   │   ├── SchedulePreview  [when selection.datasetName === 'preview']
-        │   │   │   (src/uielements/schedule-preview.tsx)
+        │   │   ├── Preview  [when selection.datasetName === 'preview']
+        │   │   │   (src/uielements/preview.tsx)
         │   │   └── SelectionInfo  [otherwise]
         │   │       (src/uielements/selection-info.tsx)
         │   │       ├── MatchInfo  [per selected feature]
