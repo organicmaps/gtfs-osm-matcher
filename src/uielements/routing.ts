@@ -1,25 +1,24 @@
-import { useRef, useSyncExternalStore } from "preact/compat";
+import { useRef, useSyncExternalStore, useCallback } from "preact/compat";
 
 
 export function useHash() {
     const hashRef = useRef<String>(window.location.hash);
-    return useSyncExternalStore((callback) => {
-        window.addEventListener("hashchange", () => {
-            if (hashRef.current !== window.location.hash) {
-                hashRef.current = window.location.hash;
-
-                if (import.meta.env.DEV) {
-                    console.log('Hash changed', hashRef.current);
+    return useSyncExternalStore(
+        useCallback((callback: () => void) => {
+            const onChange = () => {
+                if (hashRef.current !== window.location.hash) {
+                    hashRef.current = window.location.hash;
+                    if (import.meta.env.DEV) {
+                        console.log('Hash changed', hashRef.current);
+                    }
+                    callback();
                 }
-
-                callback();
-            }
-        });
-
-        return () => {
-            window.removeEventListener("hashchange", callback);
-        }
-    }, () => window.location.hash);
+            };
+            window.addEventListener("hashchange", onChange);
+            return () => window.removeEventListener("hashchange", onChange);
+        }, []),
+        () => window.location.hash
+    );
 }
 
 export function useHashRoute<T>(parser: (hashString: string) => T) {
@@ -39,14 +38,25 @@ export type SelectionHash = {
     id: string;
 };
 
-// `…/preview/{id}` for timetable preview, `…/selection/{id}` for everything else.
-// The category is no longer part of the URL — it is recovered from index.tsv.
+// `…/preview/{id}` for a stop in the matcher's own output, `…/selection/{id}` for one in
+// the match report. The category is no longer part of the URL — it is recovered from
+// index.tsv. The id is percent-encoded by whoever wrote the hash, since GTFS ids are
+// free-form and a raw '/' would end the segment here.
 export function parseSelectionHash(hashString: string): SelectionHash | undefined {
     const match = hashString.match(/\/(preview|selection)\/([^/]+)/);
     if (match) {
         return {
             kind: match[1] as 'preview' | 'selection',
-            id: match[2],
+            id: decodeId(match[2]),
         };
+    }
+}
+
+/** A '%' that is not an escape is a link from before the ids were encoded, not an error. */
+function decodeId(raw: string): string {
+    try {
+        return decodeURIComponent(raw);
+    } catch {
+        return raw;
     }
 }

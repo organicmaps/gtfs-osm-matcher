@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "preact/hooks";
+import { useContext, useEffect, useMemo, useState } from "preact/hooks";
 import { MapContext } from "../app";
 import { routesStyling } from "./routes-styling";
 import type { GeoJSONSource } from "maplibre-gl";
@@ -18,7 +18,11 @@ export function RoutesMap({ fullRoutes = [] }: RoutesMapProps) {
 
     const [mapStylesReady, setMapStylesReady] = useState<boolean>(!!map?.getSource('routes'));
 
-    const fullRouteFeatures = fullRoutes.map(({ routeKey, coordinates }) => ({
+    // Memoised here rather than at the call sites: this component re-renders
+    // whenever its parent does, and a fresh array identity makes the effect below
+    // wipe the source to an empty FeatureCollection before setting it again --
+    // visible as a flash on every unrelated state change.
+    const allFeatures = useMemo(() => fullRoutes.map(({ routeKey, coordinates }) => ({
         type: 'Feature',
         geometry: {
             type: 'LineString',
@@ -28,9 +32,7 @@ export function RoutesMap({ fullRoutes = [] }: RoutesMapProps) {
             name: routeKey,
             color: 'green'
         }
-    }));
-
-    const allFeatures = fullRouteFeatures;
+    })), [fullRoutes]);
 
     useEffect(() => {
         if (!map) return;
@@ -46,12 +48,10 @@ export function RoutesMap({ fullRoutes = [] }: RoutesMapProps) {
         }
 
         const createRouteLayers = () => {
-            if (!map.getSource('routes')) {
-                console.log('Create routes map styles');
-
-                layerControls?.addOverlayImmediate(routesStyling);
-            }
-
+            // addOverlayImmediate is idempotent, so this does not need to guard on
+            // map.getSource -- which is the wrong registry to ask anyway, and reads
+            // as absent while setStyle rebuilds.
+            layerControls?.addOverlayImmediate(routesStyling);
             setMapStylesReady(true);
         };
 

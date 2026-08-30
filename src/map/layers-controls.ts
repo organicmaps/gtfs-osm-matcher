@@ -29,16 +29,30 @@ export class LayerControls {
         });
     }
 
-    // For now just keep overlays always visible
+    // For now just keep overlays always visible.
+    //
+    // Idempotent, because `overlays` and the map are two registries and callers
+    // guard on the map: RoutesMap adds `routesStyling` when `map.getSource` says
+    // the source is absent, which it is for a moment while setStyle rebuilds.
+    // Registering the same overlay twice makes setBaseStyle replay its layers
+    // twice over one source -- the route line, its arrows and its labels all
+    // drawn on top of themselves.
     addOverlayImmediate(overlayStyle: OverlaySpecification) {
+        if (this.overlays.includes(overlayStyle)) {
+            return;
+        }
         this.overlays.push(overlayStyle);
 
         for (const [key, source] of Object.entries(overlayStyle.sources)) {
-            this.map.addSource(key, source);
+            if (!this.map.getSource(key)) {
+                this.map.addSource(key, source);
+            }
         }
 
         for (const layer of overlayStyle.layers) {
-            this.map.addLayer(layer);
+            if (!this.map.getLayer(layer.id)) {
+                this.map.addLayer(layer);
+            }
         }
     }
 
@@ -46,11 +60,15 @@ export class LayerControls {
         this.overlays = this.overlays.filter(o => o !== overlayStyle);
 
         for (const layer of overlayStyle.layers) {
-            this.map.removeLayer(layer.id);
+            if (this.map.getLayer(layer.id)) {
+                this.map.removeLayer(layer.id);
+            }
         }
 
         for (const key of Object.keys(overlayStyle.sources)) {
-            this.map.removeSource(key);
+            if (this.map.getSource(key)) {
+                this.map.removeSource(key);
+            }
         }
     }
 

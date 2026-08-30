@@ -8,7 +8,7 @@ import { createMap } from './map/map';
 import { useEffect, useState } from 'preact/hooks';
 import { MatchReportSelector } from './uielements/report-selector';
 import { SelectionInfo } from './uielements/selection-info';
-import { SchedulePreview } from './uielements/schedule-preview';
+import { Preview } from './uielements/preview';
 import { MapTools } from './uielements/map-tools';
 import { parseUrlReportRegion, useHashRoute } from './uielements/routing';
 import { cls } from './uielements/cls';
@@ -136,7 +136,10 @@ export function App() {
       var hash = `#/match-report/${reportRegion}`;
 
       if (id) {
-        hash += datasetName === 'preview' ? `/preview/${id}` : `/selection/${id}`;
+        // GTFS ids are free-form UTF-8 and do occur with spaces, '#' or '/': a '#'
+        // truncates the hash and parseSelectionHash's [^/]+ cuts at a slash.
+        const encoded = encodeURIComponent(id);
+        hash += datasetName === 'preview' ? `/preview/${encoded}` : `/selection/${encoded}`;
       }
 
       window.location.hash = hash;
@@ -163,7 +166,7 @@ export function App() {
 
               <div className={cls(activeTab !== 'selection' && 'tab-hidden')}>
                 {preview ?
-                  <SchedulePreview selection={selection} /> :
+                  <Preview selection={selection} /> :
                   <SelectionInfo selection={selection} />
                 }
               </div>
