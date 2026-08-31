@@ -2,10 +2,10 @@
 
 ## Purpose of this project
 
-In order to display GTFS stops on the map without doubling and visual clutter
+In order to display GTFS stops on the map without duplicates and visual clutter
 we need to match GTFS stops to OSM stops.
 
-This UI displays matching results in more convenient way.
+This UI displays matching results in a more convenient way.
 
 There are several sets of matched (not matched) stops,
 with different level of confidence and different ways of improving matching.
