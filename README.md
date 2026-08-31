@@ -76,8 +76,8 @@ These stops were matched by the routes going through them.
 
 ### match-name
 These stops were matched by name and type and didn't get into a cluster of matches.
-Names are getting normalised: special characters removed, lowercase, diacritics removed,
-ß converted to ss etc. Names are checked against *name* element tags.
+Names are normalised: special characters and diacritics are removed, names are lowercased,
+ß is converted to ss, etc. Names are checked against *name* element tags.
 Cluster of matches in this context means that more than one GTFS stop matched to the same OSM element.
 
 ### name-id-conflict
