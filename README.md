@@ -2,10 +2,10 @@
 
 ## Purpose of this project
 
-In order to display GTFS stops on the map without doubling ond visual clutter
+In order to display GTFS stops on the map without duplicates and visual clutter
 we need to match GTFS stops to OSM stops.
 
-This UI displays matching results in more convenient way.
+This UI displays matching results in a more convenient way.
 
 There are several sets of matched (not matched) stops,
 with different level of confidence and different ways of improving matching.
@@ -55,45 +55,60 @@ Please take a look what tag is considered appropriate by the local community.
 
 Typical tags are `<agency>_ref`, `gtfs:id`, `gtfs:stop_id`, `gtfs:stop_code`, etc.
 
-At this moment the quickest way to do so is to use `Goto OSM` button to open the
-current view on OSM and use `Id` or `JOSM` editor via `Edit` button
-to add above mentioned data to OSM stops or create it.
+One way to do so is to use the `Goto OSM` button to open the
+current view on OSM and use the `Id` or `JOSM` editor via the `Edit` button
+to add above mentioned data to OSM stops or create them.
+
+Alternatively, use the built-in editor: enable `Edit` on an OSM element in the
+selection panel to change its tags (with `Set Name` / `Set Id` / `Set Code`
+shortcuts), `Move` it, or use `Add OSM Stop` to create a missing one. Collected
+edits are listed in the `OSM Changes` tab and can be downloaded as a
+JOSM-compatible `.osm` file for review and upload.
 
 
 ### match-id
-This stops were matched by GTFS stop ID or Code.
-That means that one of the osm element tags have exact match with GTFS stop ID or Code.
+These stops were matched by GTFS stop ID or Code.
+That means that one of the OSM element tags has an exact match with the GTFS stop ID or Code.
 Usually this is some kind of a ref tag.
 
+### match-routes
+These stops were matched by the routes going through them.
+
 ### match-name
-This stops were matched by name and type and didn't get into a cluster of matches.
-Names are getting normalised: Special characters removed, lowercase, diacritics removed,
-ß converted to ss etc. Names are checked against *name* elemnt tags.
+These stops were matched by name and type and didn't get into a cluster of matches.
+Names are normalised: special characters and diacritics are removed, names are lowercased,
+ß is converted to ss, etc. Names are checked against *name* element tags.
 Cluster of matches in this context means that more than one GTFS stop matched to the same OSM element.
 
-### separated-clusters
-This dataset contains matches that were successfuly separated from clusters.
+### name-id-conflict
+These stops were matched by name, but the GTFS ID or Code did not match.
+
+### match-generic
+These stops were matched to a nearby OSM stop that has no name or code to compare against.
+
+### separated-cluster
+This sub-category contains matches that were successfully separated from clusters.
 At this moment cluster separation is done by distance.
 
-In general this features considered matched. It's possible that stop matches where separated from the cluster incorrectly.
-To fix this type of an error add GTFS `id` or `code` to osm stop.
+In general these features are considered matched. It's possible that stop matches were separated from the cluster incorrectly.
+To fix this type of an error add GTFS `id` or `code` to the OSM stop.
 
-### transit-hub-clusters
-This are clusters which contains one and only one OSM element
-representing trunsport hub, such as `amenity=bus_station`, `railway=station`, etc.
+### transit-hub
+These are clusters which contain one and only one OSM element
+representing a transport hub, such as `amenity=bus_station`, `railway=station`, etc.
 and any number of stops or platforms.
 
 ### many-to-one
-This are clusters where multiple GTFS stops were matched to excatly one OSM element.
+These are clusters where multiple GTFS stops were matched to exactly one OSM element.
 
-### clusters
-This are clusters which the tool was unable to separate.
+### cluster
+These are clusters which the tool was unable to separate.
 
-### no-match and no-osm-stops
+### no-match and no-osm
 
-This two categories are simmilar in that they both contain stops
-that were not matched to OSM element. But in case of `no-osm-stops`
-means that no OSM element of the appropiate type
+These two categories are similar in that they both contain stops
+that were not matched to any OSM element. But `no-osm`
+means that no OSM element of the appropriate type
 was found at all within 750m (1000m for rail transport) radius.
 
 ## License
