@@ -2068,6 +2068,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"fflate@npm:^0.8.2":
+  version: 0.8.3
+  resolution: "fflate@npm:0.8.3"
+  checksum: 10c0/eab181ca37f5348ae76d4b6f840e0026e30220e33153289ac942222d8b9638237d486507dbcc09878d724095bd354993a2ee48bbee99c8f2c6440d4448719aa7
+  languageName: node
+  linkType: hard
+
 "fs-minipass@npm:^3.0.0":
   version: 3.0.3
   resolution: "fs-minipass@npm:3.0.3"
@@ -2604,6 +2611,15 @@ __metadata:
   version: 4.0.3
   resolution: "picomatch@npm:4.0.3"
   checksum: 10c0/9582c951e95eebee5434f59e426cddd228a7b97a0161a375aed4be244bd3fe8e3a31b846808ea14ef2c8a2527a6eeab7b3946a67d5979e81694654f939473ae2
+  languageName: node
+  linkType: hard
+
+"pmtiles@npm:^4.5.0":
+  version: 4.5.0
+  resolution: "pmtiles@npm:4.5.0"
+  dependencies:
+    fflate: "npm:^0.8.2"
+  checksum: 10c0/4f698991c1ace17447567e05f5793f9f192f085377cb1ba94e85e67461a01848096b6cf72972479abb698e171f3e8b61547d3d7a309f7cfa3ece2d545c618dc0
   languageName: node
   linkType: hard
 
@@ -3160,6 +3176,7 @@ __metadata:
     "@types/node": "npm:^25.2.0"
     baseline-browser-mapping: "npm:^2.9.15"
     maplibre-gl: "npm:^5.10.0"
+    pmtiles: "npm:^4.5.0"
     preact: "npm:^10.27.3"
     typescript: "npm:~5.9.3"
     vite: "npm:^7.3.5"

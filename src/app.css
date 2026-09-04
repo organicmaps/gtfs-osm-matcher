@@ -293,3 +293,39 @@
     text-decoration: none;
     color: #333;
 }
+
+/* The dissolution panel: what the matcher plans to do with a stop that stands for
+   several places. */
+.dissolving-plan {
+    margin: 8px 0;
+    padding: 8px 10px;
+    border-left: 3px solid #b45309;
+    background: rgba(180, 83, 9, 0.08);
+    /* rem, not px: the mobile rule shrinks :root, and an absolute size here would leave
+       this one panel at desktop scale on a phone. */
+    font-size: 0.93rem;
+}
+.dissolving-plan ul { margin: 6px 0 0; padding-left: 18px; }
+
+/* The same panel for a stop the pass only measured: nothing was done to it, so it does not
+   get the acted-on colour. */
+.dissolving-plan.not-applied {
+    border-left-color: #8b8b8b;
+    background: rgba(139, 139, 139, 0.08);
+}
+
+/* And for a stop it looked at and refused. Neither of the above: nothing is planned for it
+   and nothing is wrong with it, so it carries no warning colour at all. */
+.dissolving-plan.not-dissolved {
+    border-left-color: #9aa4ad;
+    background: rgba(154, 164, 173, 0.10);
+}
+
+/* The button of a map overlay that is currently drawn. Without it the layer's only feedback
+   is the layer itself, and an archive with nothing near the viewport looks like a dead
+   button. */
+#map-tools-content button.active {
+    background: #2f6fbf;
+    border-color: #2f6fbf;
+    color: #fff;
+}

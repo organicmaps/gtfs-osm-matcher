@@ -36,6 +36,26 @@ const importantTagsRg = /(name|ref|gtfs|bus|train|tram|trolleybus|ferry|station|
 
 const ABC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
+/**
+ * Why the matcher looked at a stop that stands for several places and left it whole. The
+ * report writes its own reason codes; these are what they mean to someone fixing OSM, who is
+ * the reader here. An unknown code shows as itself rather than as nothing.
+ *
+ * This is the numerous case, not the exotic one: swiss-opendata plans 2,635 stops and
+ * declines 8,040, and a decline is the only one of the two a mapper can argue with.
+ */
+const NOT_DISSOLVED_REASON: { [code: string]: string } = {
+    moreThanMaxParts: 'it matched more places than a split is allowed to make',
+    partsCloserThanMinSeparation: 'the places it matched are too close together to tell apart',
+    servedInOneDirection: 'every service calls in the same direction, so there is nothing to split',
+    stopDoesNotBelongToItsParts: 'the stop lies too far off the places it matched',
+    headingCouldNotTellThePartsApart: 'nothing said which place each service calls at',
+    residueOverMaxUnassignedShare: 'too many of its services could not be placed',
+    aChildsAnchorIsNotAmongItsFeatures: 'one of the stops it would deal to is not anchored to any of its features',
+    fewerThanTwoParts: 'the feed names fewer than two parts for it',
+    derivedIdCollidesWithAFeedStop: 'the id a part would be published under is already a stop of this feed',
+};
+
 export type SelectionInfoProps = {
     selection: SelectionT | null
 }
@@ -187,6 +207,63 @@ function MatchInfo({ datasetName, properties, geometry, idTags, reportRegion }: 
             })}
         </div>}
 
+        {/* Both outcomes, not just the interesting one. A panel that speaks only when a stop
+            dissolves leaves silence meaning either "left whole" or "this build does not show
+            it", and those are not the same answer. */}
+        {properties['notDissolved'] &&
+            <div className="dissolving-plan not-dissolved">
+                <div><b>Left whole</b> — considered for dissolution and declined:
+                    {' '}<span title={properties['notDissolved']}>
+                        {NOT_DISSOLVED_REASON[properties['notDissolved']] || properties['notDissolved']}
+                    </span></div>
+            </div>}
+        {/* Virtual stop dissolution. The stop is unaltered and still matched by whatever tier
+            matched it; this shows what happened to its visits, or what could.
+
+            The report speaks in two tenses and so does this: `dissolving` is a run that dealt
+            the stop's visits, `dissolvable` one that measured and acted on nothing — a feed
+            whose report says `analysis`, which is asked for per feed rather than opted out
+            of. A feed with neither says `off` and carries no marks at all. */}
+        {(properties['dissolving'] || properties['dissolvable']) && (() => {
+        const applied = !!properties['dissolving'];
+        const parts = applied ? properties['dissolvesToParts'] : properties['wouldDissolveToParts'];
+        return <div className={cls('dissolving-plan', !applied && 'not-applied')}>
+            <div><b>{applied ? 'Dissolved' : 'Could be dissolved'}</b>
+                {applied
+                    ? <span> — its departures are dealt to the places it stands for; the stop
+                        itself keeps its id and holds whatever no place could take</span>
+                    : <span> — dissolution is in analysis for this feed, so the same pass ran
+                        and nothing was done to it</span>}</div>
+            {parts && (() => {
+                const partIds = parseJsonSafe<string[]>(parts, []) as string[];
+                // A minted id is the stop's own id plus the OSM feature it stands at; a
+                // re-pointed one is a stop the feed already has. The two look different
+                // because they are different: only the first is invented.
+                //
+                // The whole prefix, not the separator alone. Feed ids are free-form and do
+                // contain '#' -- this app encodes it in the URL hash for that reason -- so a
+                // contains-test would tell a mapper that their own stop `STN#3` exists only
+                // in the published data.
+                const mintedPrefix = `${properties['gtfsStopId']}#`;
+                const minted = partIds.filter(p => p.startsWith(mintedPrefix));
+                const repointed = partIds.filter(p => !p.startsWith(mintedPrefix));
+                return <>
+                    {repointed.length > 0 && <>
+                        <div>{applied ? 'Visits dealt to' : 'Visits would be dealt to'} the stops
+                            this feed already names as its parts:</div>
+                        <ul>{repointed.map(part => <li key={part}><b>{part}</b></li>)}</ul>
+                    </>}
+                    {minted.length > 0 && <>
+                        <div>{applied ? 'Split into' : 'Would be split into'} places the feed
+                            never named — these ids exist only in the published data, not in
+                            the feed:</div>
+                        <ul>{minted.map(part => <li key={part}><b>{part}</b></li>)}</ul>
+                    </>}
+                </>;
+            })()}
+        </div>;
+        })()}
+
         <DatasetHelp datasetName={datasetName} />
 
         <MatchArrowLayer gtfsLon={lon} gtfsLat={lat} osmPoints={osmPoints} visible={matched} />
@@ -194,6 +271,11 @@ function MatchInfo({ datasetName, properties, geometry, idTags, reportRegion }: 
         {gtfsFeatures.length === 1 && <div>
             <div>GTFS stop ID: <b>{properties.gtfsStopId}</b></div>
             <div>GTFS stop code: {properties.gtfsStopCode ? <b>{properties.gtfsStopCode}</b> : <i>N/A</i>}</div>
+            {/* The bay the feed says this is, from its own platform_code field. Shown only
+                when there is one: most stops are not bays, and a row of N/A on every one of
+                them says nothing. */}
+            {properties.gtfsPlatformCode &&
+                <div>Platform code: <b>{properties.gtfsPlatformCode}</b></div>}
         </div>}
 
         {gtfsFeatures.length > 1 && <div>
