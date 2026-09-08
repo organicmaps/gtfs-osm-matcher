@@ -151,7 +151,22 @@ const STRUCTURE_ZOOM = 14;
  */
 const NEAR_ENOUGH_ZOOM = 8;
 
+/**
+ * The pmtiles reader, fetched on the first toggle and shared by every later one. A promise
+ * rather than a flag: the import is awaited, so two clicks before it lands would both pass a
+ * flag set after it and register the protocol twice — maplibre 5 overwrites the handler
+ * silently, discarding the first reader's tile cache.
+ */
 let structureProtocol: Promise<void> | null = null;
+
+function registerStructureProtocol(): Promise<void> {
+    // Loaded here rather than imported: most sessions never turn this on, and the reader is
+    // a chunk of its own.
+    structureProtocol ??= import('pmtiles').then(({ Protocol }) => {
+        maplibregl.addProtocol('pmtiles', new Protocol().tile);
+    });
+    return structureProtocol;
+}
 
 function attachStopStructureToggle(map: Map, layerControls: LayerControls,
         loaded: Promise<Map>) {
@@ -201,48 +216,48 @@ function attachStopStructureToggle(map: Map, layerControls: LayerControls,
     };
 
     let shown = false;
-    // Which press is current. The handler awaits, so two quick presses overlap and the map
-    // must end up where the last of them asked for -- not where the slowest one finishes.
-    let press = 0;
+    let applied = false;
     button.onclick = async () => {
-        const thisPress = ++press;
+        // Flipped and shown before the await, not after: the reader is a chunk of its own, and
+        // on a cold cache everything below waited a network round trip while the button looked
+        // dead. Two clicks inside that window then resolved in order and cancelled each other.
         shown = !shown;
-        const wanted = shown;
-        // Marked before the awaits: the button answers the finger, and the layer catches up.
-        button.classList.toggle('active', wanted);
-
-        if (wanted && !structureProtocol) {
-            // Fetched when the layer is first asked for, not with the app: pmtiles and its
-            // inflate cost 8.7 kB gzipped, and most visits never press this. Held as a
-            // promise so two quick presses share one fetch, and the protocol is registered
-            // once per page -- maplibre keeps protocols globally and a second handler for
-            // the same scheme throws.
-            structureProtocol = import('pmtiles').then(({ Protocol }) => {
-                maplibregl.addProtocol('pmtiles', new Protocol().tile);
-            });
-        }
-        if (wanted) {
-            await structureProtocol;
-        }
-
-        // Awaited, like every other overlay here: addSource throws "Style is not done
-        // loading" before the first load, and addOverlayImmediate registers the overlay
-        // before it adds it -- so a press during startup used to leave the control holding
-        // a layer the map does not have, and the button dead from then on.
-        await loaded;
-        if (thisPress !== press) {
-            // Pressed again while this one was waiting; that press owns the outcome.
-            return;
-        }
-
-        wanted ? layerControls.addOverlayImmediate(spec) : layerControls.removeOverlayImmediate(spec);
-        if (wanted && map.getZoom() < STRUCTURE_ZOOM && map.getZoom() >= NEAR_ENOUGH_ZOOM) {
+        button.classList.toggle('active', shown);
+        if (shown && map.getZoom() < STRUCTURE_ZOOM && map.getZoom() >= NEAR_ENOUGH_ZOOM) {
             // Nothing exists below the archive's own zoom, so zooming in is the difference
             // between a toggle that draws and one that appears to do nothing. Only from
-            // somewhere the user has already chosen: from the world view this would land in
+            // somewhere the viewer has already chosen: from the world view this would land in
             // the middle of the Atlantic at z14, which helps nobody.
             map.easeTo({ zoom: STRUCTURE_ZOOM });
         }
+
+        try {
+            await registerStructureProtocol();
+        } catch (e) {
+            // A chunk that will not load leaves a button that does nothing; say which, and put
+            // the button back where it was. Cleared so a later click can try again.
+            structureProtocol = null;
+            shown = false;
+            button.classList.remove('active');
+            console.error('Could not load the pmtiles reader', e);
+            return;
+        }
+
+        // Awaited like every other overlay here: addSource throws "Style is not done
+        // loading" before the first load, and addOverlayImmediate registers the overlay
+        // before it adds it -- so a press during startup left the control holding a layer
+        // the map does not have, and the button dead from then on.
+        await loaded;
+
+        // Applied from the current state rather than from this click's: several clicks share
+        // one load, and what matters is the state the last of them asked for.
+        if (shown === applied) {
+            return;
+        }
+        applied = shown;
+        // The same immediate add/remove the report's own overlays use, so the layer survives
+        // a base-style switch.
+        shown ? layerControls.addOverlayImmediate(spec) : layerControls.removeOverlayImmediate(spec);
     };
 }
 

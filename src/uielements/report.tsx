@@ -1,12 +1,14 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { MapContext, SelectionContext } from "../app";
+import { MapContext, SelectionContext, ViewOptionsContext } from "../app";
 import { loadSvgWithColors } from "../map/map";
-import type { MapGeoJSONFeature, MapMouseEvent } from "maplibre-gl";
+import type { GeoJSONSource, MapGeoJSONFeature, MapMouseEvent } from "maplibre-gl";
+import type { FeatureCollection } from "geojson";
 
 import "./report.css"
 import { parseSelectionHash, useHash } from "./routing";
 import { DATA_BASE_URL } from "../config";
 import { CATEGORIES, CATEGORY_CODES, detailFileFor, parseIndex } from "../services/matchIndex";
+import { PreviewSwitch } from "./switch";
 import type { Group, IndexRow } from "../services/matchIndex";
 
 var shouldUpdateBoundsSignal = {
@@ -21,8 +23,6 @@ const GROUPS: { group: Group; title: string }[] = [
     { group: 'matched', title: 'Matched' },
     { group: 'not-matched', title: 'Not matched' },
 ];
-
-const PREVIEW_COLOR = '#2c2ca5ff';
 
 // A stop whose calls this run dealt to the places it stands for is drawn grey rather than in
 // its match category's colour: it is still matched, still filtered by that category's
@@ -89,17 +89,31 @@ type StopLocator = {
     subcategory: string
 }
 
-type GeojsonDataT = {
-    features: any[]
-    [key: string]: any
-};
-
-function buildFeatureCollection(rows: IndexRow[], dissolutionApplied: boolean): GeojsonDataT {
+/**
+ * The stops, drawn either where their feed puts them or where the matcher anchored them.
+ *
+ * <p>One collection either way, with the same feature ids: the preview is a re-projection of
+ * the report's own markers, not a second dataset over them. That is what lets the switch be
+ * flipped with a stop selected — the selected feature still exists, so the panel stays open
+ * and the marker simply moves. A stop the anchoring refused keeps its feed position, since
+ * there is nowhere else to draw it.
+ *
+ * <p>The feed position is deliberately not carried in the properties: a click resolves the
+ * stop through its index row, which holds both positions, so nothing downstream has to
+ * guess which one a marker's geometry is.
+ */
+function buildFeatureCollection(rows: IndexRow[], anchored: boolean,
+        dissolutionApplied: boolean): FeatureCollection {
     return {
         type: 'FeatureCollection',
         features: rows.map(r => ({
             type: 'Feature',
-            geometry: { type: 'Point', coordinates: [r.lon, r.lat] },
+            geometry: {
+                type: 'Point',
+                coordinates: anchored && r.anchorLon !== null && r.anchorLat !== null
+                    ? [r.anchorLon, r.anchorLat]
+                    : [r.lon, r.lat],
+            },
             properties: {
                 gtfsStopId: r.id,
                 subcategory: r.code,
@@ -109,6 +123,11 @@ function buildFeatureCollection(rows: IndexRow[], dissolutionApplied: boolean): 
                 // Grey only where this run actually dealt the stop's visits: the same bit on a
                 // feed that was only measured means "would", and nothing happened to it.
                 dissolved: r.dissolutionPlanned && dissolutionApplied,
+                // Drawn faded while the preview is on: this stop did not move because the
+                // anchoring refused it, and a marker that stayed put otherwise looks exactly
+                // like one the matcher placed where the feed already had it. The panel says
+                // which refusal it was.
+                unanchored: anchored && r.anchorLon === null,
             }
         }))
     };
@@ -146,7 +165,9 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
 
     const [rows, setRows] = useState<IndexRow[]>([]);
     const [selectedDatasets, updateSelectedDatasets] = useState<DatatsetsSelectonT>(defaultSets);
-    const [previewData, setPreviewData] = useState<GeojsonDataT | null>(null);
+    // Shared with the selection panel: the same switch appears there, so the state cannot
+    // live in this component's own dataset map.
+    const { previewOn, setPreviewAvailable } = useContext(ViewOptionsContext);
     // Two channels, because the two messages live on different clocks. The index
     // message is a property of the loaded region and stays true until the region
     // changes; the action message describes one click. Sharing one state let a
@@ -159,7 +180,6 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
     useEffect(() => {
         let cancelled = false;
         setRows([]);
-        setPreviewData(null);
         if (import.meta.env.DEV) {
             console.log('Loading index', reportRegion);
         }
@@ -196,17 +216,52 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         return () => { cancelled = true; };
     }, [reportRegion]);
 
-    const counts = useMemo(() => {
-        const m: { [code: string]: number } = {};
+    // Per category: how many stops there are, and how many of them the matcher anchored.
+    // The second is what the preview can actually move, and the categories selected by
+    // default (the unmatched ones) have none of it — so without the count beside the switch
+    // its first use looks like a broken control.
+    const { counts, anchoredCounts, anchoredTotal } = useMemo(() => {
+        const counts: { [code: string]: number } = {};
+        const anchoredCounts: { [code: string]: number } = {};
+        let anchoredTotal = 0;
         for (const r of rows) {
-            m[r.code] = (m[r.code] || 0) + 1;
+            counts[r.code] = (counts[r.code] || 0) + 1;
+            if (r.anchorLon !== null && r.anchorLat !== null) {
+                anchoredCounts[r.code] = (anchoredCounts[r.code] || 0) + 1;
+                anchoredTotal++;
+            }
         }
-        return m;
+        return { counts, anchoredCounts, anchoredTotal };
     }, [rows]);
 
+    // The switch lives in App, so it outlives the region and the report list. Rather than
+    // turning it off after the fact -- which stored a wrong state, drew from it, and then
+    // corrected it -- nothing reads it while the report has nothing to preview, and the
+    // switch tells the panel's copy of itself to stop offering the control.
+    const previewing = previewOn && anchoredTotal > 0;
+
+    useEffect(() => {
+        setPreviewAvailable(anchoredTotal > 0);
+        return () => setPreviewAvailable(false);
+    }, [anchoredTotal, setPreviewAvailable]);
+
+    // A click gives a feature, and the report answers about a stop; this is the join.
+    const rowsById = useMemo(() => new Map(rows.map(r => [r.id, r])), [rows]);
+
     const dissolutionApplied = reportData.dissolution === 'on';
-    const featureCollection = useMemo(() => buildFeatureCollection(rows, dissolutionApplied),
-        [rows, dissolutionApplied]);
+
+    // Both projections of the same rows, built at most once each and kept: a flip used to
+    // rebuild every feature of the region and re-upload the lot, and on germany-local that is
+    // 433,086 features of which 272,142 are identical between the two.
+    const collections = useMemo(() => {
+        const built: { [k: string]: FeatureCollection } = {};
+        return (anchored: boolean) => {
+            const key = anchored ? 'anchored' : 'feed';
+            return built[key] ??= buildFeatureCollection(rows, anchored, dissolutionApplied);
+        };
+    }, [rows, dissolutionApplied]);
+
+    const featureCollection = collections(previewing);
 
     // Range-fetch a single stop's detail object and turn it into a selection.
     const selectStop = useCallback(async (loc: StopLocator, source: 'map-click' | 'url-hash') => {
@@ -231,91 +286,13 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         updateSelection({ feature, datasetName: loc.subcategory, reportRegion, idTags }, source);
     }, [reportRegion, idTags, updateSelection]);
 
-    const handleStopClick = useCallback((feature?: MapGeoJSONFeature) => {
-        if (!feature) return;
-        const p = feature.properties;
-        const [lon, lat] = (feature.geometry as { coordinates: number[] } & any)?.coordinates || [p.lon, p.lat];
+    // Both ways into a selection go through the index row rather than through the drawn
+    // marker. With the preview on a marker stands at its anchor, which is usually the
+    // matched OSM feature itself — a panel measuring from there would report every matched
+    // stop as 0 m from the feature it should be judged against.
+    const selectRow = useCallback((row: IndexRow, source: 'map-click' | 'url-hash') => {
         // The banner describes the attempt in progress, not every attempt since the
         // region loaded; a stale one reads as if the report itself were broken.
-        setActionError(null);
-        selectStop({
-            type: p.type,
-            byteStart: p.byteStart,
-            byteEnd: p.byteEnd,
-            lon, lat,
-            subcategory: p.subcategory,
-        }, 'map-click').catch(e => {
-            console.error('Could not load stop detail', e);
-            setActionError(`Could not load the stop: ${e.message}`);
-        });
-    }, [selectStop]);
-
-    // The preview source is clustered, so below clusterMaxZoom a click lands on a cluster:
-    // no id, no coordinates, but truthy enough to open a panel full of undefined. Zoom into
-    // it instead — that is what a click on a cluster means anywhere else on a map.
-    const handlePreviewSelect = useCallback((feature?: any) => {
-        if (!feature) return;
-        if (feature.properties?.cluster) {
-            const coords = (feature.geometry as { coordinates: [number, number] } & any)?.coordinates;
-            // Past clusterMaxZoom, so one click always opens the cluster rather than
-            // landing on another one.
-            if (map && coords) {
-                map.easeTo({ center: coords, zoom: Math.max(map.getZoom() + 2, 11) });
-            }
-            return;
-        }
-        updateSelection({ feature, datasetName: 'preview', reportRegion, idTags }, 'map-click');
-    }, [map, reportRegion, idTags, updateSelection]);
-
-    // Load ir-preview.ndjson lazily when the preview toggle is on.
-    useEffect(() => {
-        let cancelled = false;
-        if (selectedDatasets['preview'] && !previewData) {
-            setActionError(null);
-            fetch(`${DATA_BASE_URL}/${reportRegion}/ir-preview.ndjson`)
-                .then(r => {
-                    if (!r.ok) throw new Error(`${r.status} for ir-preview.ndjson`);
-                    return r.text();
-                })
-                .then(text => {
-                    const features = text.trim().split('\n').filter(l => l).map(line => {
-                        const stop = JSON.parse(line);
-                        return {
-                            type: 'Feature',
-                            geometry: { type: 'Point', coordinates: [stop.lon, stop.lat] },
-                            properties: stop
-                        };
-                    });
-                    // This is the slowest fetch in the panel and covers a whole
-                    // region, so a region switch mid-flight would otherwise drop the
-                    // previous region's stops onto the new region's map.
-                    if (!cancelled) setPreviewData({ type: 'FeatureCollection', features });
-                })
-                .catch(e => {
-                    console.error('Could not read ir-preview.ndjson for', reportRegion, e);
-                    if (!cancelled) setActionError(`Could not read the preview: ${e.message}`);
-                });
-        }
-        return () => { cancelled = true; };
-    }, [selectedDatasets['preview'], previewData, reportRegion]);
-
-    // Deep-link restore for a stop selection: the category is recovered from the
-    // index row (it is no longer encoded in the URL).
-    useEffect(() => {
-        if (hashSelection?.kind !== 'selection' || rows.length === 0) return;
-        const id = hashSelection.id;
-
-        if (selection?.feature.properties.gtfsStopId === id ||
-            (selection?.feature.properties.gtfsFeatures as { id: string }[])?.some?.(({ id: fid }) => fid === id)) {
-            return;
-        }
-
-        const row = rows.find(r => r.id === id);
-        if (!row) return;
-
-        // Make sure the stop's sub-category layer is visible.
-        updateSelectedDatasets(prev => prev[row.code] ? prev : { ...prev, [row.code]: true });
-
         setActionError(null);
         selectStop({
             type: row.type,
@@ -324,43 +301,74 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
             lon: row.lon,
             lat: row.lat,
             subcategory: row.code,
-        }, 'url-hash').catch(e => {
-            console.error('Could not load the deep-linked stop', id, e);
+        }, source).catch(e => {
+            console.error('Could not load stop detail', row.id, e);
             setActionError(`Could not load the stop: ${e.message}`);
         });
-    }, [hashSelection?.kind, hashSelection?.id, rows]);
+    }, [selectStop]);
 
-    // Deep-link restore for a preview selection.
-    useEffect(() => {
-        if (hashSelection?.kind === 'preview') {
-            updateSelectedDatasets(prev => prev['preview'] ? prev : { ...prev, preview: true });
+    const handleStopClick = useCallback((feature?: MapGeoJSONFeature) => {
+        if (!feature) return;
+        const row = rowsById.get(feature.properties.gtfsStopId);
+        if (!row) {
+            // Every feature was built from a row, so this is a bug rather than bad data.
+            console.error('Clicked a stop the index does not have', feature.properties);
+            return;
         }
-    }, [hashSelection?.kind]);
+        selectRow(row, 'map-click');
+    }, [rowsById, selectRow]);
 
+    // Deep-link restore for a stop selection: the category is recovered from the
+    // index row (it is no longer encoded in the URL).
     useEffect(() => {
-        if (hashSelection?.kind !== 'preview' || !previewData) return;
+        if (!hashSelection || rows.length === 0) return;
         const id = hashSelection.id;
-        if (selection?.feature.properties.id === id) return;
 
-        const found = previewData.features.find((f: any) => String(f.properties.id) === id);
-        if (found) {
-            updateSelection({ feature: stringifyProperties(found), datasetName: 'preview', reportRegion, idTags }, 'url-hash');
+        if (selection?.feature.properties.gtfsStopId === id ||
+            (selection?.feature.properties.gtfsFeatures as { id: string }[])?.some?.(({ id: fid }) => fid === id)) {
+            return;
         }
-    }, [hashSelection?.kind, hashSelection?.id, previewData]);
+
+        const row = rowsById.get(id);
+        if (!row) {
+            // A `/selection/` link naming a stop this report does not have is worth saying out
+            // loud. A `/preview/` one is not: those were written by the preview panel that no
+            // longer exists, and some of their ids -- generated stations -- were never rows of
+            // any index.tsv, so the red banner would accuse the report of losing a stop it
+            // never had.
+            if (hashSelection.legacy) {
+                console.warn('Ignoring a preview-era link to', id);
+            } else {
+                setActionError(`No stop ${id} in this report`);
+            }
+            return;
+        }
+
+        // Make sure the stop's sub-category layer is visible.
+        updateSelectedDatasets(prev => prev[row.code] ? prev : { ...prev, [row.code]: true });
+
+        selectRow(row, 'url-hash');
+    }, [hashSelection?.id, rowsById]);
 
     useEffect(() => {
         if (map && selectionSource === 'url-hash' && selection) {
-            const lonlat = (selection.feature.geometry as { coordinates: number[] } & any)?.coordinates;
-            console.log('about to fly to', selection?.feature);
-            map.flyTo({ center: lonlat, zoom: 18, duration: 1 });
+            // Where the marker is, not where the feed put the stop: with the preview on the
+            // two differ by up to 742 m on swiss-opendata, and the camera would land on empty
+            // map beside a stop whose panel is open.
+            const row = rowsById.get(selection.feature.properties?.gtfsStopId);
+            const drawnAt = previewing && row?.anchorLon !== null && row?.anchorLat != null
+                ? [row!.anchorLon, row!.anchorLat]
+                : (selection.feature.geometry as { coordinates: number[] } & any)?.coordinates;
+            map.flyTo({ center: drawnAt as [number, number], zoom: 18, duration: 1 });
         }
     }, [map, selection, selectionSource]);
 
-    const previewOn = !!selectedDatasets['preview'];
-    // Preview replaces the report's stops rather than overlaying them. Filtering them all
-    // out says so without unmounting the layer, which would drop and re-ingest the whole
-    // source on every toggle — and the checkboxes keep their state for when it goes off.
-    const selectedCodes = previewOn ? [] : CATEGORY_CODES.filter(c => selectedDatasets[c]);
+    // The preview moves the stops rather than replacing them, so the category filters keep
+    // working while it is on -- which is the point: a category is still the thing you are
+    // looking at, and now you are looking at where the matcher put it.
+    const selectedCodes = CATEGORY_CODES.filter(c => selectedDatasets[c]);
+
+    const anchoredShown = selectedCodes.reduce((sum, c) => sum + (anchoredCounts[c] || 0), 0);
 
     const datasetControls = GROUPS.map(({ group, title }) => {
         const codes = CATEGORY_CODES.filter(c => CATEGORIES[c].group === group && (counts[c] || 0) > 0);
@@ -382,7 +390,6 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
             <div className={'match-group'} key={group}>
                 <div className={'match-group-header'}>
                     <input className={'match-dataset-select'} type={'checkbox'} checked={allOn}
-                        disabled={previewOn}
                         ref={el => { if (el) el.indeterminate = !allOn && someOn; }}
                         onChange={e => toggleGroup((e.target as HTMLInputElement).checked)} />
                     <span className={'match-group-title'}>{title}</span>
@@ -391,7 +398,6 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
                 {codes.map(code => (
                     <div className={'match-child'} key={code}>
                         <input className={'match-dataset-select'} type={'checkbox'} checked={!!selectedDatasets[code]}
-                            disabled={previewOn}
                             onChange={e => updateSelectedDatasets({ ...selectedDatasets, [code]: (e.target as HTMLInputElement).checked })} />
                         <span className={'match-dataset'} title={CATEGORIES[code].help}>{CATEGORIES[code].label}</span>
                         <span className={'match-dataset-count'}>{counts[code] || 0}</span>
@@ -401,14 +407,18 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         );
     });
 
-    const previewControl = (
+    // Offered only where the report can honour it, the way a category control is offered
+    // only when the category has stops: an index.tsv written before the anchor columns
+    // parses fine and anchors nothing, and a switch that cannot move a stop is worse than
+    // no switch. The count says how many of the *shown* stops it can move, which is the
+    // question the default selection raises — the unmatched categories have no anchors at
+    // all, so without it the first flip looks like a broken control.
+    const previewControl = anchoredTotal > 0 && (
         <div className={'match-group'} key={'preview'}>
             <div className={'match-group-header'}>
-                <input className={'match-dataset-select'} type={'checkbox'} checked={previewOn}
-                    onChange={e => updateSelectedDatasets({
-                        ...selectedDatasets, preview: (e.target as HTMLInputElement).checked,
-                    })} />
-                <span className={'match-dataset'} title={'Show the stop positions and routes the matcher wrote'}>Preview</span>
+                <PreviewSwitch />
+                <span className={'match-dataset-count'}
+                    title={'Stops of the shown categories the matcher anchored'}>{anchoredShown}</span>
             </div>
         </div>
     );
@@ -416,9 +426,6 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
     const stopsLayer = rows.length > 0 &&
         <StopsLayer key={reportRegion} layerKey={reportRegion} data={featureCollection}
             selectedCodes={selectedCodes} onClick={handleStopClick} />;
-
-    const previewLayer = previewOn && previewData &&
-        <PreviewLayer key={`${reportRegion}:preview`} data={previewData} onClick={handlePreviewSelect} />;
 
     const gtfsTS = new Date(matchMeta.gtfsTimeStamp).toUTCString();
     const osmSourcesTS = matchMeta.coveredPbfSources.map(({ path, fileTimestamp }) => {
@@ -432,7 +439,6 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         {indexError && <div className={"report-load-error"} role={"alert"}>{indexError}</div>}
         {actionError && <div className={"report-load-error"} role={"alert"}>{actionError}</div>}
         {stopsLayer}
-        {previewLayer}
         {previewControl}
         {datasetControls}
         <div className={"match-report-meta"}>
@@ -464,7 +470,7 @@ function buildFilter(codes: string[]) {
 
 type StopsLayerProps = {
     layerKey: string
-    data: GeojsonDataT
+    data: FeatureCollection
     selectedCodes: string[]
     onClick?: (feature?: MapGeoJSONFeature) => void
 }
@@ -483,6 +489,14 @@ function StopsLayer({ layerKey, data, selectedCodes, onClick }: StopsLayerProps)
     const selectedRef = useRef(selectedCodes);
     selectedRef.current = selectedCodes;
 
+    // The click handler, held rather than listed in the deps below: re-creating the source
+    // is not how this layer changes -- the preview flips every stop's geometry, and tearing
+    // the source down on each flip drops the layer often enough that the switch stops
+    // appearing to work. onClick is a new function on every App render, so without this the
+    // map would keep calling the one it was mounted with.
+    const onClickRef = useRef(onClick);
+    onClickRef.current = onClick;
+
     // Stored layer/source spec — addOverlayImmediate keeps it by reference, so
     // mutating its `filter` keeps base-style switches consistent.
     const specRef = useRef<any>(null);
@@ -495,6 +509,16 @@ function StopsLayer({ layerKey, data, selectedCodes, onClick }: StopsLayerProps)
             'type': 'symbol',
             'source': sourceId,
             'filter': buildFilter(selectedRef.current),
+            'paint': {
+                // A stop the anchoring refused keeps its feed position, so while the preview
+                // is on it is the one marker that did not move -- and without this it is
+                // indistinguishable from a stop the matcher placed exactly where the feed
+                // already had it. On germany-local that is 63% of the rows.
+                'icon-opacity': ['case',
+                    ['boolean', ['get', 'unanchored'], false], 0.35,
+                    1,
+                ] as any,
+            },
             'layout': {
                 'icon-image': ['case',
                     ['boolean', ['get', 'dissolved'], false], DISSOLVED_ICON,
@@ -517,7 +541,7 @@ function StopsLayer({ layerKey, data, selectedCodes, onClick }: StopsLayerProps)
         specRef.current = stopsStyle;
 
         const handleClick = (e: MapLayerClickEvent) => {
-            onClick && onClick(e.features?.[0]);
+            onClickRef.current?.(e.features?.[0]);
         };
 
         const subscription = { canceled: false, promiseFulfiled: false };
@@ -557,7 +581,19 @@ function StopsLayer({ layerKey, data, selectedCodes, onClick }: StopsLayerProps)
                 }
             }
         };
-    }, [map, stylingControls, data, layerId, sourceId]);
+    }, [map, stylingControls, layerId, sourceId]);
+
+    // New geometry — the preview moving every stop to where the matcher anchored it — goes
+    // to the live source. The spec keeps a copy so a base-style switch re-adds the layer
+    // with what is on screen rather than with what it was created from.
+    useEffect(() => {
+        if (!map) return;
+        if (specRef.current) {
+            specRef.current.sources[sourceId].data = data;
+        }
+        const source = map.getSource(sourceId) as GeoJSONSource | undefined;
+        source?.setData(data);
+    }, [map, data, sourceId]);
 
     // Update visibility when the selected sub-categories change.
     useEffect(() => {
@@ -570,105 +606,6 @@ function StopsLayer({ layerKey, data, selectedCodes, onClick }: StopsLayerProps)
             map.setFilter(layerId, filter);
         }
     }, [map, layerId, selectedCodes.join(',')]);
-
-    return <></>;
-}
-
-type PreviewLayerProps = {
-    data: GeojsonDataT
-    onClick?: (feature?: MapGeoJSONFeature, e?: MapLayerClickEvent) => void
-}
-// The preview overlay: one clustered symbol layer over ir-preview.ndjson. Clustered
-// because it holds every stop of the region at once, matched or not.
-//
-// The ids and the colour are literals rather than props: there is one overlay of this
-// kind, and a name prop only bought string-concatenated ids and a callback argument
-// every caller ignored.
-function PreviewLayer({ data, onClick }: PreviewLayerProps) {
-
-    const mapContext = useContext(MapContext);
-    const map = mapContext?.map;
-    const mapLoaded = mapContext?.loaded;
-    const stylingControls = mapContext?.layerControls;
-
-    useEffect(() => {
-        if (!map || !stylingControls) return;
-
-        const sourceId = 'stops-preview';
-        const layerId = 'stops-preview';
-
-        const stopsLayer = {
-            'id': layerId,
-            'type': 'symbol',
-            'source': sourceId,
-            'layout': {
-                'icon-image': 'stop-preview',
-                'icon-size': 0.2,
-                'icon-allow-overlap': true,
-            }
-        };
-
-        const source = {
-            'type': 'geojson',
-            'cluster': true,
-            'clusterMaxZoom': 10,
-            'clusterRadius': 10,
-            'data': data
-        };
-
-        const stopsStyle = {
-            sources: { [sourceId]: source },
-            layers: [stopsLayer]
-        };
-
-        const handleClick = (e: MapLayerClickEvent) => {
-            onClick && onClick(e.features?.[0], e);
-        }
-
-        const iconImageId = 'stop-preview';
-        const imageColors = {
-            ".stroke-fg": ["stroke", PREVIEW_COLOR] as [string, string],
-            ".fill-fg": ["fill", PREVIEW_COLOR] as [string, string],
-        };
-
-        const subscription = {
-            canceled: false,
-            promiseFulfiled: false
-        };
-
-        const iconPromise = map.hasImage(iconImageId) ? null :
-            loadSvgWithColors("/stop-var.svg", imageColors);
-
-        mapLoaded?.then(async map => {
-            if (iconPromise && !map.hasImage(iconImageId)) {
-                const image = await iconPromise;
-                if (!map.hasImage(iconImageId)) {
-                    map.addImage(iconImageId, image);
-                }
-            }
-
-            subscription.promiseFulfiled = true;
-            if (!subscription.canceled) {
-                // @ts-ignore
-                stylingControls.addOverlayImmediate(stopsStyle);
-                if (onClick) {
-                    map.on('click', layerId, handleClick);
-                }
-            }
-        });
-
-        return () => {
-            subscription.canceled = true;
-            if (subscription.promiseFulfiled) {
-                // @ts-ignore
-                stylingControls.removeOverlayImmediate(stopsStyle);
-                if (onClick) {
-                    map.off('click', layerId, handleClick);
-                }
-            }
-        };
-
-    }, [map, stylingControls, data]);
 
     return <></>;
 }

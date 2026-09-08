@@ -2,7 +2,7 @@
 
 ```
 App  (src/app.tsx)
-└── [MapContext + SelectionContext providers]
+└── [MapContext + SelectionContext + ViewOptionsContext providers]
     └── #content-area
         ├── #side-panel
         │   ├── SidePanelNav  (inline in app.tsx)
@@ -10,10 +10,8 @@ App  (src/app.tsx)
         │   │       subscribes to OSM_DATA for anyOsmChanges
         │   │
         │   ├── [tab: selection]
-        │   │   ├── Preview  [when selection.datasetName === 'preview']
-        │   │   │   (src/uielements/preview.tsx)
-        │   │   └── SelectionInfo  [otherwise]
-        │   │       (src/uielements/selection-info.tsx)
+        │   │   └── SelectionInfo  (src/uielements/selection-info.tsx)
+        │   │       ├── PreviewSwitch  (src/uielements/switch.tsx)  [anchored positions; shares ViewOptionsContext with MatchReport]
         │   │       └── MatchInfo  [per selected feature]
         │   │           ├── DatasetHelp
         │   │           ├── MatchArrowLayer  (src/uielements/match-arrow.tsx)  [GTFS→OSM arrows on map, matched categories only]
@@ -33,8 +31,10 @@ App  (src/app.tsx)
         │   │       ├── RegionMarkersLayer  [when no report selected — region circles/bboxes on map]
         │   │       ├── ReportTable  [when no report selected]  (src/uielements/report-table.tsx)
         │   │       └── MatchReport  [when report region in URL hash]  (src/uielements/report.tsx)
-        │   │           ├── StopsLayer  [all index.tsv stops in one symbol layer; sub-categories toggled via map.setFilter]
-        │   │           └── DatasetMapLayer  [preview.geojson overlay, only when Preview is enabled]
+        │   │           ├── PreviewSwitch  (src/uielements/switch.tsx)  [shared with SelectionInfo]
+        │   │           └── StopsLayer  [all index.tsv stops in one symbol layer; sub-categories toggled via
+        │   │               map.setFilter, geometry swapped via setData when Preview draws them at their
+        │   │               anchored positions]
         │   │
         │   └── [tab: changes]
         │       └── Changes  (src/uielements/editor/changes.tsx)
@@ -70,8 +70,9 @@ App  (src/app.tsx)
 
 | Context | Provider | Consumers |
 |---|---|---|
-| `MapContext` | `App` | `MatchReport`, `StopsLayer`, `DatasetMapLayer`, `RegionMarkersLayer`, `RoutesMap`, `MatchArrowLayer`, `HtmlMapMarker`, `LocateMe`, `AddOsmStopController`, `MoveController` |
+| `MapContext` | `App` | `MatchReport`, `StopsLayer`, `RegionMarkersLayer`, `RoutesMap`, `MatchArrowLayer`, `HtmlMapMarker`, `LocateMe`, `AddOsmStopController`, `MoveController` |
 | `SelectionContext` | `App` | `MatchReport`, `SelectionInfo`, `OsmListElement` |
+| `ViewOptionsContext` | `App` | `MatchReport` (publishes `previewAvailable`), `PreviewSwitch` (hidden when unavailable) |
 
 ## OSMData event system
 

@@ -11,15 +11,11 @@ export type RouteVariant = {
 };
 
 // Cache keyed by region+routeId — independent of which stop, panel or selection triggered
-// the fetch, so re-selecting a previously-seen route never hits the network again. One
-// cache for both callers: the route list and the preview panel read the same byte ranges
-// of the same file, and two caches fetched the same route twice.
+// the fetch, so re-selecting a previously-seen route never hits the network again.
 const routeVariantCache: { [key: string]: Promise<RouteVariant[]> } = {};
 
 /**
- * The variants of one route, from the byte range whichever index named it — `routes.ndjson`
- * for the route list, a stop's own route line for the preview. They differ only in the
- * field names holding the offset and the length.
+ * The variants of one route, from the byte range `routes.ndjson` named for it.
  *
  * A failed range request is evicted rather than cached: the caller can retry, instead of
  * the panel being pinned at "loading" for the rest of the session.

@@ -127,3 +127,20 @@ span.loading-indicator {
     margin-left: 0;
     margin-right: 6px;
 }
+
+/* The same switch inside the selection panel, where it sits above the stop's details. */
+.selection-view-options {
+    padding: 6px 0 10px;
+    border-bottom: 1px solid #e1e5e8;
+    margin-bottom: 10px;
+}
+
+/* Where the matcher put this stop, or why it would not. Read beside Preview, which moves a
+   stop's marker onto its anchor and cannot say why one did not move. */
+.anchor-verdict {
+    margin: 6px 0;
+    font-size: 13px;
+}
+.anchor-verdict.not-anchored {
+    color: #6b7280;
+}

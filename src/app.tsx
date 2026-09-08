@@ -5,10 +5,9 @@ import type { LayerControls } from './map/layers-controls';
 
 import './app.css'
 import { createMap } from './map/map';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { MatchReportSelector } from './uielements/report-selector';
 import { SelectionInfo } from './uielements/selection-info';
-import { Preview } from './uielements/preview';
 import { MapTools } from './uielements/map-tools';
 import { parseUrlReportRegion, useHashRoute } from './uielements/routing';
 import { cls } from './uielements/cls';
@@ -97,11 +96,50 @@ export const SelectionContext = createContext<SelectionContextT>({
   updateSelection: () => { }
 });
 
+/**
+ * View options the report and the selection panel both need. They are siblings under App —
+ * the report renders in the report tab and the panel in the selection tab — so a control
+ * wanted in both cannot own its state in either.
+ */
+export type ViewOptionsT = {
+  previewOn: boolean;
+  setPreviewOn: (on: boolean) => void;
+  /**
+   * Whether the loaded report has anything to preview. Published by the report, because only
+   * it has read the index; consumed by the switch, which is rendered in two places and must
+   * not offer a control that would immediately turn itself off.
+   */
+  previewAvailable: boolean;
+  setPreviewAvailable: (available: boolean) => void;
+};
+
+export const ViewOptionsContext = createContext<ViewOptionsT>({
+  previewOn: false,
+  setPreviewOn: () => { },
+  previewAvailable: false,
+  setPreviewAvailable: () => { }
+});
+
 export function App() {
   const [activeTab, setActiveTab] = useState<'report' | 'selection' | 'changes'>('report');
   const [mapContextVal, setMapContextVal] = useState<MapContextT>();
   const [selection, updateSelection] = useState<SelectionT | null>(null);
   const [selectionSource, updateSelectionSource] = useState<SelectionSourceT>('app-init');
+  // Shared with the selection panel, which is the report's sibling rather than its child.
+  const [previewOn, setPreviewOn] = useState(false);
+  const [previewAvailable, setPreviewAvailable] = useState(false);
+
+  // A region with no anchors, or the report list, leaves nothing to preview -- and the switch
+  // outlives both, so it is cleared here rather than by whichever component noticed.
+  useEffect(() => {
+    if (!previewAvailable && previewOn) setPreviewOn(false);
+  }, [previewAvailable, previewOn]);
+
+  // Memoised: a fresh object here force-renders every consumer on every App render, and
+  // both consumers are whole panels.
+  const viewOptions = useMemo(
+    () => ({ previewOn, setPreviewOn, previewAvailable, setPreviewAvailable }),
+    [previewOn, previewAvailable]);
 
   const selectionContext: SelectionContextT = {
     selection,
@@ -125,7 +163,6 @@ export function App() {
 
   useEffect(() => {
     const reportRegion = selection?.reportRegion;
-    const datasetName = selection?.datasetName;
 
     const clusterGtfsFeaturesStr = selection?.feature.properties?.gtfsFeatures;
     const clusterGtfsFeatures = clusterGtfsFeaturesStr && JSON.parse(clusterGtfsFeaturesStr);
@@ -139,7 +176,7 @@ export function App() {
         // GTFS ids are free-form UTF-8 and do occur with spaces, '#' or '/': a '#'
         // truncates the hash and parseSelectionHash's [^/]+ cuts at a slash.
         const encoded = encodeURIComponent(id);
-        hash += datasetName === 'preview' ? `/preview/${encoded}` : `/selection/${encoded}`;
+        hash += `/selection/${encoded}`;
       }
 
       window.location.hash = hash;
@@ -147,44 +184,42 @@ export function App() {
   }, [selection]);
 
 
-  const preview = selection?.datasetName === 'preview';
   const reportRegion = useHashRoute(parseUrlReportRegion);
 
   return (
     <>
       <MapContext value={mapContextVal} >
         <SelectionContext value={selectionContext} >
-          <div id="content-area">
-            <div id="side-panel" className={cls(reportRegion && 'slim')}>
-              <SidePanelNav
-                reportRegion={reportRegion}
-                selection={selection}
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
-                onBackToReports={() => selectionContext.onReportSelect(null)}
-              />
+          <ViewOptionsContext value={viewOptions} >
+            <div id="content-area">
+              <div id="side-panel" className={cls(reportRegion && 'slim')}>
+                <SidePanelNav
+                  reportRegion={reportRegion}
+                  selection={selection}
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                  onBackToReports={() => selectionContext.onReportSelect(null)}
+                />
 
-              <div className={cls(activeTab !== 'selection' && 'tab-hidden')}>
-                {preview ?
-                  <Preview selection={selection} /> :
+                <div className={cls(activeTab !== 'selection' && 'tab-hidden')}>
                   <SelectionInfo selection={selection} />
-                }
-              </div>
+                </div>
 
-              <div className={cls(activeTab !== 'report' && 'tab-hidden')}>
-                <MatchReportSelector onSelectReport={selectionContext.onReportSelect} />
-              </div>
+                <div className={cls(activeTab !== 'report' && 'tab-hidden')}>
+                  <MatchReportSelector onSelectReport={selectionContext.onReportSelect} />
+                </div>
 
-              <div className={cls(activeTab !== 'changes' && 'tab-hidden')}>
-                <Changes osmData={OSM_DATA} />
-              </div>
+                <div className={cls(activeTab !== 'changes' && 'tab-hidden')}>
+                  <Changes osmData={OSM_DATA} />
+                </div>
 
+              </div>
+              <div id="map-container">
+                <MapTools />
+                <div id="map-view"></div>
+              </div>
             </div>
-            <div id="map-container">
-              <MapTools />
-              <div id="map-view"></div>
-            </div>
-          </div>
+          </ViewOptionsContext>
         </SelectionContext>
       </MapContext>
     </>

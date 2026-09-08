@@ -11,6 +11,7 @@ import { cls } from "./cls";
 import { RouteList } from "./route-list";
 import { OSM_DATA, nwrType, osmFeatureUrl } from "../services/OSMData";
 import { CATEGORIES, STRATEGIES, strategiesForCode } from "../services/matchIndex";
+import { PreviewSwitch } from "./switch";
 import type { Strategy } from "../services/matchIndex";
 import { useSyncExternalStore } from "preact/compat";
 import { getTileXYZ } from "../services/tile-utils";
@@ -37,9 +38,25 @@ const importantTagsRg = /(name|ref|gtfs|bus|train|tram|trolleybus|ferry|station|
 const ABC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 /**
+ * Why the matcher would not write the stop at an OSM feature, in the words of someone fixing
+ * OSM rather than the pipeline's own. An unknown code shows as itself.
+ *
+ * This is the other half of Preview: a stop drawn at its feed position either anchored exactly
+ * there or was refused, and the map cannot tell those apart on its own.
+ */
+const NOT_ANCHORED_REASON: { [code: string]: string } = {
+    idConflict: 'every feature it matched carries another stop’s id',
+    severalPositions: 'the features it matched stand in more than one place',
+    notANode: 'it matched a way or a relation, which has no single position',
+    tooFar: 'the feature it matched is too far away to stand for it',
+    pooledCandidate: 'it matched only by proximity, which is not enough to place it',
+    noPosition: 'the feature it matched has no position',
+};
+
+/**
  * Why the matcher looked at a stop that stands for several places and left it whole. The
- * report writes its own reason codes; these are what they mean to someone fixing OSM, who is
- * the reader here. An unknown code shows as itself rather than as nothing.
+ * report writes its own reason codes; these are what they mean to someone fixing OSM, who
+ * is the reader here. An unknown code shows as itself rather than as nothing.
  *
  * This is the numerous case, not the exotic one: swiss-opendata plans 2,635 stops and
  * declines 8,040, and a decline is the only one of the two a mapper can argue with.
@@ -72,6 +89,11 @@ export function SelectionInfo({ selection }: SelectionInfoProps) {
     return (<>
         <div id={"selection-info"} className={cls(!selection && "hidden")}>
             {selection && <button className="close-button" onClick={() => onReportSelect(null)} title="Close selection">&times;</button>}
+            {/* The same switch as the report's, so the map can be flipped while a stop is
+                open rather than by going back to the dataset list and losing your place. */}
+            {selection && <div className={'selection-view-options'}>
+                <PreviewSwitch />
+            </div>}
             {properties && reportRegion &&
                 <MatchInfo {...{ datasetName, properties, geometry, reportRegion, idTags }} />}
         </div>
@@ -207,9 +229,24 @@ function MatchInfo({ datasetName, properties, geometry, idTags, reportRegion }: 
             })}
         </div>}
 
-        {/* Both outcomes, not just the interesting one. A panel that speaks only when a stop
-            dissolves leaves silence meaning either "left whole" or "this build does not show
-            it", and those are not the same answer. */}
+        {/* Where the IR writes this stop, and why it writes it at its own coordinates when it
+            does. Preview moves a stop's marker onto its anchor, so a marker that did not move
+            means either "anchored exactly here" or "refused" -- and only this says which. */}
+        {properties['osmAnchor'] && <div className={'anchor-verdict'}>
+            Anchored at{' '}
+            <a href={osmFeatureUrl(properties['osmAnchor'])} target={'_blank'} rel={'noreferrer'}>
+                {properties['osmAnchor']}
+            </a>
+        </div>}
+        {properties['notAnchored'] && <div className={'anchor-verdict not-anchored'}>
+            <b>Not anchored</b> — {NOT_ANCHORED_REASON[properties['notAnchored']]
+                || properties['notAnchored']}
+            {', so it keeps its feed position'}
+        </div>}
+
+        {/* Both outcomes, not just the interesting one. A panel that speaks only when a
+            stop dissolves leaves silence meaning either "left whole" or "this build does
+            not show it", and those are not the same answer. */}
         {properties['notDissolved'] &&
             <div className="dissolving-plan not-dissolved">
                 <div><b>Left whole</b> — considered for dissolution and declined:
@@ -300,11 +337,19 @@ function MatchInfo({ datasetName, properties, geometry, idTags, reportRegion }: 
     </div>)
 }
 
+/**
+ * The store's elements, and the revision they were read at.
+ *
+ * The revision is what the subscription compares: the elements array is mutated in place, so
+ * a snapshot of it never differs and neither a re-render nor a memo keyed on it would ever
+ * fire. Anything derived from the elements takes the revision as its dependency.
+ */
 function useOsmFeatures() {
-    return useSyncExternalStore(
+    const revision = useSyncExternalStore(
         (sub) => OSM_DATA.subscribe(sub),
-        () => OSM_DATA.elements
+        () => OSM_DATA.revision
     );
+    return { elements: OSM_DATA.elements, revision };
 }
 
 function getGtfsFeatures(properties: { [k: string]: any }) {
@@ -345,14 +390,18 @@ function OsmElements({ properties, idTags, parentLonLat, setLoading, matched }: 
         tagActions.setCode = [gtfsIdTag, properties.gtfsStopCode] as [string, string];
 
     const [highlightId, setHighlightId] = useState<string | null>(null);
+    // Follows the selected stop: the panel is not keyed by it, so a `useState` initialiser
+    // would freeze this at whichever stop was opened first -- and then a no-match stop, the
+    // one whose surroundings matter most, would open with the list collapsed.
     const [hideSurroundOsm, setHideSurroundOsm] = useState(matched);
+    useEffect(() => setHideSurroundOsm(matched), [properties['gtfsStopId'], matched]);
 
     const handleHover = useCallback((id: string, hover: boolean) => {
         // Clear only our own highlight id
         setHighlightId((activeHl) => hover ? id : (activeHl === id ? null : activeHl));
     }, [setHighlightId]);
 
-    const allOsmFeatures = useOsmFeatures();
+    const { elements: allOsmFeatures, revision: osmRevision } = useOsmFeatures();
 
     const missingOsmFeatures = useMemo(() => {
         const seenIds = new Set<string>();
@@ -365,7 +414,7 @@ function OsmElements({ properties, idTags, parentLonLat, setLoading, matched }: 
 
         return featuresToLoad;
 
-    }, [osmFeatures, allOsmFeatures]);
+    }, [osmFeatures, osmRevision]);
 
     useEffect(() => {
         if (missingOsmFeatures.length > 0) {
@@ -393,18 +442,31 @@ function OsmElements({ properties, idTags, parentLonLat, setLoading, matched }: 
         }
     }, [missingOsmFeatures, setLoading]);
 
-    const overpassElements = allOsmFeatures
+    // What else is here, nearest first: the list is read outwards from the stop, and OSM's
+    // own order carries no meaning at all. One distance per element, because the radius and
+    // the ordering are the same question and asking it twice is how the two come to
+    // disagree. An element with no position is kept for its tags and sorts last: an unknown
+    // distance is not a short one.
+    //
+    // Memoised on the store's revision, not on its array: the elements are mutated in place,
+    // so a memo keyed on them would compute once over an empty store and keep that answer for
+    // the whole selection -- the Overpass response would arrive and change nothing.
+    const overpassElements = useMemo(() => allOsmFeatures
         .filter(e => e.tags && Object.keys(e.tags).length > 0)
-        .filter(e => {
+        .filter(ovp => !osmFeatures.some(f => f.id === `${ovp.type[0]}${ovp.id}`))
+        .map(e => {
             const elLL = OSM_DATA.getLonLat(e);
-            if (!elLL) {
-                // I still want to show all elements that have tags 
-                return true;
-            }
-            return elLL && getDistanceLonLat(elLL, parentLonLat as [number, number]) < 500
+            return {
+                element: e,
+                distance: elLL
+                    ? getDistanceLonLat(elLL, parentLonLat as [number, number])
+                    : Number.POSITIVE_INFINITY,
+            };
         })
-        .filter(ovp =>
-            !osmFeatures.some(f => f.id === `${ovp.type[0]}${ovp.id}`));
+        .filter(({ distance }) => distance < 500 || distance === Number.POSITIVE_INFINITY)
+        .sort((a, b) => a.distance - b.distance)
+        .map(({ element }) => element),
+        [allOsmFeatures, osmRevision, osmFeatures, parentLonLat[0], parentLonLat[1]]);
 
     const osmMapElements = overpassElements.map((f: any) => {
         const lonLat = OSM_DATA.getLonLat(f);
@@ -595,8 +657,8 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
         {
             warnExpanded && <ul>{
                 // GTFS ids are free-form UTF-8: a `#` truncates the link and a `/`
-                // is cut by parseSelectionHash's [^/]+, same as the two writers in
-                // app.tsx and preview.tsx that already encode.
+                // is cut by parseSelectionHash's [^/]+, same as the hash writer in
+                // app.tsx that already encodes.
                 f.mtch.map((m: string) => {return (<li key={m}><a href={`/#/match-report/${reportRegion}/selection/${encodeURIComponent(m)}`}>{m}</a></li>)})
             }
             </ul>
