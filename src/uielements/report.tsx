@@ -9,7 +9,7 @@ import { parseSelectionHash, useHash } from "./routing";
 import { DATA_BASE_URL } from "../config";
 import { CATEGORIES, CATEGORY_CODES, detailFileFor, parseIndex } from "../services/matchIndex";
 import { PreviewSwitch } from "./switch";
-import { loadUnassignedOsmFeatures } from "../services/osmIndex";
+import { loadUnmatchedOsmStops } from "../services/osmIndex";
 import type { OsmIndexRow } from "../services/osmIndex";
 import type { Group, IndexRow } from "../services/matchIndex";
 
@@ -125,11 +125,6 @@ function buildFeatureCollection(rows: IndexRow[], anchored: boolean,
                 // Grey only where this run actually dealt the stop's visits: the same bit on a
                 // feed that was only measured means "would", and nothing happened to it.
                 dissolved: r.dissolutionPlanned && dissolutionApplied,
-                // Drawn faded while the preview is on: this stop did not move because the
-                // anchoring refused it, and a marker that stayed put otherwise looks exactly
-                // like one the matcher placed where the feed already had it. The panel says
-                // which refusal it was.
-                unanchored: anchored && r.anchorLon === null,
             }
         }))
     };
@@ -250,32 +245,25 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
     // What the matcher looked at and did not use, drawn beside the stops it placed. Fetched
     // only while the preview is on: it is the largest file the report publishes, and a
     // session that never looks at the preview should never pay for it.
+    const [showUnmatchedOsm, setShowUnmatchedOsm] = useState(false);
     const [unassignedRows, setUnassignedRows] = useState<OsmIndexRow[] | null>(null);
     useEffect(() => {
-        if (!previewing) return;
+        if (!showUnmatchedOsm) return;
         let cancelled = false;
-        loadUnassignedOsmFeatures(reportRegion)
+        loadUnmatchedOsmStops(reportRegion)
             .then(rows => { if (!cancelled) setUnassignedRows(rows); })
             .catch(e => {
                 console.error('Could not read osm-index.tsv.gz for', reportRegion, e);
                 setActionError(`Could not read osm-index.tsv.gz: ${e.message}`);
             });
         return () => { cancelled = true; };
-    }, [previewing, reportRegion]);
+    }, [showUnmatchedOsm, reportRegion]);
 
-    // A platform way and a stop_position node are things OSM holds, not things the app draws
-    // a marker for -- and on swiss-opendata they are 59,053 of the 68,140 features nothing
-    // matched. Narrowing to what a passenger would recognise as a stop leaves 9,087, which is
-    // a list somebody can read.
-    const [stopsAndStationsOnly, setStopsAndStationsOnly] = useState(true);
     const unassigned = useMemo(() => {
         if (!unassignedRows) return null;
-        const kept = stopsAndStationsOnly
-            ? unassignedRows.filter(r => /stop|station/.test(r.flavour))
-            : unassignedRows;
         return {
             type: 'FeatureCollection',
-            features: kept.map(r => ({
+            features: unassignedRows.map(r => ({
                 type: 'Feature',
                 geometry: { type: 'Point', coordinates: [r.lon, r.lat] },
                 properties: {
@@ -284,7 +272,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
                 },
             })),
         } as FeatureCollection;
-    }, [unassignedRows, stopsAndStationsOnly]);
+    }, [unassignedRows]);
 
     // A click gives a feature, and the report answers about a stop; this is the join.
     const rowsById = useMemo(() => new Map(rows.map(r => [r.id, r])), [rows]);
@@ -448,12 +436,9 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         );
     });
 
-    // Offered only where the report can honour it, the way a category control is offered
-    // only when the category has stops: an index.tsv written before the anchor columns
-    // parses fine and anchors nothing, and a switch that cannot move a stop is worse than
-    // no switch. The count says how many of the *shown* stops it can move, which is the
-    // question the default selection raises — the unmatched categories have no anchors at
-    // all, so without it the first flip looks like a broken control.
+    // Offered only where the report can honour it, the way a category control is offered only
+    // when the category has stops: an index.tsv written before the anchor columns parses fine
+    // and anchors nothing. The count says how many of the *shown* stops it can move.
     const previewControl = anchoredTotal > 0 && (
         <div className={'match-group'} key={'preview'}>
             <div className={'match-group-header'}>
@@ -461,19 +446,19 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
                 <span className={'match-dataset-count'}
                     title={'Stops of the shown categories the matcher anchored'}>{anchoredShown}</span>
             </div>
-            {previewing && unassigned && <div className={'match-child'}>
-                <input className={'match-dataset-select'} type={'checkbox'}
-                    checked={stopsAndStationsOnly}
-                    onChange={e => setStopsAndStationsOnly((e.target as HTMLInputElement).checked)} />
+            <div className={'match-child'}>
+                <input className={'match-dataset-select'} type={'checkbox'} checked={showUnmatchedOsm}
+                    onChange={e => setShowUnmatchedOsm((e.target as HTMLInputElement).checked)} />
                 <span className={'match-dataset'}
-                    title={'OSM features the matcher was offered for some stop and nothing matched.'
-                        + ' Ticked: only the ones a passenger would recognise as a stop —'
-                        + ' platform ways and stop_position nodes are what OSM holds, not what'
-                        + ' the app draws.'}>
-                    unmatched OSM: stops and stations
+                    title={'OSM stops and stations the matcher was offered for some GTFS stop'
+                        + ' and nothing matched. Its own dataset: it does not move anything,'
+                        + ' and it can be shown beside any of the categories above.'}>
+                    unmatched OSM stops
                 </span>
-                <span className={'match-dataset-count'}>{unassigned.features.length}</span>
-            </div>}
+                <span className={'match-dataset-count'}>
+                    {unassigned ? unassigned.features.length : ''}
+                </span>
+            </div>
         </div>
     );
 
@@ -481,7 +466,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         <StopsLayer key={reportRegion} layerKey={reportRegion} data={featureCollection}
             selectedCodes={selectedCodes} onClick={handleStopClick} />;
 
-    const unassignedLayer = previewing && unassigned &&
+    const unassignedLayer = showUnmatchedOsm && unassigned &&
         <UnassignedOsmLayer key={reportRegion} layerKey={reportRegion} data={unassigned} />;
 
     const gtfsTS = new Date(matchMeta.gtfsTimeStamp).toUTCString();
@@ -567,16 +552,6 @@ function StopsLayer({ layerKey, data, selectedCodes, onClick }: StopsLayerProps)
             'type': 'symbol',
             'source': sourceId,
             'filter': buildFilter(selectedRef.current),
-            'paint': {
-                // A stop the anchoring refused keeps its feed position, so while the preview
-                // is on it is the one marker that did not move -- and without this it is
-                // indistinguishable from a stop the matcher placed exactly where the feed
-                // already had it. On germany-local that is 63% of the rows.
-                'icon-opacity': ['case',
-                    ['boolean', ['get', 'unanchored'], false], 0.35,
-                    1,
-                ] as any,
-            },
             'layout': {
                 'icon-image': ['case',
                     ['boolean', ['get', 'dissolved'], false], DISSOLVED_ICON,

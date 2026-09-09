@@ -31,9 +31,13 @@ export function Switch({ checked, onChange, label, title }: SwitchProps) {
 }
 
 /**
- * The Preview switch. One component because it is rendered in two places — the report tab
- * and the selection panel — and two hand-written copies had already drifted: one of them
- * still described the routes the preview used to draw.
+ * The switch that moves the stops onto their anchors, in one component because it is rendered
+ * in two places — the report tab and the selection panel — and two hand-written copies had
+ * already drifted apart once.
+ *
+ * <p>It moves markers and does nothing else: it selects no dataset, hides no category, and
+ * draws nothing of its own. Several stops anchored to one feature are several markers at that
+ * feature, not one.
  */
 export function PreviewSwitch() {
     const { previewOn, setPreviewOn, previewAvailable } = useContext(ViewOptionsContext);
@@ -44,7 +48,9 @@ export function PreviewSwitch() {
         return null;
     }
     return (
-        <Switch checked={previewOn} onChange={setPreviewOn} label={'Preview'}
-            title={'Draw each stop where the matcher anchored it, instead of where its feed puts it'} />
+        <Switch checked={previewOn} onChange={setPreviewOn} label={'Move GTFS to anchors'}
+            title={'Draw each stop at the OSM feature the matcher anchored it to, instead of'
+                + ' where its feed puts it. Nothing else changes: the categories stay as they'
+                + ' are, and a stop the anchoring refused stays where it was.'} />
     );
 }

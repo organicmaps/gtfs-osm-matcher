@@ -47,25 +47,28 @@ async function gunzip(res: Response): Promise<string> {
 }
 
 /**
- * The features nothing matched: what the matcher looked at and did not use.
+ * The OSM stops and stations the matcher was offered and nothing matched.
  *
- * <p>Null where the region's report has no `osm-index.tsv` — a report written before the
- * matcher recorded its candidate pool. That is an absence, not a failure: Preview then shows
- * what it always did.
+ * <p>Null where the region's report has no such file — one written before the matcher
+ * recorded its candidate pool. An absence, not a failure: the map then has nothing to draw
+ * and says so with an empty count.
  */
-export async function loadUnassignedOsmFeatures(region: string): Promise<OsmIndexRow[] | null> {
+export async function loadUnmatchedOsmStops(region: string): Promise<OsmIndexRow[] | null> {
     return cache[region] ??= fetchRegion(region);
 }
 
 const cache: { [region: string]: Promise<OsmIndexRow[] | null> } = {};
 
 async function fetchRegion(region: string): Promise<OsmIndexRow[] | null> {
-    const res = await fetch(`${DATA_BASE_URL}/${region}/osm-index.tsv.gz`);
+    // The small file, not the pool: the report writes the stops and stations nothing matched
+    // as their own file precisely so a map can draw them without fetching what the matcher
+    // looked at. germany-local is 67,428 rows here against 732,315 there.
+    const res = await fetch(`${DATA_BASE_URL}/${region}/osm-index-stops.tsv.gz`);
     if (res.status === 404) {
         return null;
     }
     if (!res.ok) {
-        throw new Error(`${res.status} for osm-index.tsv.gz`);
+        throw new Error(`${res.status} for osm-index-stops.tsv.gz`);
     }
 
     const lines = (await gunzip(res)).split('\n');
@@ -82,10 +85,6 @@ async function fetchRegion(region: string): Promise<OsmIndexRow[] | null> {
         if (!lines[i]) continue;
         const c = lines[i].split('\t');
 
-        // Only the ones nothing claimed. The rest of the pool is every OSM stop near the feed
-        // — 123,530 features on swiss-opendata against 68,571 stops — and drawing it would
-        // bury the answer in the question.
-        if (parseInt(c[at['gtfs_matched']], 10) !== 0) continue;
 
         const lon = parseFloat(c[at['lon']]);
         const lat = parseFloat(c[at['lat']]);
