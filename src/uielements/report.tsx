@@ -9,6 +9,7 @@ import { parseSelectionHash, useHash } from "./routing";
 import { DATA_BASE_URL } from "../config";
 import { CATEGORIES, CATEGORY_CODES, detailFileFor, parseIndex } from "../services/matchIndex";
 import { PreviewSwitch } from "./switch";
+import { loadUnassignedOsmFeatures } from "../services/osmIndex";
 import type { Group, IndexRow } from "../services/matchIndex";
 
 var shouldUpdateBoundsSignal = {
@@ -245,6 +246,35 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         return () => setPreviewAvailable(false);
     }, [anchoredTotal, setPreviewAvailable]);
 
+    // What the matcher looked at and did not use, drawn beside the stops it placed. Fetched
+    // only while the preview is on: it is the largest file the report publishes, and a
+    // session that never looks at the preview should never pay for it.
+    const [unassigned, setUnassigned] = useState<FeatureCollection | null>(null);
+    useEffect(() => {
+        if (!previewing) return;
+        let cancelled = false;
+        loadUnassignedOsmFeatures(reportRegion)
+            .then(rows => {
+                if (cancelled || rows === null) return;
+                setUnassigned({
+                    type: 'FeatureCollection',
+                    features: rows.map(r => ({
+                        type: 'Feature',
+                        geometry: { type: 'Point', coordinates: [r.lon, r.lat] },
+                        properties: {
+                            osmId: r.osmId, flavour: r.flavour, name: r.name,
+                            seenBy: r.seenBy, nearestM: r.nearestM,
+                        },
+                    })),
+                });
+            })
+            .catch(e => {
+                console.error('Could not read osm-index.tsv for', reportRegion, e);
+                setActionError(`Could not read osm-index.tsv: ${e.message}`);
+            });
+        return () => { cancelled = true; };
+    }, [previewing, reportRegion]);
+
     // A click gives a feature, and the report answers about a stop; this is the join.
     const rowsById = useMemo(() => new Map(rows.map(r => [r.id, r])), [rows]);
 
@@ -420,12 +450,22 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
                 <span className={'match-dataset-count'}
                     title={'Stops of the shown categories the matcher anchored'}>{anchoredShown}</span>
             </div>
+            {previewing && unassigned && <div className={'match-child'}>
+                <span className={'match-dataset'}
+                    title={'OSM features the matcher was offered for some stop and nothing matched'}>
+                    OSM features nothing matched
+                </span>
+                <span className={'match-dataset-count'}>{unassigned.features.length}</span>
+            </div>}
         </div>
     );
 
     const stopsLayer = rows.length > 0 &&
         <StopsLayer key={reportRegion} layerKey={reportRegion} data={featureCollection}
             selectedCodes={selectedCodes} onClick={handleStopClick} />;
+
+    const unassignedLayer = previewing && unassigned &&
+        <UnassignedOsmLayer key={reportRegion} layerKey={reportRegion} data={unassigned} />;
 
     const gtfsTS = new Date(matchMeta.gtfsTimeStamp).toUTCString();
     const osmSourcesTS = matchMeta.coveredPbfSources.map(({ path, fileTimestamp }) => {
@@ -439,6 +479,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         {indexError && <div className={"report-load-error"} role={"alert"}>{indexError}</div>}
         {actionError && <div className={"report-load-error"} role={"alert"}>{actionError}</div>}
         {stopsLayer}
+        {unassignedLayer}
         {previewControl}
         {datasetControls}
         <div className={"match-report-meta"}>
@@ -606,6 +647,90 @@ function StopsLayer({ layerKey, data, selectedCodes, onClick }: StopsLayerProps)
             map.setFilter(layerId, filter);
         }
     }, [map, layerId, selectedCodes.join(',')]);
+
+    return <></>;
+}
+
+type UnassignedOsmLayerProps = {
+    layerKey: string
+    data: FeatureCollection
+};
+
+/**
+ * The OSM features the matcher was offered and nothing matched, while the preview is on.
+ *
+ * <p>Preview answers "where did the matcher put this stop"; this answers the other half of the
+ * same question — what was standing there that it did not use. Zürich Central has seven
+ * platforms named <i>Central</i> within 46 m of the stop, matched by nothing, and no view of
+ * the report showed them before.
+ *
+ * <p>Circles rather than icons: there are tens of thousands of them, and a ring reads as
+ * "something OSM has here" rather than as another stop of the feed.
+ */
+function UnassignedOsmLayer({ layerKey, data }: UnassignedOsmLayerProps) {
+    const mapContext = useContext(MapContext);
+    const map = mapContext?.map;
+    const mapLoaded = mapContext?.loaded;
+    const stylingControls = mapContext?.layerControls;
+
+    const sourceId = `unassigned-osm-${layerKey}`;
+    const layerId = `unassigned-osm-${layerKey}`;
+
+    const specRef = useRef<any>(null);
+
+    useEffect(() => {
+        if (!map || !stylingControls) return;
+
+        const spec = {
+            sources: {
+                [sourceId]: { 'type': 'geojson', 'data': data },
+            },
+            layers: [{
+                'id': layerId,
+                'type': 'circle',
+                'source': sourceId,
+                'paint': {
+                    'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 2, 17, 6] as any,
+                    'circle-color': '#c23b22',
+                    'circle-stroke-width': 1,
+                    'circle-stroke-color': '#fff',
+                    'circle-opacity': 0.75,
+                },
+            }],
+        };
+        specRef.current = spec;
+
+        const subscription = { canceled: false, promiseFulfiled: false };
+        mapLoaded?.then(() => {
+            subscription.promiseFulfiled = true;
+            if (subscription.canceled) return;
+            // @ts-ignore — the same immediate add the report's own overlays use, so the layer
+            // survives a base-style switch.
+            stylingControls.addOverlayImmediate(spec);
+            // Under the stop pins: a stop the matcher did place must never be hidden by a
+            // feature it did not.
+            if (map.getLayer(layerId) && map.getLayer(`stops-${layerKey}`)) {
+                map.moveLayer(layerId, `stops-${layerKey}`);
+            }
+        });
+
+        return () => {
+            subscription.canceled = true;
+            if (subscription.promiseFulfiled) {
+                // @ts-ignore
+                stylingControls.removeOverlayImmediate(spec);
+            }
+        };
+    }, [map, stylingControls, layerId, sourceId]);
+
+    useEffect(() => {
+        if (!map) return;
+        if (specRef.current) {
+            specRef.current.sources[sourceId].data = data;
+        }
+        const source = map.getSource(sourceId) as GeoJSONSource | undefined;
+        source?.setData(data);
+    }, [map, data, sourceId]);
 
     return <></>;
 }

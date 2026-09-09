@@ -32,6 +32,7 @@ App  (src/app.tsx)
         │   │       ├── ReportTable  [when no report selected]  (src/uielements/report-table.tsx)
         │   │       └── MatchReport  [when report region in URL hash]  (src/uielements/report.tsx)
         │   │           ├── PreviewSwitch  (src/uielements/switch.tsx)  [shared with SelectionInfo]
+        │   │           ├── UnassignedOsmLayer  [osm-index.tsv features nothing matched; only while Preview is on]
         │   │           └── StopsLayer  [all index.tsv stops in one symbol layer; sub-categories toggled via
         │   │               map.setFilter, geometry swapped via setData when Preview draws them at their
         │   │               anchored positions]
