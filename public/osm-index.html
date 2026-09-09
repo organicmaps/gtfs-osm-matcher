@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>osm-index viewer</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.10.0/maplibre-gl.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.10.0/maplibre-gl.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; font: 13px/1.4 system-ui, sans-serif; }
+  #map { position: absolute; inset: 0; }
+  #panel {
+    position: absolute; top: 10px; left: 10px; z-index: 1; width: 300px;
+    background: #fff; border-radius: 6px; box-shadow: 0 1px 6px rgba(0,0,0,.3);
+    padding: 10px 12px; max-height: calc(100% - 20px); overflow: auto;
+  }
+  h1 { font-size: 14px; margin: 0 0 8px; }
+  label { display: block; margin: 8px 0 2px; color: #444; }
+  input[type=range] { width: 100%; }
+  select, button { width: 100%; padding: 4px; }
+  .row { display: flex; gap: 6px; align-items: center; }
+  .row label { margin: 0; }
+  .counts { margin-top: 10px; border-top: 1px solid #e3e3e3; padding-top: 8px; }
+  .counts b { font-variant-numeric: tabular-nums; }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+  .note { color: #666; margin-top: 8px; }
+  .maplibregl-popup-content { font: 12px/1.45 system-ui, sans-serif; max-width: 320px; }
+  .maplibregl-popup-content table { border-collapse: collapse; }
+  .maplibregl-popup-content td { padding: 1px 6px 1px 0; vertical-align: top; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="panel">
+  <h1>osm-index viewer</h1>
+
+  <label for="region">Region</label>
+  <select id="region"></select>
+
+  <label>Stops within <b id="rLabel">25</b> m: at least <b id="nLabel">5</b></label>
+  <input type="range" id="r" min="5" max="200" step="5" value="25">
+  <input type="range" id="n" min="1" max="10" step="1" value="5">
+
+  <div class="row" style="margin-top:8px">
+    <input type="checkbox" id="unusedOnly" checked>
+    <label for="unusedOnly">matched by nothing only</label>
+  </div>
+  <div class="row">
+    <input type="checkbox" id="platformsOnly">
+    <label for="platformsOnly">platforms and stops only</label>
+  </div>
+
+  <div class="counts" id="counts">loading…</div>
+  <div class="note" id="note"></div>
+</div>
+
+<script>
+// A viewer for one question: which OSM features could several GTFS stops see, and none of
+// them use. The report gives the pool (osm-index.tsv) and the stops (index.tsv); "several
+// stops within R" is the spatial join the file deliberately does not bake in, so it is done
+// here, where the radius is a slider rather than a rebuild.
+const DATA = 'data';
+const COLOURS = { none: '#c23b22', one: '#2f7a54', many: '#c98a0b', context: '#9aa4ad' };
+
+const el = id => document.getElementById(id);
+const map = new maplibregl.Map({
+  container: 'map',
+  style: 'https://tiles.openfreemap.org/styles/bright',
+  center: [8.5417, 47.3769], zoom: 12,
+});
+map.addControl(new maplibregl.NavigationControl());
+
+function parseTsv(text) {
+  const lines = text.split('\n');
+  const at = {};
+  lines[0].split('\t').forEach((name, i) => at[name.trim()] = i);
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i]) continue;
+    rows.push(lines[i].split('\t'));
+  }
+  return { at, rows };
+}
+
+let features = [];   // the pool, as plain objects
+let stopGrid = null; // stops by 0.001-degree cell, for "how many stops within R"
+const CELL = 0.001;
+
+function buildStopGrid(index) {
+  const { at, rows } = index;
+  const grid = new Map();
+  for (const c of rows) {
+    const lon = +c[at['lon']], lat = +c[at['lat']];
+    if (!isFinite(lon) || !isFinite(lat)) continue;
+    const key = Math.floor(lat / CELL) + ':' + Math.floor(lon / CELL);
+    let cell = grid.get(key);
+    if (!cell) grid.set(key, cell = []);
+    cell.push([lon, lat]);
+  }
+  return grid;
+}
+
+function metres(lat1, lon1, lat2, lon2) {
+  const dLat = (lat1 - lat2) * 111320;
+  const dLon = (lon1 - lon2) * 111320 * Math.cos((lat1 + lat2) / 2 * Math.PI / 180);
+  return Math.hypot(dLat, dLon);
+}
+
+// How many stops stand within `radius` of this feature. A 0.001-degree cell is ~111 m, so a
+// 3x3 block covers every radius the slider offers; beyond that the block would have to grow.
+function stopsWithin(f, radius) {
+  const reach = Math.max(1, Math.ceil(radius / 111));
+  const gy = Math.floor(f.lat / CELL), gx = Math.floor(f.lon / CELL);
+  let count = 0;
+  for (let dy = -reach; dy <= reach; dy++) {
+    for (let dx = -reach; dx <= reach; dx++) {
+      const cell = stopGrid.get((gy + dy) + ':' + (gx + dx));
+      if (!cell) continue;
+      for (const [lon, lat] of cell) {
+        if (metres(f.lat, f.lon, lat, lon) <= radius) count++;
+      }
+    }
+  }
+  return count;
+}
+
+function colourOf(f) {
+  if (f.anchored >= 2) return COLOURS.many;
+  if (f.anchored === 1) return COLOURS.one;
+  return f.matched === 0 ? COLOURS.none : COLOURS.context;
+}
+
+function render() {
+  const radius = +el('r').value, minStops = +el('n').value;
+  const unusedOnly = el('unusedOnly').checked, platformsOnly = el('platformsOnly').checked;
+  el('rLabel').textContent = radius;
+  el('nLabel').textContent = minStops;
+
+  const shown = [];
+  let none = 0, one = 0, many = 0;
+  for (const f of features) {
+    if (unusedOnly && f.matched !== 0) continue;
+    if (platformsOnly && !/platform|stop/.test(f.flavour)) continue;
+    if (minStops > 1 || radius < 200) {
+      if (stopsWithin(f, radius) < minStops) continue;
+    }
+    shown.push(f);
+    if (f.anchored >= 2) many++; else if (f.anchored === 1) one++; else none++;
+  }
+
+  map.getSource('osm-index').setData({
+    type: 'FeatureCollection',
+    features: shown.map(f => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [f.lon, f.lat] },
+      properties: { ...f, colour: colourOf(f) },
+    })),
+  });
+
+  el('counts').innerHTML =
+    `<b>${shown.length.toLocaleString()}</b> of ${features.length.toLocaleString()} features shown`
+    + `<div><span class="sw" style="background:${COLOURS.none}"></span>no anchored stop: <b>${none.toLocaleString()}</b></div>`
+    + `<div><span class="sw" style="background:${COLOURS.one}"></span>one: <b>${one.toLocaleString()}</b></div>`
+    + `<div><span class="sw" style="background:${COLOURS.many}"></span>several: <b>${many.toLocaleString()}</b></div>`;
+}
+
+async function loadRegion(region) {
+  el('counts').textContent = 'loading…';
+  el('note').textContent = '';
+  const [poolRes, indexRes] = await Promise.all([
+    fetch(`${DATA}/${region}/osm-index.tsv`),
+    fetch(`${DATA}/${region}/index.tsv`),
+  ]);
+  if (!poolRes.ok) {
+    features = [];
+    el('counts').textContent = 'no osm-index.tsv for this region';
+    el('note').textContent = 'Only a report written by a build that records the candidate pool has one.';
+    map.getSource('osm-index').setData({ type: 'FeatureCollection', features: [] });
+    return;
+  }
+
+  const pool = parseTsv(await poolRes.text());
+  const { at } = pool;
+  features = pool.rows.map(c => ({
+    id: c[at['osm:id']],
+    lon: +c[at['lon']], lat: +c[at['lat']],
+    flavour: c[at['flavour']], modes: c[at['modes']],
+    seenBy: +c[at['gtfs_seen_by']], nearest: +c[at['nearest_m']],
+    matched: +c[at['gtfs_matched']], anchored: +c[at['gtfs_anchored']],
+    ids: c[at['gtfs_ids']] || '', name: c[at['name']] || '',
+  }));
+  stopGrid = buildStopGrid(parseTsv(await indexRes.text()));
+
+  const lons = features.map(f => f.lon), lats = features.map(f => f.lat);
+  map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]],
+    { padding: 30, duration: 0 });
+  render();
+}
+
+map.on('load', async () => {
+  map.addSource('osm-index', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({
+    id: 'osm-index', type: 'circle', source: 'osm-index',
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 2.5, 16, 6],
+      'circle-color': ['get', 'colour'],
+      'circle-stroke-width': 1,
+      'circle-stroke-color': '#fff',
+      'circle-opacity': 0.9,
+    },
+  });
+
+  map.on('click', 'osm-index', e => {
+    const p = e.features[0].properties;
+    const stops = (p.ids || '').split(';').filter(Boolean);
+    const region = el('region').value;
+    new maplibregl.Popup({ maxWidth: '340px' })
+      .setLngLat(e.lngLat)
+      .setHTML(`<table>
+        <tr><td><b>${p.id}</b></td><td><a href="https://www.openstreetmap.org/${p.id[0] === 'n' ? 'node' : p.id[0] === 'w' ? 'way' : 'relation'}/${p.id.slice(1)}" target="_blank">OSM</a></td></tr>
+        <tr><td>name</td><td>${p.name || '—'}</td></tr>
+        <tr><td>flavour</td><td>${p.flavour}</td></tr>
+        <tr><td>modes</td><td>${(p.modes || '').replace(/;/g, ', ') || '—'}</td></tr>
+        <tr><td>seen by</td><td>${p.seenBy} stops, nearest ${p.nearest} m</td></tr>
+        <tr><td>matched</td><td>${p.matched}</td></tr>
+        <tr><td>anchored</td><td>${p.anchored}</td></tr>
+        <tr><td>stops</td><td>${stops.length
+          ? stops.map(id => `<a href="/#/match-report/${region}/selection/${encodeURIComponent(id)}" target="_blank">${id}</a>`).join('<br>')
+          : '—'}</td></tr>
+      </table>`)
+      .addTo(map);
+  });
+  map.on('mouseenter', 'osm-index', () => map.getCanvas().style.cursor = 'pointer');
+  map.on('mouseleave', 'osm-index', () => map.getCanvas().style.cursor = '');
+
+  // Regions come from the report the app already publishes; a region without an
+  // osm-index.tsv says so when it is picked, rather than being hidden.
+  const report = await fetch(`${DATA}/match-report.json?t=${Date.now()}`).then(r => r.json());
+  const regions = report.matchedRegions.map(m => m.region).sort();
+  el('region').innerHTML = regions.map(r => `<option>${r}</option>`).join('');
+  const preferred = regions.includes('swiss-opendata') ? 'swiss-opendata' : regions[0];
+  el('region').value = preferred;
+  await loadRegion(preferred);
+});
+
+el('region').addEventListener('change', e => loadRegion(e.target.value));
+for (const id of ['r', 'n', 'unusedOnly', 'platformsOnly']) {
+  el(id).addEventListener('input', render);
+}
+</script>
+</body>
+</html>
