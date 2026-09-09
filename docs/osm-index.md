@@ -130,3 +130,110 @@ writer reads the mint plans alongside the anchors — which only matters once
 3. The map colouring and the legend.
 4. Later, if it earns it: clicking a feature opens a panel listing its stops. The selection
    panel is GTFS-stop-centric, so that is a new selection kind, not a tweak.
+
+## Measured, before any of it is built
+
+The matcher side is implemented (`gtfs-server` `feat/osm-index`). Two feeds, current planet:
+
+| | swiss-opendata | italy-milano |
+| :--- | ---: | ---: |
+| GTFS stops | 68,571 | 4,855 |
+| pool (features offered to some stop) | **123,530** | **13,540** |
+| of those, in nobody's verdict | 67,925 (55%) | 8,293 (61%) |
+| `osm-index.tsv` raw / gzip | 10.8 MB / 2.9 MB | 1.1 MB / — |
+| `index.tsv` for comparison | 9.3 MB | 0.59 MB |
+
+Anchored stops per feature:
+
+| | 0 | 1 | 2 | 3 | 4+ |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| swiss-opendata | 84,777 | 29,971 | 6,748 | 1,861 | 106 |
+| italy-milano | 9,074 | 4,447 | 18 | 1 | 0 |
+
+Three things follow, and they shape the frontend rather than decorate it.
+
+**The pool is 1.8–2.8× the stop count, and the file is bigger than `index.tsv`.** Extrapolating
+germany-local's 433,086 stops gives roughly 800k rows and 60–70 MB raw. Fetching that eagerly
+is out of the question, and fetching it at all needs a reason.
+
+**69% of features carry no anchored stop.** Drawing the whole pool is drawing mostly grey — the
+bucket that is least interesting per feature and most numerous.
+
+**Two columns are a quarter of the bytes** and neither is needed to draw a dot: `gtfs_ids`
+2.52 MB (23%) and `name` 1.72 MB (16%).
+
+## The frontend, then
+
+### 1. A slim file for the map, the full one for a click
+
+The map needs `osm:id`, `lon`, `lat`, `gtfs_anchored` — 26% of the bytes. `gtfs_ids`, `name`,
+`modes`, `flavour` and `gtfs_matched` answer questions about *one* feature, which is a click.
+
+So the server writes `osm-index.tsv` sorted by id, and the reader fetches it once per region
+**on the first toggle** — never with `index.tsv` — parsing only the four columns it draws with
+and keeping the rest as offsets into the fetched text. Nothing is re-fetched per click; the
+text is already in memory, and a `byte_start`/`byte_end` scheme like the stop details would be
+a second mechanism for something a `Map<osmId, line>` already does.
+
+If germany-local's 60 MB proves too much even lazily, the fallback is a server-side split: a
+`osm-index.slim.tsv` of the four map columns, with the full file range-requested per feature.
+Not built until a feed needs it — the numbers above do not yet demand it.
+
+### 2. One layer, three colours, drawn under the stops
+
+`OsmIndexLayer`, a render-less overlay following `StopsLayer`'s idiom exactly — build the spec,
+`mapLoaded.then` behind a `subscription` guard, `addOverlayImmediate`, clean up on unmount. A
+`circle` layer, not symbols: 123k circles cost far less than 123k icons, and a circle reads as
+"a thing OSM has" rather than as another stop pin.
+
+```
+circle-color: ['case',
+    ['==', ['get', 'anchored'], 0], grey,      // 69% — nothing is written here
+    ['==', ['get', 'anchored'], 1], green,     // the healthy case
+    amber]                                     // several stops at one feature
+```
+
+Below the stop symbols in the layer order, so a stop pin is never obscured by the feature it
+is anchored to.
+
+### 3. The switch takes the preview's place
+
+`ViewOptionsContext` keeps its shape — a flag, an availability, both published by the report —
+and only the meaning changes: `previewOn` becomes `osmIndexOn`, `previewAvailable` becomes
+"this region has an `osm-index.tsv`" (a 404 on first fetch turns it off and says so once).
+`PreviewSwitch` becomes `OsmIndexSwitch`, still one component rendered in both the report tab
+and the selection panel, still hidden where the region cannot honour it.
+
+The legend goes beside it: three swatches with region-wide counts, which the parsed rows give
+for free — 84,777 / 29,971 / 8,715 for swiss-opendata.
+
+### 4. Clicking a feature, without a new selection kind
+
+A click on a circle shows what the row holds: the feature's flavour and modes, its `name`, and
+its stops as links. The links are ordinary `#/match-report/{region}/selection/{gtfsId}` hashes,
+so each one lands in the panel that already exists — no second panel shape, no second detail
+fetch path, and the "several stops at one feature" case becomes navigable rather than merely
+coloured.
+
+A feature with no stops has nothing to link, and that is the point of the bucket: the panel
+says so, and the OSM link is the action.
+
+### 5. What comes out when it lands
+
+In one change, so there is never a window with two half-features:
+
+* `anchor_lon` / `anchor_lat` from `index.tsv` (962 KB swiss, 3.6 MB germany-local, on every
+  row whether or not it has an anchor) and their parsing in `matchIndex.ts`;
+* the two-projection cache, `previewing`, `anchoredTotal` / `anchoredCounts`, the `unanchored`
+  fade and the anchor-aware `flyTo` in `report.tsx`;
+* the preview's entry in the data contract and the component tree.
+
+What stays is the panel's anchoring verdict — `osmAnchor` / `notAnchored` in words — which
+answers "why is this stop not on a feature" and has no equivalent on the OSM side.
+
+### Order
+
+Slim reader and layer first, against swiss-opendata, where 8,715 multi-stop features make the
+amber bucket worth looking at. Then the legend and the switch swap. Then the removals, which
+are the change that needs the server column drop landing with it. The click panel last: it is
+the only part that can be dropped without leaving a half-feature behind.
