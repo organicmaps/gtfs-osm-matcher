@@ -446,14 +446,22 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
                 <span className={'match-dataset-count'}
                     title={'Stops of the shown categories the matcher anchored'}>{anchoredShown}</span>
             </div>
-            <div className={'match-child'}>
+        </div>
+    );
+
+    // A dataset of its own, after the GTFS ones and shaped like them: it is the same kind of
+    // thing — a set of features the map either draws or does not — and it reads as one only
+    // if it sits at their level rather than under the switch.
+    const unmatchedOsmControl = (
+        <div className={'match-group'} key={'osm'}>
+            <div className={'match-group-header'}>
                 <input className={'match-dataset-select'} type={'checkbox'} checked={showUnmatchedOsm}
                     onChange={e => setShowUnmatchedOsm((e.target as HTMLInputElement).checked)} />
-                <span className={'match-dataset'}
+                <span className={'match-group-title'}
                     title={'OSM stops and stations the matcher was offered for some GTFS stop'
-                        + ' and nothing matched. Its own dataset: it does not move anything,'
-                        + ' and it can be shown beside any of the categories above.'}>
-                    unmatched OSM stops
+                        + ' and nothing matched, and that nothing else in the pipeline claims.'
+                        + ' Shown beside any of the categories above; it moves nothing.'}>
+                    Unmatched OSM stops
                 </span>
                 <span className={'match-dataset-count'}>
                     {unassigned ? unassigned.features.length : ''}
@@ -484,6 +492,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         {unassignedLayer}
         {previewControl}
         {datasetControls}
+        {unmatchedOsmControl}
         <div className={"match-report-meta"}>
             <div className={"section"}>
                 <label>GTFS source timestamp </label><div className={"ts-value"}>{gtfsTS}</div>
