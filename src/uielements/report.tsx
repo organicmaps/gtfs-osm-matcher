@@ -10,6 +10,7 @@ import { DATA_BASE_URL } from "../config";
 import { CATEGORIES, CATEGORY_CODES, detailFileFor, parseIndex } from "../services/matchIndex";
 import { PreviewSwitch } from "./switch";
 import { loadUnassignedOsmFeatures } from "../services/osmIndex";
+import type { OsmIndexRow } from "../services/osmIndex";
 import type { Group, IndexRow } from "../services/matchIndex";
 
 var shouldUpdateBoundsSignal = {
@@ -249,31 +250,41 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
     // What the matcher looked at and did not use, drawn beside the stops it placed. Fetched
     // only while the preview is on: it is the largest file the report publishes, and a
     // session that never looks at the preview should never pay for it.
-    const [unassigned, setUnassigned] = useState<FeatureCollection | null>(null);
+    const [unassignedRows, setUnassignedRows] = useState<OsmIndexRow[] | null>(null);
     useEffect(() => {
         if (!previewing) return;
         let cancelled = false;
         loadUnassignedOsmFeatures(reportRegion)
-            .then(rows => {
-                if (cancelled || rows === null) return;
-                setUnassigned({
-                    type: 'FeatureCollection',
-                    features: rows.map(r => ({
-                        type: 'Feature',
-                        geometry: { type: 'Point', coordinates: [r.lon, r.lat] },
-                        properties: {
-                            osmId: r.osmId, flavour: r.flavour, name: r.name,
-                            seenBy: r.seenBy, nearestM: r.nearestM,
-                        },
-                    })),
-                });
-            })
+            .then(rows => { if (!cancelled) setUnassignedRows(rows); })
             .catch(e => {
-                console.error('Could not read osm-index.tsv for', reportRegion, e);
-                setActionError(`Could not read osm-index.tsv: ${e.message}`);
+                console.error('Could not read osm-index.tsv.gz for', reportRegion, e);
+                setActionError(`Could not read osm-index.tsv.gz: ${e.message}`);
             });
         return () => { cancelled = true; };
     }, [previewing, reportRegion]);
+
+    // A platform way and a stop_position node are things OSM holds, not things the app draws
+    // a marker for -- and on swiss-opendata they are 59,053 of the 68,140 features nothing
+    // matched. Narrowing to what a passenger would recognise as a stop leaves 9,087, which is
+    // a list somebody can read.
+    const [stopsAndStationsOnly, setStopsAndStationsOnly] = useState(true);
+    const unassigned = useMemo(() => {
+        if (!unassignedRows) return null;
+        const kept = stopsAndStationsOnly
+            ? unassignedRows.filter(r => /stop|station/.test(r.flavour))
+            : unassignedRows;
+        return {
+            type: 'FeatureCollection',
+            features: kept.map(r => ({
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [r.lon, r.lat] },
+                properties: {
+                    osmId: r.osmId, flavour: r.flavour, name: r.name,
+                    seenBy: r.seenBy, nearestM: r.nearestM,
+                },
+            })),
+        } as FeatureCollection;
+    }, [unassignedRows, stopsAndStationsOnly]);
 
     // A click gives a feature, and the report answers about a stop; this is the join.
     const rowsById = useMemo(() => new Map(rows.map(r => [r.id, r])), [rows]);
@@ -451,9 +462,15 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
                     title={'Stops of the shown categories the matcher anchored'}>{anchoredShown}</span>
             </div>
             {previewing && unassigned && <div className={'match-child'}>
+                <input className={'match-dataset-select'} type={'checkbox'}
+                    checked={stopsAndStationsOnly}
+                    onChange={e => setStopsAndStationsOnly((e.target as HTMLInputElement).checked)} />
                 <span className={'match-dataset'}
-                    title={'OSM features the matcher was offered for some stop and nothing matched'}>
-                    OSM features nothing matched
+                    title={'OSM features the matcher was offered for some stop and nothing matched.'
+                        + ' Ticked: only the ones a passenger would recognise as a stop —'
+                        + ' platform ways and stop_position nodes are what OSM holds, not what'
+                        + ' the app draws.'}>
+                    unmatched OSM: stops and stations
                 </span>
                 <span className={'match-dataset-count'}>{unassigned.features.length}</span>
             </div>}

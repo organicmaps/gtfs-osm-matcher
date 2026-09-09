@@ -2,8 +2,12 @@
 // candidate for some stop, and what the GTFS side made of it.
 //
 // Fetched only when Preview is on, and once per region. It is the largest file the report
-// publishes — 11.6 MB for swiss-opendata, against 9.3 MB for index.tsv — because the pool is
-// nearly twice the stop count, so it must never be loaded with the index.
+// publishes — the pool is nearly twice the stop count — so it is written gzipped and never
+// loaded with the index: swiss-opendata is 11.6 MB of text and 3.3 MB on the wire.
+//
+// Decompressed here rather than by the web server, which compresses only text/html and is
+// not ours to configure. `DecompressionStream` is native; a report served with
+// `Content-Encoding: gzip` would arrive already unwrapped, so the magic bytes decide.
 
 import { DATA_BASE_URL } from "../config";
 
@@ -27,6 +31,22 @@ export type OsmIndexRow = {
 const REQUIRED = ['osm:id', 'lon', 'lat', 'gtfs_matched', 'gtfs_anchored'];
 
 /**
+ * The response body as text, gunzipped unless the server already did it.
+ *
+ * A server configured with `gzip_static` or a matching `gzip_types` unwraps the body itself
+ * and `res.text()` is the file; ours does neither, so the bytes arrive as they were written.
+ * Sniffing the two magic bytes covers both without asking the caller to know which.
+ */
+async function gunzip(res: Response): Promise<string> {
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) {
+        return new TextDecoder().decode(bytes);
+    }
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return new Response(stream).text();
+}
+
+/**
  * The features nothing matched: what the matcher looked at and did not use.
  *
  * <p>Null where the region's report has no `osm-index.tsv` — a report written before the
@@ -40,15 +60,15 @@ export async function loadUnassignedOsmFeatures(region: string): Promise<OsmInde
 const cache: { [region: string]: Promise<OsmIndexRow[] | null> } = {};
 
 async function fetchRegion(region: string): Promise<OsmIndexRow[] | null> {
-    const res = await fetch(`${DATA_BASE_URL}/${region}/osm-index.tsv`);
+    const res = await fetch(`${DATA_BASE_URL}/${region}/osm-index.tsv.gz`);
     if (res.status === 404) {
         return null;
     }
     if (!res.ok) {
-        throw new Error(`${res.status} for osm-index.tsv`);
+        throw new Error(`${res.status} for osm-index.tsv.gz`);
     }
 
-    const lines = (await res.text()).split('\n');
+    const lines = (await gunzip(res)).split('\n');
     const at: { [name: string]: number } = {};
     (lines[0] || '').split('\t').forEach((name, i) => at[name.trim()] = i);
 

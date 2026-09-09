@@ -70,6 +70,14 @@ const map = new maplibregl.Map({
 });
 map.addControl(new maplibregl.NavigationControl());
 
+// The pool file is written gzipped; a server that unwrapped it for us leaves plain text, so
+// the magic bytes decide rather than the caller.
+async function gunzip(res) {
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) return new TextDecoder().decode(bytes);
+  return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+}
+
 function parseTsv(text) {
   const lines = text.split('\n');
   const at = {};
@@ -168,18 +176,18 @@ async function loadRegion(region) {
   el('counts').textContent = 'loading…';
   el('note').textContent = '';
   const [poolRes, indexRes] = await Promise.all([
-    fetch(`${DATA}/${region}/osm-index.tsv`),
+    fetch(`${DATA}/${region}/osm-index.tsv.gz`),
     fetch(`${DATA}/${region}/index.tsv`),
   ]);
   if (!poolRes.ok) {
     features = [];
-    el('counts').textContent = 'no osm-index.tsv for this region';
+    el('counts').textContent = 'no osm-index.tsv.gz for this region';
     el('note').textContent = 'Only a report written by a build that records the candidate pool has one.';
     map.getSource('osm-index').setData({ type: 'FeatureCollection', features: [] });
     return;
   }
 
-  const pool = parseTsv(await poolRes.text());
+  const pool = parseTsv(await gunzip(poolRes));
   const { at } = pool;
   features = pool.rows.map(c => ({
     id: c[at['osm:id']],
