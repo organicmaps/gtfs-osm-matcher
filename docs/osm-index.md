@@ -67,18 +67,45 @@ misses — two poles of one stop, a station and its platforms. The number is wor
 because it *moves*: a tier that stops firing, a radius change, a mode filter that got
 stricter, all show up here before they show up as anchors.
 
-## What the map does with it
+## What the map does with it: it takes over the preview
 
-Preview mode (`feat/preview-and-dissolution`) already re-projects stops onto their anchors.
-Colouring the OSM features by `gtfs_anchored` needs nothing else: the file is per region, it
-holds coordinates, and it is loaded the way `index.tsv` is. Three colours — none, one,
-several — a legend with exact counts, and no join.
+Preview today re-projects the report's own stop markers onto their anchors, from
+`anchor_lon`/`anchor_lat` on every index row. `osm-index.tsv` makes that the long way round.
+The anchored position *is* the OSM feature's position, so drawing the features themselves
+shows the same geometry and, in the same layer, the thing the re-projection cannot say: how
+many GTFS stops each feature carries. Three colours — none, one, several — a legend with
+exact counts, and no join.
 
-This drops both halves of the earlier plan: no `anchor_osm` column on the stop rows (the
-inverse index *is* the file), and no `feature-state` colouring of `pt-structure.pmtiles`
-against a client-side map. The structure archive stays what it is — the geometry layer behind
-the report — and the "none" bucket becomes an honest region-scoped count rather than
-"whatever the planet-wide archive happens to hold at `--modes bus,trolleybus,tram`".
+So the switch stops meaning "move the stops" and starts meaning "show what the matcher was
+matching against". What that buys, beyond the new bucket:
+
+* **The stop rows lose two columns.** `anchor_lon`/`anchor_lat` are 962 KB on swiss-opendata
+  and 3.6 MB on germany-local — 7% of that index — carried on every row whether or not it has
+  an anchor, and downloaded by every visitor on every load for a switch that defaults to off.
+  With the features drawn from their own file, nothing reads them.
+* **The new file is lazy.** It is fetched on the first toggle, not with the index, which is
+  the shape the repo asks for and the one the preview's own deleted predecessor had.
+* **A refused stop stops being ambiguous.** Under the re-projection a stop that did not move
+  means either "anchored exactly here" or "the anchoring refused it", and telling them apart
+  needed a faded icon plus a panel line. With the features on the map the question answers
+  itself: the stop sits beside a feature that carries no anchored stop.
+
+What it costs, and it is a real cost: the re-projection shows *displacement* — this stop moved
+174 m — at a glance, for every stop at once. Drawing features shows what is there, and the
+displacement is only visible per selected stop, through the match arrow the panel already
+draws. If the displacement view turns out to be the one people use, it is worth keeping both,
+and then the anchor columns stay.
+
+**Sequencing.** `feat/preview-anchors` works today against data that exists, and is reviewed;
+this needs a matcher change that has not been written. So that lands first, and `osm-index`
+supersedes it in one change that also drops the anchor columns and the preview's own
+machinery — the two-projection cache, the availability gate, the faded refusals. There is
+never a window with two half-features, and never one with neither.
+
+The structure archive stays what it is — the geometry layer behind the report. The "none"
+bucket is a region-scoped count rather than "whatever the planet-wide archive happens to hold
+at `--modes bus,trolleybus,tram`", and no `anchor_osm` column on stop rows is needed either:
+the inverse index *is* the file.
 
 ## The dissolution wrinkle
 
