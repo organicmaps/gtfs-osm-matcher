@@ -89,11 +89,6 @@ export function SelectionInfo({ selection }: SelectionInfoProps) {
     return (<>
         <div id={"selection-info"} className={cls(!selection && "hidden")}>
             {selection && <button className="close-button" onClick={() => onReportSelect(null)} title="Close selection">&times;</button>}
-            {/* The same switch as the report's, so the map can be flipped while a stop is
-                open rather than by going back to the dataset list and losing your place. */}
-            {selection && <div className={'selection-view-options'}>
-                <PreviewSwitch />
-            </div>}
             {properties && reportRegion &&
                 <MatchInfo {...{ datasetName, properties, geometry, reportRegion, idTags }} />}
         </div>
@@ -243,6 +238,14 @@ function MatchInfo({ datasetName, properties, geometry, idTags, reportRegion }: 
                 || properties['notAnchored']}
             {', so it keeps its feed position'}
         </div>}
+
+        {/* Beside the verdict it acts on. The switch is the report's own, so the map can be
+            flipped while a stop is open rather than by going back to the dataset list and
+            losing your place; here the line above it says where this stop's marker would go,
+            or why it would not move. It draws nothing when the report has no anchors. */}
+        <div className={'selection-view-options'}>
+            <PreviewSwitch />
+        </div>
 
         {/* Both outcomes, not just the interesting one. A panel that speaks only when a
             stop dissolves leaves silence meaning either "left whole" or "this build does

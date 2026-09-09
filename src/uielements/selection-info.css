@@ -128,11 +128,14 @@ span.loading-indicator {
     margin-right: 6px;
 }
 
-/* The same switch inside the selection panel, where it sits above the stop's details. */
+/* Sits under the anchor verdict it acts on, so it is spaced as part of that block rather
+   than fenced off as a panel header. Empty where the report has no anchors -- PreviewSwitch
+   draws nothing then, and a wrapper holding nothing must not hold space either. */
 .selection-view-options {
-    padding: 6px 0 10px;
-    border-bottom: 1px solid #e1e5e8;
-    margin-bottom: 10px;
+    margin: 8px 0 12px;
+}
+.selection-view-options:empty {
+    display: none;
 }
 
 /* Where the matcher put this stop, or why it would not. Read beside Preview, which moves a
