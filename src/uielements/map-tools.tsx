@@ -16,7 +16,7 @@ export function MapTools() {
                 <button id="map-style-button" title="Switch the base map between the cartographic and the satellite style">Sat/Geo</button>
                 {/* The stop-structure layer: each stop's bay, the road beside it and which way
                     that road runs. Served from the same data root as the reports. */}
-                <button id="pt-structure-button" title="Show the stop-structure layer: bays, and what the nearest road says about each stop">PT structure</button>
+                <button id="pt-structure-button" title="Show the stop-structure layer: bays, and what the nearest road says about each stop. Drawn from zoom 8 in; from the world view there is nothing to draw.">PT structure</button>
                 <div id="map-location">
                     <input/>
                     <a target={'_blank'} className={'goto-button'}><button>Goto OSM</button></a>

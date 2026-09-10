@@ -219,10 +219,24 @@ function attachStopStructureToggle(map: Map, layerControls: LayerControls,
             // the same scheme throws.
             structureProtocol = import('pmtiles').then(({ Protocol }) => {
                 maplibregl.addProtocol('pmtiles', new Protocol().tile);
+            }).catch(e => {
+                // Forgotten on failure, or the rejection stays cached here and every later
+                // press fails on it -- button blue, layer never drawn, no way to retry.
+                structureProtocol = null;
+                throw e;
             });
         }
         if (wanted) {
-            await structureProtocol;
+            try {
+                await structureProtocol;
+            } catch (e) {
+                console.error('Could not load the pmtiles protocol', e);
+                if (thisPress === press) {
+                    shown = false;
+                    button.classList.remove('active');
+                }
+                return;
+            }
         }
 
         // Awaited, like every other overlay here: addSource throws "Style is not done
