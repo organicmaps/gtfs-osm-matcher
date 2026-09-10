@@ -24,6 +24,14 @@ const GROUPS: { group: Group; title: string }[] = [
 
 const PREVIEW_COLOR = '#2c2ca5ff';
 
+// A stop whose calls this run dealt to the places it stands for is drawn grey rather than in
+// its match category's colour: it is still matched, still filtered by that category's
+// checkbox, and still in the data -- what moved is its departures. Only `dissolved` is drawn
+// this way. `wouldDissolve` and `dissolvable` describe a run that acted on nothing, so those
+// stops keep their category's own pin; the panel says what would have happened.
+const DISSOLVED_ICON = 'stop-dissolved';
+const DISSOLVED_COLOR = '#8b8b8b';
+
 type DatatsetsSelectonT = {
     [key: string]: boolean
 }
@@ -39,6 +47,13 @@ export type Report = {
     };
 
     liveUpdates?: boolean;
+
+    /**
+     * What the run did about dissolution on this feed: acted, only detected and marked, or
+     * neither. Absent in older reports. `off` is a real answer, not a missing one: the
+     * analysis is asked for per feed, so an unmarked feed says nothing on its own.
+     */
+    dissolution?: 'on' | 'analysis' | 'off';
 
     matchStats: {
         total: number;
@@ -79,7 +94,7 @@ type GeojsonDataT = {
     [key: string]: any
 };
 
-function buildFeatureCollection(rows: IndexRow[]): GeojsonDataT {
+function buildFeatureCollection(rows: IndexRow[], dissolutionApplied: boolean): GeojsonDataT {
     return {
         type: 'FeatureCollection',
         features: rows.map(r => ({
@@ -91,6 +106,9 @@ function buildFeatureCollection(rows: IndexRow[]): GeojsonDataT {
                 type: r.type,
                 byteStart: r.byteStart,
                 byteEnd: r.byteEnd,
+                // Grey only where this run actually dealt the stop's visits: the same bit on a
+                // feed that was only measured means "would", and nothing happened to it.
+                dissolved: r.dissolutionPlanned && dissolutionApplied,
             }
         }))
     };
@@ -186,7 +204,9 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         return m;
     }, [rows]);
 
-    const featureCollection = useMemo(() => buildFeatureCollection(rows), [rows]);
+    const dissolutionApplied = reportData.dissolution === 'on';
+    const featureCollection = useMemo(() => buildFeatureCollection(rows, dissolutionApplied),
+        [rows, dissolutionApplied]);
 
     // Range-fetch a single stop's detail object and turn it into a selection.
     const selectStop = useCallback(async (loc: StopLocator, source: 'map-click' | 'url-hash') => {
@@ -419,6 +439,12 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
             <div className={"section"}>
                 <label>GTFS source timestamp </label><div className={"ts-value"}>{gtfsTS}</div>
             </div>
+            {reportData.dissolution && <div className={"section"}>
+                {/* Without this a feed with nothing to dissolve and a feed with the feature
+                    switched off read exactly the same on the map. */}
+                <label>Stop dissolution </label>
+                <div className={"ts-value"}>{reportData.dissolution}</div>
+            </div>}
             <div className={"section"}>
                 <label>OSM Sources timestamps</label>
                 {osmSourcesTS}
@@ -470,7 +496,10 @@ function StopsLayer({ layerKey, data, selectedCodes, onClick }: StopsLayerProps)
             'source': sourceId,
             'filter': buildFilter(selectedRef.current),
             'layout': {
-                'icon-image': ['concat', 'stop-', ['get', 'subcategory']],
+                'icon-image': ['case',
+                    ['boolean', ['get', 'dissolved'], false], DISSOLVED_ICON,
+                    ['concat', 'stop-', ['get', 'subcategory']],
+                ] as any,
                 'icon-size': 0.2,
                 'icon-allow-overlap': true,
             }
@@ -494,12 +523,14 @@ function StopsLayer({ layerKey, data, selectedCodes, onClick }: StopsLayerProps)
         const subscription = { canceled: false, promiseFulfiled: false };
 
         mapLoaded?.then(async m => {
-            await Promise.all(CATEGORY_CODES.map(async code => {
-                const iconId = `stop-${code}`;
+            const iconColors: { [iconId: string]: string } = { [DISSOLVED_ICON]: DISSOLVED_COLOR };
+            CATEGORY_CODES.forEach(code => iconColors[`stop-${code}`] = CATEGORIES[code].color);
+
+            await Promise.all(Object.entries(iconColors).map(async ([iconId, color]) => {
                 if (m.hasImage(iconId)) return;
                 const image = await loadSvgWithColors("/stop-var.svg", {
-                    ".stroke-fg": ["stroke", CATEGORIES[code].color],
-                    ".fill-fg": ["fill", CATEGORIES[code].color],
+                    ".stroke-fg": ["stroke", color],
+                    ".fill-fg": ["fill", color],
                 });
                 if (!m.hasImage(iconId)) {
                     m.addImage(iconId, image);

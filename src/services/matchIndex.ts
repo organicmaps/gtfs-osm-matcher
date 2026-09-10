@@ -8,10 +8,10 @@
 // range request instead of an error.
 //
 // Only `gtfs:id`, `type`, `lon`, `lat`, `byte_start`, `byte_end` and a category column
-// are required. `status`, `line`, `search_terms` and `strategies` are there for reading
-// the file by hand and for
-// a facet that does not exist yet; the panel's strategy badges come from the detail body,
-// which names them, so nothing here decodes the column.
+// are required. `status`, `line` and `search_terms` are there for reading the file by hand.
+// `strategies` is decoded, but only for its dissolution bits: the map draws from this file
+// and cannot fetch a body per stop, while the panel's strategy badges come from the detail
+// body, which names them.
 //
 // The category column is `kind` in current reports and was `status_detailed` in older
 // ones, which also folded the match strategies into it (`mid`, `mrt`, `mnm`, `nic`).
@@ -94,7 +94,34 @@ export type IndexRow = {
     lat: number
     byteStart: number
     byteEnd: number
+    /**
+     * Dissolution made a plan for this stop: it stands in for several places, and they take
+     * its calls. The stop keeps its row, its id and its position, and any call no part could
+     * take stays on it — so this is "its departures moved", not "it is gone".
+     *
+     * Whether they moved or only would have is not here: it is a fact about the feed, and
+     * `matchedRegions[].dissolution` states it once.
+     */
+    dissolutionPlanned: boolean
+    /** Dissolution considered this stop and left it whole; the body names the rule. */
+    dissolutionDeclined: boolean
 }
+
+/**
+ * Bits of the flag column, which the report calls `strategies` for historical reasons: the
+ * on/off facts about a stop, of which several hold at once. The first seven are match
+ * strategies; these two are what dissolution made of the stop.
+ *
+ * Which tense they belong to is not here, because it is not a fact about the stop: the run
+ * either acted on this feed or only measured it, and `matchedRegions[].dissolution` in the
+ * report says which, once.
+ *
+ * `1 << 8` is skipped. The report used to set it where a named stop also had an assignment,
+ * back when its measuring run had a detector that could name a family it could not deal;
+ * both runs now plan the same way, so it marked exactly the rows `1 << 7` marks.
+ */
+const FLAG_DISSOLUTION_PLANNED = 1 << 7;
+const FLAG_DISSOLUTION_DECLINED = 1 << 9;
 
 const REQUIRED = ['gtfs:id', 'type', 'lon', 'lat', 'byte_start', 'byte_end'];
 
@@ -162,6 +189,10 @@ export function parseIndex(tsv: string): ParsedIndex {
             continue;
         }
 
+        // Absent in a report from before the flags existed, which reads as a stop nothing
+        // was decided about -- true of every stop of a feed nobody analysed.
+        const flags = at['strategies'] !== undefined ? parseInt(c[at['strategies']], 10) : 0;
+
         rows.push({
             id: c[at['gtfs:id']],
             code: c[at[categoryColumn]],
@@ -170,6 +201,8 @@ export function parseIndex(tsv: string): ParsedIndex {
             lat,
             byteStart,
             byteEnd,
+            dissolutionPlanned: (flags & FLAG_DISSOLUTION_PLANNED) !== 0,
+            dissolutionDeclined: (flags & FLAG_DISSOLUTION_DECLINED) !== 0,
         });
     }
     return { rows, skipped };

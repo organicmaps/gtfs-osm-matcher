@@ -27,8 +27,9 @@ There are no tests and no ESLint. The only static check is `tsc -b`. The `tsconf
 
 ## Data contract (the heart of the app)
 
-- `GET {DATA_BASE_URL}/match-report.json?t=<now>` → `{ matchedRegions: Report[], foldByName: string[] }` — region list with per-region `matchStats`, `idTags` (which OSM tags hold GTFS ids, with counts — drives the editor's Set Id/Code defaults), `matchMeta` (timestamps, bbox, sources), `liveUpdates`; `foldByName` holds region-name prefixes the report table folds into groups. See `Report` in `src/uielements/report.tsx`. (There is no separate update-report.json anymore.)
-- `GET {DATA_BASE_URL}/{region}/index.tsv?t=<now>` → one row per GTFS stop: `id, status (m|…), code, type, lon, lat, byteStart, byteEnd, search_terms(ignored)`. `code` is the 3-letter sub-category (`status_detailed`), `type` picks the detail file.
+- `GET {DATA_BASE_URL}/match-report.json?t=<now>` → `{ matchedRegions: Report[], foldByName: string[] }` — region list with per-region `matchStats`, `idTags` (which OSM tags hold GTFS ids, with counts — drives the editor's Set Id/Code defaults), `matchMeta` (timestamps, bbox, sources), `liveUpdates`; `foldByName` holds region-name prefixes the report table folds into groups, and per-region `dissolution` (`on` / `analysis` / `off`) says whether that feed's run dealt its catch-all stops' departures, only measured them, or neither — it is what tells `dissolving` from `dissolvable`. See `Report` in `src/uielements/report.tsx`. (There is no separate update-report.json anymore.)
+- `GET {DATA_BASE_URL}/{region}/index.tsv?t=<now>` → one row per GTFS stop: `id, status (m|…), code, type, lon, lat, byteStart, byteEnd, search_terms(ignored)`. `code` is the 3-letter sub-category (`status_detailed`), `type` picks the detail file. The `strategies` column is a bit field; only its dissolution bits are decoded here (`1 << 7` planned, `1 << 9` declined — `1 << 8` is retired and left unused), because the map filters on them and cannot fetch a body per stop.
+- `GET {DATA_BASE_URL}/pt-structure.pmtiles` → the stop-structure overlay. One archive for all regions rather than one per region, so it is unaffected by a region switch and covers whatever the pipeline put in it; if it is missing entirely the request 404s and the button simply draws nothing. Fetched only when the PT structure button is pressed, which is also when `pmtiles` itself is imported. Its tiles are written at zoom 14 only, so below zoom 8 (`NEAR_ENOUGH_ZOOM`, from where the button zooms in for you) nothing is drawn.
 - Stop details are **NDJSON fetched with HTTP `Range` headers**: `type` → `matches.ndjson` / `clusters.ndjson` / `no-osm.ndjson` (`fileFor` in `report.tsx`), byte offsets from the index row. The detail JSON becomes the selected feature's properties.
 - `GET {DATA_BASE_URL}/{region}/routes.ndjson` → route index (with `byteOffset`/`byteLength`); `route-stops.ndjson` is then Range-fetched per route for variants + polylines (`route-list.tsx`, with module-level promise caches).
 - `GET {DATA_BASE_URL}/{region}/preview.geojson` → stops for the timetable-preview overlay.
@@ -79,7 +80,7 @@ Match data comes from our own pipeline and is trusted: fail visibly in the conso
 
 ## Main focus
 
-- Simplicity and less code: prefer the smallest change that works; no new dependencies (the runtime deps are exactly `preact` and `maplibre-gl` — even XML encoding is hand-rolled) or state/router libraries.
+- Simplicity and less code: prefer the smallest change that works; no new dependencies (the runtime deps are exactly `preact`, `maplibre-gl` and `pmtiles`, the last dynamically imported by the one button that needs it — even XML encoding is hand-rolled) or state/router libraries.
 - Performance on big regions: thousands of stops ride in one filtered source; details, routes, and schedules are lazy (Range requests, promise caches, compact encodings). Keep new data paths lazy too, and clean up overlays/markers on unmount.
 - Keep `docs/component-tree.md` in sync when adding/moving components.
 

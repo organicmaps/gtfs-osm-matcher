@@ -42,7 +42,7 @@ App  (src/app.tsx)
         └── #map-container
             ├── MapTools  (src/uielements/map-tools.tsx)  [floating panel, top-right of map]
             │   ├── map-tools-toggle  ◀/▶ fold button
-            │   ├── [map-tools-content: Help | Map Style | Location input + Goto OSM]
+            │   ├── [map-tools-content: Help | Sat/Geo | PT structure | Location input + Goto OSM]
             │   └── ReportHelpOverlay  [conditional: showHelp, portals into document.body]
             └── #map-view  (MapLibre GL canvas)
 ```

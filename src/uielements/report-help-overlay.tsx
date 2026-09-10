@@ -69,6 +69,20 @@ export function ReportHelpOverlay({ onClose }: { onClose: () => void }) {
                     </ul>
                 </p>
                 <p>
+                    A stop drawn <b>grey</b> is a catch-all standing in for its own bays whose
+                    departures this run dealt to those bays. The stop itself stays in the data,
+                    with its id and its position, and holds any departure no bay could take. It
+                    keeps whatever category matched it, so it is still shown and hidden by that
+                    category's checkbox. Where the tool measured such a stop without acting on
+                    it — a feed whose report says <b>analysis</b>, which is asked for per feed —
+                    it is marked <b>dissolvable</b> and drawn normally, because nothing was done
+                    to it. The selection panel says where its departures went, or would go, and
+                    names the rule where dissolution looked at a stop and left it whole. The
+                    report panel below says whether dissolution was switched on for the feed,
+                    only measured, or off — a feed with no marks and a feed nobody measured
+                    look the same otherwise.
+                </p>
+                <p>
                     If you found a bug or have a suggestion, please write us at
                     <span> <a href="mailto:publictransport@organicmaps.app">
                         publictransport@organicmaps.app
