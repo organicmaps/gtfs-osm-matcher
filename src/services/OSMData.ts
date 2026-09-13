@@ -49,12 +49,23 @@ export default class OSMData {
 
     private listeners = new Set<() => void>();
 
+    /**
+     * Bumped on every change, and the value `useSyncExternalStore` reads.
+     *
+     * `elements` is built once and pushed to, so its identity never changes and a snapshot of
+     * it is the same value before and after an Overpass response — the store fired, the
+     * snapshot compared equal, and nothing re-rendered. Anything derived from the store has to
+     * key on this instead.
+     */
+    revision = 0;
+
     subscribe(fn: () => void): () => void {
         this.listeners.add(fn);
         return () => this.listeners.delete(fn);
     }
 
     private emit() {
+        this.revision++;
         this.listeners.forEach(fn => fn());
     }
 
