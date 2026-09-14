@@ -10,6 +10,7 @@ export type OSMNode = {
     id: number
     type: "node"
     tags: OSMElementTags
+    version?: number
     
     lon: number
     lat: number
@@ -19,6 +20,7 @@ export type OSMWay = {
     id: number
     type: "way"
     tags: OSMElementTags
+    version?: number
     
     nodes: number[]
 }
@@ -33,6 +35,7 @@ export type OSMRelation = {
     id: number
     type: "relation"
     tags: OSMElementTags
+    version?: number
     
     members: OSMRelationMember[]
 }

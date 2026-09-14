@@ -65,20 +65,19 @@ function encodeChanges(changes: OSMDataChange[], region?: string) {
         const tagElements = Object.entries(element.tags || {})
             .map(([k, v]) => ({ tag: { _attr: { k, v } } }));
 
-        const { type, tags, ...rest } = element;
-        const { nodes, ...attr } = rest as Record<string, any>;
-
-        // @ts-ignore
-        attr['action'] = 'modify';
-        // @ts-ignore
-        attr['version'] = '1';
-
-        const children: any[] = [...tagElements];
-
-        if (element.type === 'way' && Array.isArray(nodes)) {
-            const ndElements = nodes.map((nodeId: number) => ({ nd: { _attr: { ref: nodeId } } }));
-            children.unshift(...ndElements);
+        const attr: Record<string, string | number> = {
+            id: element.id,
+            version: element.version ?? 0,
+            action: 'modify',
+        };
+        if (element.type === 'node') {
+            attr.lat = element.lat;
+            attr.lon = element.lon;
         }
+
+        const children = element.type === 'way'
+            ? [...element.nodes.map(ref => ({ nd: { _attr: { ref } } })), ...tagElements]
+            : tagElements;
 
         return {
             [element.type]: [{ _attr: attr }, ...children]
@@ -87,7 +86,7 @@ function encodeChanges(changes: OSMDataChange[], region?: string) {
 
     const changesetTags = [
         { tag: { _attr: { k: 'created_by', v: 'gtfs-osm-matcher.organicmaps.app' } } },
-        { tag: { _attr: { k: 'hashtags', v: '#gtfs;#gtfs-osm-matcher.organicmaps.app' } } },
+        { tag: { _attr: { k: 'hashtags', v: '#gtfs;#gtfs-osm-matcher;#organicmaps' } } },
     ];
 
     if (region) {
