@@ -127,3 +127,23 @@ span.loading-indicator {
     margin-left: 0;
     margin-right: 6px;
 }
+
+/* Sits under the anchor verdict it acts on, so it is spaced as part of that block rather
+   than fenced off as a panel header. Empty where the report has no anchors -- OsmMatchesSwitch
+   draws nothing then, and a wrapper holding nothing must not hold space either. */
+.selection-view-options {
+    margin: 8px 0 12px;
+}
+.selection-view-options:empty {
+    display: none;
+}
+
+/* Where the matcher put this stop, or why it would not. Read beside the osm-matches view,
+   which moves a stop's marker onto its anchor and cannot say why one did not move. */
+.anchor-verdict {
+    margin: 6px 0;
+    font-size: 13px;
+}
+.anchor-verdict.not-anchored {
+    color: #6b7280;
+}

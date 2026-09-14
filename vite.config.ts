@@ -17,10 +17,16 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: {
             preact: ['preact', 'preact/hooks', 'preact/compat'],
-            maplibre: ['maplibre-gl']
+            maplibre: ['maplibre-gl'],
+            // Named, not split, by this entry: the `await import('pmtiles')` in map.ts is what
+            // keeps it out of the entry bundle until the stop-structure layer is switched on.
+            pmtiles: ['pmtiles']
           }
         }
       }
+    },
+    optimizeDeps: {
+      exclude: ['maplibre-gl'],
     },
     server: {
       proxy: {

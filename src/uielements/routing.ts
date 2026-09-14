@@ -34,21 +34,27 @@ export function parseUrlReportRegion(hashString: string) {
 }
 
 export type SelectionHash = {
-    kind: 'preview' | 'selection';
     id: string;
+    /**
+     * True where the hash said `/preview/`. Those links were written by the preview panel
+     * this app no longer has, and some of their ids -- a generated station's, for one -- were
+     * never rows of `index.tsv`. An id from one of them that resolves to nothing is a link
+     * from an older build, not a report with something missing.
+     */
+    legacy: boolean;
 };
 
-// `…/preview/{id}` for a stop in the matcher's own output, `…/selection/{id}` for one in
-// the match report. The category is no longer part of the URL — it is recovered from
-// index.tsv. The id is percent-encoded by whoever wrote the hash, since GTFS ids are
+// `…/selection/{id}` names a stop of the report. `…/preview/{id}` is read as the same
+// thing: the preview used to be a dataset of its own with its own links, and is now a way
+// of drawing the report's stops. Most of those ids are report stops and still resolve; the
+// ones that are not — a generated station the preview minted — are reported as unknown
+// rather than silently ignored. The category is not in the URL at all; it is recovered
+// from index.tsv. The id is percent-encoded by whoever wrote the hash, since GTFS ids are
 // free-form and a raw '/' would end the segment here.
 export function parseSelectionHash(hashString: string): SelectionHash | undefined {
     const match = hashString.match(/\/(preview|selection)\/([^/]+)/);
     if (match) {
-        return {
-            kind: match[1] as 'preview' | 'selection',
-            id: decodeId(match[2]),
-        };
+        return { id: decodeId(match[2]), legacy: match[1] === 'preview' };
     }
 }
 

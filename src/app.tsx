@@ -5,10 +5,9 @@ import type { LayerControls } from './map/layers-controls';
 
 import './app.css'
 import { createMap } from './map/map';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { MatchReportSelector } from './uielements/report-selector';
 import { SelectionInfo } from './uielements/selection-info';
-import { Preview } from './uielements/preview';
 import { MapTools } from './uielements/map-tools';
 import { parseUrlReportRegion, useHashRoute } from './uielements/routing';
 import { cls } from './uielements/cls';
@@ -97,11 +96,49 @@ export const SelectionContext = createContext<SelectionContextT>({
   updateSelection: () => { }
 });
 
+/**
+ * OSM-matches view options: re-project each stop's marker onto the OSM feature the
+ * matcher anchored it to, instead of where its feed puts it. Shared between the report
+ * and the selection panel — they are siblings under App, so a control wanted in both
+ * cannot own its state in either.
+ */
+export type OsmMatchesOptionsT = {
+  osmMatchesOn: boolean;
+  setOsmMatchesOn: (on: boolean) => void;
+  /** Whether the loaded report has any anchored stops to re-project. Published by the report,
+   *  consumed by the switch, which is rendered in two places and must not offer a control that
+   *  would immediately turn itself off. */
+  osmMatchesAvailable: boolean;
+  setOsmMatchesAvailable: (available: boolean) => void;
+};
+
+export const OsmMatchesOptionsContext = createContext<OsmMatchesOptionsT>({
+  osmMatchesOn: false,
+  setOsmMatchesOn: () => { },
+  osmMatchesAvailable: false,
+  setOsmMatchesAvailable: () => { }
+});
+
 export function App() {
   const [activeTab, setActiveTab] = useState<'report' | 'selection' | 'changes'>('report');
   const [mapContextVal, setMapContextVal] = useState<MapContextT>();
   const [selection, updateSelection] = useState<SelectionT | null>(null);
   const [selectionSource, updateSelectionSource] = useState<SelectionSourceT>('app-init');
+  // Shared with the selection panel, which is the report's sibling rather than its child.
+  const [osmMatchesOn, setOsmMatchesOn] = useState(false);
+  const [osmMatchesAvailable, setOsmMatchesAvailable] = useState(false);
+
+  // A region with no anchors, or the report list, leaves nothing to show on osm matches -- and
+  // the switch outlives both, so it is cleared here rather than by whichever component noticed.
+  useEffect(() => {
+    if (!osmMatchesAvailable && osmMatchesOn) setOsmMatchesOn(false);
+  }, [osmMatchesAvailable, osmMatchesOn]);
+
+  // Memoised: a fresh object here force-renders every consumer on every App render, and
+  // both consumers are whole panels.
+  const osmMatchesOptions = useMemo(
+    () => ({ osmMatchesOn, setOsmMatchesOn, osmMatchesAvailable, setOsmMatchesAvailable }),
+    [osmMatchesOn, osmMatchesAvailable]);
 
   const selectionContext: SelectionContextT = {
     selection,
@@ -125,7 +162,6 @@ export function App() {
 
   useEffect(() => {
     const reportRegion = selection?.reportRegion;
-    const datasetName = selection?.datasetName;
 
     const clusterGtfsFeaturesStr = selection?.feature.properties?.gtfsFeatures;
     const clusterGtfsFeatures = clusterGtfsFeaturesStr && JSON.parse(clusterGtfsFeaturesStr);
@@ -139,7 +175,7 @@ export function App() {
         // GTFS ids are free-form UTF-8 and do occur with spaces, '#' or '/': a '#'
         // truncates the hash and parseSelectionHash's [^/]+ cuts at a slash.
         const encoded = encodeURIComponent(id);
-        hash += datasetName === 'preview' ? `/preview/${encoded}` : `/selection/${encoded}`;
+        hash += `/selection/${encoded}`;
       }
 
       window.location.hash = hash;
@@ -147,44 +183,42 @@ export function App() {
   }, [selection]);
 
 
-  const preview = selection?.datasetName === 'preview';
   const reportRegion = useHashRoute(parseUrlReportRegion);
 
   return (
     <>
       <MapContext value={mapContextVal} >
         <SelectionContext value={selectionContext} >
-          <div id="content-area">
-            <div id="side-panel" className={cls(reportRegion && 'slim')}>
-              <SidePanelNav
-                reportRegion={reportRegion}
-                selection={selection}
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
-                onBackToReports={() => selectionContext.onReportSelect(null)}
-              />
+          <OsmMatchesOptionsContext value={osmMatchesOptions} >
+            <div id="content-area">
+              <div id="side-panel" className={cls(reportRegion && 'slim')}>
+                <SidePanelNav
+                  reportRegion={reportRegion}
+                  selection={selection}
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                  onBackToReports={() => selectionContext.onReportSelect(null)}
+                />
 
-              <div className={cls(activeTab !== 'selection' && 'tab-hidden')}>
-                {preview ?
-                  <Preview selection={selection} /> :
+                <div className={cls(activeTab !== 'selection' && 'tab-hidden')}>
                   <SelectionInfo selection={selection} />
-                }
-              </div>
+                </div>
 
-              <div className={cls(activeTab !== 'report' && 'tab-hidden')}>
-                <MatchReportSelector onSelectReport={selectionContext.onReportSelect} />
-              </div>
+                <div className={cls(activeTab !== 'report' && 'tab-hidden')}>
+                  <MatchReportSelector onSelectReport={selectionContext.onReportSelect} />
+                </div>
 
               <div className={cls(activeTab !== 'changes' && 'tab-hidden')}>
                 <Changes osmData={OSM_DATA} region={reportRegion} />
               </div>
 
+              </div>
+              <div id="map-container">
+                <MapTools />
+                <div id="map-view"></div>
+              </div>
             </div>
-            <div id="map-container">
-              <MapTools />
-              <div id="map-view"></div>
-            </div>
-          </div>
+          </OsmMatchesOptionsContext>
         </SelectionContext>
       </MapContext>
     </>

@@ -105,6 +105,13 @@ export type IndexRow = {
     dissolutionPlanned: boolean
     /** Dissolution considered this stop and left it whole; the body names the rule. */
     dissolutionDeclined: boolean
+    /**
+     * Where the matcher's anchoring put the stop, or null where it refused. The report
+     * marker is drawn from this row, so the row is what has to know: without it the map
+     * could not show the anchored position without fetching every stop's detail body.
+     */
+    anchorLon: number | null
+    anchorLat: number | null
 }
 
 /**
@@ -193,6 +200,12 @@ export function parseIndex(tsv: string): ParsedIndex {
         // was decided about -- true of every stop of a feed nobody analysed.
         const flags = at['strategies'] !== undefined ? parseInt(c[at['strategies']], 10) : 0;
 
+        // Absent for a stop the anchoring refused, which is not the same as a stop anchored
+        // exactly where its feed puts it -- so an empty cell stays null rather than becoming
+        // the feed position.
+        const anchorLon = at['anchor_lon'] !== undefined ? parseFloat(c[at['anchor_lon']]) : NaN;
+        const anchorLat = at['anchor_lat'] !== undefined ? parseFloat(c[at['anchor_lat']]) : NaN;
+
         rows.push({
             id: c[at['gtfs:id']],
             code: c[at[categoryColumn]],
@@ -203,6 +216,10 @@ export function parseIndex(tsv: string): ParsedIndex {
             byteEnd,
             dissolutionPlanned: (flags & FLAG_DISSOLUTION_PLANNED) !== 0,
             dissolutionDeclined: (flags & FLAG_DISSOLUTION_DECLINED) !== 0,
+            // Both or neither: half an anchor is not a position, and two fields that can
+            // disagree invite two different tests for "is this stop anchored".
+            anchorLon: Number.isFinite(anchorLon) && Number.isFinite(anchorLat) ? anchorLon : null,
+            anchorLat: Number.isFinite(anchorLon) && Number.isFinite(anchorLat) ? anchorLat : null,
         });
     }
     return { rows, skipped };
