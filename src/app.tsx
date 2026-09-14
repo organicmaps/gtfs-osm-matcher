@@ -176,7 +176,7 @@ export function App() {
               </div>
 
               <div className={cls(activeTab !== 'changes' && 'tab-hidden')}>
-                <Changes osmData={OSM_DATA} />
+                <Changes osmData={OSM_DATA} region={reportRegion} />
               </div>
 
             </div>
