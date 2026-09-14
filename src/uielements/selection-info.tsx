@@ -2,6 +2,7 @@ import "./selection-info.css";
 
 import { useCallback, useContext, useEffect, useMemo, useState } from "preact/hooks";
 import { SelectionContext, type SelectionT } from "../app";
+import type { Geometry } from "geojson";
 
 import { getDistanceLonLat } from "../map/distance";
 import { LocateMe } from "./locate-me";
@@ -113,7 +114,7 @@ function strategiesOf(properties: { [key: string]: any }, datasetName?: string):
 
 type MatchInfoProps = {
     properties: { [k: string]: any }
-    geometry: GeoJSON.Geometry | undefined
+    geometry: Geometry | undefined
     reportRegion: string
     datasetName?: string
     idTags?: { [k: string]: number }

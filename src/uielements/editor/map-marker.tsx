@@ -46,8 +46,8 @@ export function HtmlMapMarker({ name, lat, lon, className, mouseEvents }: HtmlMa
         const { onClick, onHoverUpdate } = mouseEvents || {};
 
         m.on('click', () => onClick?.());
-        m.on('mouseenter', () => onHoverUpdate?.(true));
-        m.on('mouseleave', () => onHoverUpdate?.(false));
+        m.getElement().addEventListener('mouseenter', () => onHoverUpdate?.(true));
+        m.getElement().addEventListener('mouseleave', () => onHoverUpdate?.(false));
 
         return () => {
             m.remove();

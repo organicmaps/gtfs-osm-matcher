@@ -1,4 +1,5 @@
-import maplibregl, { Map } from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
+import type { Map } from "maplibre-gl";
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { DATA_BASE_URL } from "../config";
 import { satMapStyle } from "./styling";
