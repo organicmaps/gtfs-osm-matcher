@@ -25,6 +25,9 @@ export default defineConfig(({ mode }) => {
         }
       }
     },
+    optimizeDeps: {
+      exclude: ['maplibre-gl'],
+    },
     server: {
       proxy: {
         '/data': {
