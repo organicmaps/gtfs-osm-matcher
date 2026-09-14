@@ -1,9 +1,12 @@
 import * as maplibregl from "maplibre-gl";
+import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import type { Map } from "maplibre-gl";
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { DATA_BASE_URL } from "../config";
 import { satMapStyle } from "./styling";
 import { LayerControls } from "./layers-controls";
+
+maplibregl.setWorkerUrl(workerUrl);
 
 // Zoom further away for mobile
 const DEFAULT_ZOOM = screen.width > 1200 ? 4 : 1;
