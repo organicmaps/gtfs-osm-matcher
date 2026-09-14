@@ -5,9 +5,10 @@ import "./changes.css";
 import { cls } from "../cls";
 
 type ChangesProps = {
-    osmData?: OSMData
+    osmData?: OSMData,
+    region?: string
 };
-export function Changes({ osmData }: ChangesProps) {
+export function Changes({ osmData, region }: ChangesProps) {
     const [ignoredChanges, setIgnoredChanges] = useState<string[]>([]);
 
     const downloadHandler = useCallback(() => {
@@ -15,7 +16,7 @@ export function Changes({ osmData }: ChangesProps) {
         const filteredChanges = changes?.filter(ch => !ignoredChanges.includes(`${ch.element.type[0]}${ch.element.id}`));
 
         if (filteredChanges) {
-            const data = encodeChanges(filteredChanges);
+            const data = encodeChanges(filteredChanges, region);
 
             const blob = new Blob([data], { type: 'application/xml' });
             const url = URL.createObjectURL(blob);
@@ -24,7 +25,7 @@ export function Changes({ osmData }: ChangesProps) {
 
             URL.revokeObjectURL(url);
         }
-    }, [osmData, ignoredChanges]);
+    }, [osmData, ignoredChanges, region]);
 
     const changes = osmData?.listChanges().map(ch => {
         const nwrId = `${ch.element.type[0]}${ch.element.id}`;
@@ -59,24 +60,40 @@ export function Changes({ osmData }: ChangesProps) {
     </>
 }
 
-function encodeChanges(changes: OSMDataChange[]) {
+function encodeChanges(changes: OSMDataChange[], region?: string) {
     const xmlNodes = changes.map(({ element }) => {
         const tagElements = Object.entries(element.tags || {})
             .map(([k, v]) => ({ tag: { _attr: { k, v } } }));
 
-        const { type, tags, ...attr } = element;
+        const attr: Record<string, string | number> = {
+            id: element.id,
+            version: element.version ?? 0,
+            action: 'modify',
+        };
+        if (element.type === 'node') {
+            attr.lat = element.lat;
+            attr.lon = element.lon;
+        }
 
-        // @ts-ignore
-        attr['action'] = 'modify';
-        // @ts-ignore
-        attr['version'] = '1';
+        const children = element.type === 'way'
+            ? [...element.nodes.map(ref => ({ nd: { _attr: { ref } } })), ...tagElements]
+            : tagElements;
 
         return {
-            [element.type]: [{ _attr: attr }, ...tagElements]
+            [element.type]: [{ _attr: attr }, ...children]
         }
     });
 
-    return xml({ osm: [{ _attr: { version: "0.6", generator: "osm-gtfs" } }, ...xmlNodes] }, { declaration: true });
+    const changesetTags = [
+        { tag: { _attr: { k: 'created_by', v: 'gtfs-osm-matcher.organicmaps.app' } } },
+        { tag: { _attr: { k: 'hashtags', v: '#gtfs;#gtfs-osm-matcher;#organicmaps' } } },
+    ];
+
+    if (region) {
+        changesetTags.push({ tag: { _attr: { k: 'data_used', v: region } } });
+    }
+
+    return xml({ osm: [{ _attr: { version: "0.6", generator: "osm-gtfs" } }, ...changesetTags, ...xmlNodes] }, { declaration: true });
 }
 
 function xml(root: any, options?: { declaration?: boolean }) {

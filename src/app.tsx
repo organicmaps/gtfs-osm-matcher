@@ -208,9 +208,9 @@ export function App() {
                   <MatchReportSelector onSelectReport={selectionContext.onReportSelect} />
                 </div>
 
-                <div className={cls(activeTab !== 'changes' && 'tab-hidden')}>
-                  <Changes osmData={OSM_DATA} />
-                </div>
+              <div className={cls(activeTab !== 'changes' && 'tab-hidden')}>
+                <Changes osmData={OSM_DATA} region={reportRegion} />
+              </div>
 
               </div>
               <div id="map-container">
