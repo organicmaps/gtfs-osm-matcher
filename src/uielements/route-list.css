@@ -54,3 +54,29 @@
 .route-type-group-header {
     margin-right: 4px;
 }
+
+.route-match-badge {
+    display: inline-block;
+    margin-left: 4px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.route-match-badge--matched {
+    color: #2e7d32;
+}
+
+.route-match-badge--unmatched {
+    color: #c62828;
+}
+
+.route-osm-link {
+    margin-left: 4px;
+    font-size: 0.85em;
+    color: #1565c0;
+    text-decoration: none;
+}
+
+.route-osm-link:hover {
+    text-decoration: underline;
+}

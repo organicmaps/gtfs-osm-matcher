@@ -8,6 +8,7 @@ export type RouteVariant = {
     gtfsIds: string[];
     dir?: number;
     inx: number;
+    osm?: number;
 };
 
 // Cache keyed by region+routeId — independent of which stop, panel or selection triggered

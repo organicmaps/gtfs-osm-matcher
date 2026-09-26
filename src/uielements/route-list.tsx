@@ -4,10 +4,11 @@ import { RoutesMap, type FullRouteDisplayEntry } from "./routes";
 import { cls } from "./cls";
 import { getRouteVariants, type RouteVariant } from "../services/routeVariants";
 import { memoFetch } from "../services/memoFetch";
+import { osmFeatureUrl } from "../services/OSMData";
 
 import "./route-list.css";
 
-type RouteIndexEntry = {
+export type RouteIndexEntry = {
     routeId: string;
     shortName: string;
     longName: string;
@@ -16,16 +17,17 @@ type RouteIndexEntry = {
     agency: string;
     byteOffset: number;
     byteLength: number;
+    matchStatus?: string;
 };
 
-type RouteWithVariants = {
+export type RouteWithVariants = {
     index: RouteIndexEntry;
     variants: RouteVariant[];
 };
 
 const routeIndexCache: { [region: string]: Promise<RouteIndexEntry[]> } = {};
 
-function getRouteIndex(reportRegion: string): Promise<RouteIndexEntry[]> {
+export function getRouteIndex(reportRegion: string): Promise<RouteIndexEntry[]> {
     return memoFetch(routeIndexCache, reportRegion, () =>
         fetch(`${DATA_BASE_URL}/${reportRegion}/routes.ndjson`)
             .then(r => {
@@ -51,11 +53,23 @@ type RoutePillProps = {
 
 function RoutePill({ route: r, variants, selectedRouteId, selectedVariantInx, onSelectRoute, onSelectVariant }: RoutePillProps) {
     const isSelected = selectedRouteId === r.routeId;
+    const osmRelId = variants.find(v => v.osm)?.osm;
     return (
         <span
             onClick={() => onSelectRoute(r.routeId)}
             className={cls('route-pill', (!selectedRouteId || isSelected) && 'route-pill--selected')}>
             {r.shortName || r.routeId}
+            {r.matchStatus &&
+                <span className={cls('route-match-badge', `route-match-badge--${r.matchStatus}`)}
+                    title={r.matchStatus === 'matched' ? 'Matched to an OSM relation' : 'No OSM relation matched'}>
+                    {r.matchStatus === 'matched' ? '\u2713' : '\u2717'}
+                </span>}
+            {osmRelId != null &&
+                <a href={osmFeatureUrl(`r${osmRelId}`)} target="_blank" rel="noopener"
+                    onClick={e => e.stopPropagation()}
+                    className="route-osm-link" title="OSM relation">
+                    {'\u2197'}r{osmRelId}
+                </a>}
             {variants.length > 1 &&
                 <span>
                     {' Variants: '}

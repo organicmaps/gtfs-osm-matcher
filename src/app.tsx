@@ -13,6 +13,7 @@ import { parseUrlReportRegion, useHashRoute } from './uielements/routing';
 import { cls } from './uielements/cls';
 import { OSM_DATA } from './services/OSMData';
 import { Changes } from './uielements/editor/changes';
+import { RoutesTab } from './uielements/routes-tab';
 import { useSyncExternalStore } from 'preact/compat';
 
 export type MapContextT = {
@@ -48,8 +49,8 @@ const togglePanel = () =>
 type SidePanelNavProps = {
   reportRegion: string | undefined;
   selection: SelectionT | null;
-  activeTab: 'report' | 'selection' | 'changes';
-  setActiveTab: (tab: 'report' | 'selection' | 'changes') => void;
+  activeTab: 'report' | 'routes' | 'selection' | 'changes';
+  setActiveTab: (tab: 'report' | 'routes' | 'selection' | 'changes') => void;
   onBackToReports: () => void;
 }
 
@@ -69,6 +70,9 @@ function SidePanelNav({ reportRegion, selection, activeTab, setActiveTab, onBack
       {reportRegion && <>
         <span className={cls('tab', activeTab === 'report' && 'tab-active')}
           onClick={() => { restorePanel(); setActiveTab('report'); }}>Report</span>
+        <span className={'tab-sep'}>|</span>
+        <span className={cls('tab', activeTab === 'routes' && 'tab-active')}
+          onClick={() => { restorePanel(); setActiveTab('routes'); }}>Routes</span>
         <span className={'tab-sep'}>|</span>
       </>}
       {selection && <>
@@ -120,7 +124,7 @@ export const OsmMatchesOptionsContext = createContext<OsmMatchesOptionsT>({
 });
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'report' | 'selection' | 'changes'>('report');
+  const [activeTab, setActiveTab] = useState<'report' | 'routes' | 'selection' | 'changes'>('report');
   const [mapContextVal, setMapContextVal] = useState<MapContextT>();
   const [selection, updateSelection] = useState<SelectionT | null>(null);
   const [selectionSource, updateSelectionSource] = useState<SelectionSourceT>('app-init');
@@ -206,6 +210,10 @@ export function App() {
 
                 <div className={cls(activeTab !== 'report' && 'tab-hidden')}>
                   <MatchReportSelector onSelectReport={selectionContext.onReportSelect} />
+                </div>
+
+                <div className={cls(activeTab !== 'routes' && 'tab-hidden')}>
+                  {reportRegion && <RoutesTab reportRegion={reportRegion} />}
                 </div>
 
               <div className={cls(activeTab !== 'changes' && 'tab-hidden')}>

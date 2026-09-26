@@ -1,0 +1,84 @@
+.routes-tab {
+    padding: 4px;
+}
+
+.routes-tab-stats {
+    font-size: 0.85em;
+    margin-bottom: 6px;
+    color: #555;
+}
+
+.routes-tab-filters {
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.routes-tab-filter {
+    font-size: 0.85em;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.routes-tab-search {
+    flex: 1;
+    min-width: 100px;
+    padding: 2px 6px;
+    font-size: 0.85em;
+    border: 1px solid #666;
+    border-radius: 3px;
+}
+
+.routes-tab-list {
+    max-height: calc(100vh - 180px);
+    overflow-y: auto;
+}
+
+.routes-tab-row {
+    border-bottom: 1px solid #eee;
+}
+
+.routes-tab-route-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+    cursor: pointer;
+}
+
+.routes-tab-expand {
+    font-size: 0.75em;
+    width: 1em;
+    color: #888;
+}
+
+.routes-tab-long-name {
+    font-size: 0.85em;
+    color: #444;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+
+.routes-tab-route-type {
+    font-size: 0.8em;
+    color: #888;
+    flex-shrink: 0;
+}
+
+.routes-tab-variants {
+    padding: 3px 0 3px 1.5em;
+}
+
+.routes-tab-variant {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 0;
+    font-size: 0.85em;
+    color: #555;
+}
