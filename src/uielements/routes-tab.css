@@ -48,6 +48,29 @@
     cursor: pointer;
 }
 
+.routes-tab-route-header--selected {
+    background: #f3f3f3;
+}
+
+.routes-tab-map-status {
+    margin-bottom: 6px;
+    font-size: 0.85em;
+}
+
+.routes-tab-legend-gtfs {
+    color: #c00;
+    font-weight: bold;
+}
+
+.routes-tab-legend-osm {
+    color: #0876c7;
+    font-weight: bold;
+}
+
+.routes-tab-map-error {
+    color: #a00;
+}
+
 .routes-tab-expand {
     font-size: 0.75em;
     width: 1em;
@@ -81,4 +104,11 @@
     padding: 2px 0;
     font-size: 0.85em;
     color: #555;
+    cursor: pointer;
+}
+
+.routes-tab-variant--selected {
+    background: #dcecf9;
+    color: #124d75;
+    font-weight: bold;
 }

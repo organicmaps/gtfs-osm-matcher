@@ -91,9 +91,10 @@ type RouteListProps = {
     routeIds: string[];
     routeTypes?: string;
     gtfsStopIds: string[];
+    showRouteMap: boolean;
 };
 
-export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: RouteListProps) {
+export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds, showRouteMap }: RouteListProps) {
     const [routeIndex, setRouteIndex] = useState<RouteIndexEntry[]>([]);
     const [routesWithVariants, setRoutesWithVariants] = useState<RouteWithVariants[]>([]);
     const [loading, setLoading] = useState(false);
@@ -172,7 +173,8 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
                         const allVariants = await getRouteVariants(
                             reportRegion, entry.routeId, entry.byteOffset, entry.byteLength);
                         const variants = allVariants.filter(v =>
-                            v.gtfsIds.some(id => gtfsStopIds.includes(id)));
+                            v.gtfsIds.some(id => gtfsStopIds.includes(id)) ||
+                            v.alternateGtfsIds?.some(id => gtfsStopIds.includes(id)));
                         return variants.length > 0 ? { index: entry, variants } : null;
                     })
                 );
@@ -258,7 +260,7 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
 
     return (
         <div>
-            {routesWithVariants.length > 0 && <RoutesMap fullRoutes={fullRouteEntries} />}
+            {showRouteMap && routesWithVariants.length > 0 && <RoutesMap fullRoutes={fullRouteEntries} />}
             {routeTypeHeader}
             {grouped.size > 1 ? (
                 <div>

@@ -205,7 +205,7 @@ export function App() {
                 />
 
                 <div className={cls(activeTab !== 'selection' && 'tab-hidden')}>
-                  <SelectionInfo selection={selection} />
+                  <SelectionInfo selection={selection} showRouteMap={activeTab !== 'routes'} />
                 </div>
 
                 <div className={cls(activeTab !== 'report' && 'tab-hidden')}>
@@ -213,12 +213,12 @@ export function App() {
                 </div>
 
                 <div className={cls(activeTab !== 'routes' && 'tab-hidden')}>
-                  {reportRegion && <RoutesTab reportRegion={reportRegion} />}
+                  {reportRegion && <RoutesTab key={reportRegion} reportRegion={reportRegion} active={activeTab === 'routes'} />}
                 </div>
 
-              <div className={cls(activeTab !== 'changes' && 'tab-hidden')}>
-                <Changes osmData={OSM_DATA} region={reportRegion} />
-              </div>
+                <div className={cls(activeTab !== 'changes' && 'tab-hidden')}>
+                  <Changes osmData={OSM_DATA} region={reportRegion} />
+                </div>
 
               </div>
               <div id="map-container">

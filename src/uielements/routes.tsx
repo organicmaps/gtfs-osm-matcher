@@ -6,6 +6,7 @@ import type { GeoJSONSource } from "maplibre-gl";
 export type FullRouteDisplayEntry = {
     routeKey: string;
     coordinates: [number, number][];
+    kind?: 'gtfs' | 'osm';
 }
 
 type RoutesMapProps = {
@@ -22,7 +23,7 @@ export function RoutesMap({ fullRoutes = [] }: RoutesMapProps) {
     // whenever its parent does, and a fresh array identity makes the effect below
     // wipe the source to an empty FeatureCollection before setting it again --
     // visible as a flash on every unrelated state change.
-    const allFeatures = useMemo(() => fullRoutes.map(({ routeKey, coordinates }) => ({
+    const allFeatures = useMemo(() => fullRoutes.map(({ routeKey, coordinates, kind }) => ({
         type: 'Feature',
         geometry: {
             type: 'LineString',
@@ -30,7 +31,7 @@ export function RoutesMap({ fullRoutes = [] }: RoutesMapProps) {
         },
         properties: {
             name: routeKey,
-            color: 'green'
+            kind: kind || 'gtfs'
         }
     })), [fullRoutes]);
 

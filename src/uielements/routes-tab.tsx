@@ -1,7 +1,9 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import { getRouteIndex, type RouteIndexEntry } from "./route-list";
 import { getRouteVariants, type RouteVariant } from "../services/routeVariants";
+import { getOsmRouteGeometry } from "../services/osmRouteGeometry";
 import { osmFeatureUrl } from "../services/OSMData";
+import { RoutesMap, type FullRouteDisplayEntry } from "./routes";
 import { cls } from "./cls";
 
 import "./route-list.css";
@@ -9,17 +11,22 @@ import "./routes-tab.css";
 
 type RoutesTabProps = {
     reportRegion: string;
+    active: boolean;
 };
 
-export function RoutesTab({ reportRegion }: RoutesTabProps) {
+export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
     const [index, setIndex] = useState<RouteIndexEntry[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [filter, setFilter] = useState<'all' | 'matched' | 'unmatched'>('all');
     const [search, setSearch] = useState('');
     const [expandedRoute, setExpandedRoute] = useState<string | null>(null);
+    const [selectedVariantInx, setSelectedVariantInx] = useState<number | null>(null);
     const [variantsByRoute, setVariantsByRoute] = useState<Record<string, RouteVariant[]>>({});
     const [variantLoading, setVariantLoading] = useState<string | null>(null);
+    const [osmGeometry, setOsmGeometry] = useState<{ relationId: number; lines: [number, number][][] } | null>(null);
+    const [osmLoadingId, setOsmLoadingId] = useState<number | null>(null);
+    const [osmError, setOsmError] = useState<{ relationId: number; message: string } | null>(null);
 
     useEffect(() => {
         if (!reportRegion) return;
@@ -60,12 +67,65 @@ export function RoutesTab({ reportRegion }: RoutesTabProps) {
     const unmatchedCount = index.filter(r => r.matchStatus === 'unmatched').length;
     const noDataCount = index.length - matchedCount - unmatchedCount;
 
+    const selectedVariant = selectedVariantInx === null ? undefined :
+        (variantsByRoute[expandedRoute || ''] || []).find(v => v.inx === selectedVariantInx);
+    const selectedOsmRelationId = selectedVariant?.osm;
+
+    useEffect(() => {
+        if (!active || selectedOsmRelationId == null) {
+            setOsmLoadingId(null);
+            return;
+        }
+        let cancelled = false;
+        setOsmLoadingId(selectedOsmRelationId);
+        setOsmError(null);
+        getOsmRouteGeometry(selectedOsmRelationId)
+            .then(lines => {
+                if (!cancelled) {
+                    setOsmGeometry({ relationId: selectedOsmRelationId, lines });
+                    setOsmLoadingId(null);
+                }
+            })
+            .catch(e => {
+                if (!cancelled) {
+                    setOsmError({ relationId: selectedOsmRelationId, message: String(e) });
+                    setOsmLoadingId(null);
+                }
+            });
+        return () => { cancelled = true; };
+    }, [active, selectedOsmRelationId]);
+
+    const mapEntries = useMemo<FullRouteDisplayEntry[]>(() => {
+        if (!expandedRoute) return [];
+        const route = index.find(r => r.routeId === expandedRoute);
+        const variants = variantsByRoute[expandedRoute] || [];
+        const shown = selectedVariantInx === null ? variants :
+            variants.filter(v => v.inx === selectedVariantInx);
+        const gtfs = shown.filter(v => v.latlon.length >= 4).map(v => {
+            const coordinates: [number, number][] = [];
+            for (let i = 0; i < v.latlon.length; i += 2) {
+                coordinates.push([v.latlon[i + 1], v.latlon[i]]);
+            }
+            return { routeKey: `${route?.shortName || expandedRoute} #${v.inx + 1}`, coordinates };
+        });
+        const osm = selectedOsmRelationId != null && osmGeometry?.relationId === selectedOsmRelationId
+            ? osmGeometry.lines.map(coordinates => ({
+                routeKey: `OSM r${selectedOsmRelationId}`, coordinates, kind: 'osm' as const,
+            })) : [];
+        return [...gtfs, ...osm];
+    }, [expandedRoute, index, variantsByRoute, selectedVariantInx, selectedOsmRelationId, osmGeometry]);
+
     const expandRoute = (routeId: string) => {
         if (expandedRoute === routeId) {
+            if (selectedVariantInx !== null) {
+                setSelectedVariantInx(null);
+                return;
+            }
             setExpandedRoute(null);
             return;
         }
         setExpandedRoute(routeId);
+        setSelectedVariantInx(null);
         if (variantsByRoute[routeId]) return;
         const entry = index.find(r => r.routeId === routeId);
         if (!entry) return;
@@ -87,6 +147,7 @@ export function RoutesTab({ reportRegion }: RoutesTabProps) {
 
     return (
         <div className="routes-tab">
+            {active && mapEntries.length > 0 && <RoutesMap fullRoutes={mapEntries} />}
             <div className="routes-tab-stats">
                 {hasMatchData ? (
                     <span>
@@ -101,6 +162,18 @@ export function RoutesTab({ reportRegion }: RoutesTabProps) {
                     <span>{index.length} routes</span>
                 )}
             </div>
+
+            {expandedRoute && <div className="routes-tab-map-status">
+                <span className="routes-tab-legend-gtfs">GTFS</span>
+                {selectedOsmRelationId != null && <>
+                    {' · '}<span className="routes-tab-legend-osm">OSM r{selectedOsmRelationId}</span>
+                    {osmLoadingId === selectedOsmRelationId && ' (loading…)'}
+                    {osmGeometry?.relationId === selectedOsmRelationId && osmGeometry.lines.length === 0 &&
+                        ' (no drawable ways)'}
+                    {osmError?.relationId === selectedOsmRelationId &&
+                        <span className="routes-tab-map-error"> — {osmError.message}</span>}
+                </>}
+            </div>}
 
             <div className="routes-tab-filters">
                 {hasMatchData && <>
@@ -127,7 +200,8 @@ export function RoutesTab({ reportRegion }: RoutesTabProps) {
             <div className="routes-tab-list">
                 {filtered.map(r => (
                     <div key={r.routeId} className="routes-tab-row">
-                        <div className="routes-tab-route-header" onClick={() => expandRoute(r.routeId)}>
+                        <div className={cls('routes-tab-route-header', expandedRoute === r.routeId && 'routes-tab-route-header--selected')}
+                            onClick={() => expandRoute(r.routeId)}>
                             <span className="routes-tab-expand">
                                 {expandedRoute === r.routeId ? '▼' : '▶'}
                             </span>
@@ -147,7 +221,9 @@ export function RoutesTab({ reportRegion }: RoutesTabProps) {
                             <div className="routes-tab-variants">
                                 {variantLoading === r.routeId && <div>Loading variants…</div>}
                                 {(variantsByRoute[r.routeId] || []).map((v, i) => (
-                                    <div key={i} className="routes-tab-variant">
+                                    <div key={v.inx}
+                                        className={cls('routes-tab-variant', selectedVariantInx === v.inx && 'routes-tab-variant--selected')}
+                                        onClick={() => setSelectedVariantInx(prev => prev === v.inx ? null : v.inx)}>
                                         <span>
                                             #{i + 1}
                                             {v.dir != null ? ` ${v.dir === 0 ? '\u2191' : '\u2193'}` : ''}
@@ -155,7 +231,7 @@ export function RoutesTab({ reportRegion }: RoutesTabProps) {
                                         <span>{v.gtfsIds.length} stops</span>
                                         {v.osm != null && (
                                             <a href={osmFeatureUrl(`r${v.osm}`)} target="_blank" rel="noopener"
-                                                className="route-osm-link">
+                                                className="route-osm-link" onClick={e => e.stopPropagation()}>
                                                 ↗ r{v.osm}
                                             </a>
                                         )}

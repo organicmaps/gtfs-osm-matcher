@@ -6,7 +6,7 @@ App  (src/app.tsx)
     └── #content-area
         ├── #side-panel
         │   ├── SidePanelNav  (inline in app.tsx)
-        │   │   └── [tabs: All reports | Report | Selection | OSM Changes | Minimize/Restore]
+        │   │   └── [tabs: All reports | Report | Routes | Selection | OSM Changes | Minimize/Restore]
         │   │       subscribes to OSM_DATA for anyOsmChanges
         │   │
         │   ├── [tab: selection]
@@ -36,6 +36,12 @@ App  (src/app.tsx)
         │   │           └── StopsLayer  [all index.tsv stops in one symbol layer; sub-categories toggled via
         │   │               map.setFilter, geometry swapped via setData when the osm-matches view
         │   │               draws them at their anchored positions]
+        │   │
+        │   ├── [tab: routes]
+        │   │   └── RoutesTab  (src/uielements/routes-tab.tsx)
+        │   │       ├── [route index, status filters, and lazy variant details]
+        │   │       ├── RoutesMap  [selected GTFS route/variant and matched OSM relation ways]
+        │   │       └── getOsmRouteGeometry  (src/services/osmRouteGeometry.ts)  [Overpass, cached per relation]
         │   │
         │   └── [tab: changes]
         │       └── Changes  (src/uielements/editor/changes.tsx)

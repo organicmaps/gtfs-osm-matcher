@@ -17,15 +17,17 @@ export const routesStyling: OverlaySpecification = {
         layout: {
             'line-join': 'round',
             'line-cap': 'round',
+            'line-sort-key': ['case', ['==', ['get', 'kind'], 'osm'], 0, 1],
         },
         paint: {
-            'line-color': 'red',
-            'line-width': 1,
+            'line-color': ['case', ['==', ['get', 'kind'], 'osm'], '#0876c7', 'red'],
+            'line-width': ['case', ['==', ['get', 'kind'], 'osm'], 5, 2],
         }
     }, {
         id: 'routes-arrow',
         type: 'symbol',
         source: 'routes',
+        filter: ['!=', ['get', 'kind'], 'osm'],
         layout: {
             'symbol-placement': 'line',
             'symbol-spacing': 45,
@@ -37,6 +39,7 @@ export const routesStyling: OverlaySpecification = {
         id: 'route-names',
         type: 'symbol',
         source: 'routes',
+        filter: ['!=', ['get', 'kind'], 'osm'],
         layout: {
             'text-field': ['get', 'name'],
             "symbol-placement": "line",

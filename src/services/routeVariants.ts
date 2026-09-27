@@ -6,6 +6,7 @@ export type RouteVariant = {
     route: number;
     latlon: number[];
     gtfsIds: string[];
+    alternateGtfsIds?: string[];
     dir?: number;
     inx: number;
     osm?: number;
