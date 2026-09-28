@@ -32,6 +32,7 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
     const [osmGeometry, setOsmGeometry] = useState<{ relationId: number; lines: [number, number][][] } | null>(null);
     const [osmLoadingId, setOsmLoadingId] = useState<number | null>(null);
     const [osmError, setOsmError] = useState<{ relationId: number; message: string } | null>(null);
+    const [osmRetry, setOsmRetry] = useState(0);
 
     // A region switch changes which modes are even present — reset the filter so a
     // stale one does not silently hide everything.
@@ -135,7 +136,7 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
                 }
             });
         return () => { cancelled = true; };
-    }, [active, selectedOsmRelationId]);
+    }, [active, selectedOsmRelationId, osmRetry]);
 
     const mapEntries = useMemo<FullRouteDisplayEntry[]>(() => {
         if (!expandedRoute) return [];
@@ -274,7 +275,11 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
                     {osmGeometry?.relationId === selectedOsmRelationId && osmGeometry.lines.length === 0 &&
                         ' (no drawable ways)'}
                     {osmError?.relationId === selectedOsmRelationId &&
-                        <span className="routes-tab-map-error"> — {osmError.message}</span>}
+                        <>
+                            <span className="routes-tab-map-error"> — {osmError.message}</span>{' '}
+                            <button type="button" onClick={() => setOsmRetry(retry => retry + 1)}
+                                disabled={osmLoadingId === selectedOsmRelationId}>Retry</button>
+                        </>}
                 </>}
             </div>}
 
