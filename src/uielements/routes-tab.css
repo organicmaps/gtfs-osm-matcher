@@ -31,9 +31,120 @@
     border-radius: 3px;
 }
 
+.routes-tab-modes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.routes-tab-mode {
+    font-size: 0.8em;
+    padding: 1px 8px;
+    border: 1px solid #888;
+    border-radius: 10px;
+    background: transparent;
+    cursor: pointer;
+    user-select: none;
+    line-height: 1.4;
+}
+
+.routes-tab-mode:hover {
+    border-color: #0876c7;
+    color: #0876c7;
+}
+
+.routes-tab-mode--active {
+    background: #0876c7;
+    border-color: #0876c7;
+    color: #fff;
+}
+
+.routes-tab-mode--active:hover {
+    color: #fff;
+}
+
+.routes-tab-mode-count {
+    font-size: 0.85em;
+    opacity: 0.7;
+}
+
+.routes-tab-mode-clear {
+    font-size: 0.8em;
+    padding: 1px 8px;
+    border: 1px solid #c62828;
+    border-radius: 10px;
+    background: transparent;
+    color: #c62828;
+    cursor: pointer;
+    line-height: 1.4;
+}
+
 .routes-tab-list {
-    max-height: calc(100vh - 180px);
+    max-height: calc(100vh - 220px);
     overflow-y: auto;
+}
+
+.routes-tab-info {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fafafa;
+    padding: 6px 8px;
+    margin-bottom: 8px;
+    font-size: 0.85em;
+    /* Cap at half the list's available height (the list uses 100vh - 220px), so the
+       panel never crowds the route list below it. */
+    max-height: calc(50vh - 110px);
+    overflow-y: auto;
+}
+
+.routes-tab-info-grid {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 14px;
+    row-gap: 3px;
+}
+
+.routes-tab-info-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.routes-tab-info-label {
+    color: #888;
+    font-size: 0.9em;
+}
+
+.routes-tab-info-value {
+    color: #222;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.routes-tab-info-sub {
+    color: #888;
+    font-size: 0.9em;
+}
+
+.routes-tab-info-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 1px solid #666;
+    border-radius: 2px;
+}
+
+.routes-tab-info-longname {
+    margin-top: 4px;
+    color: #444;
+    font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .routes-tab-row {
@@ -77,6 +188,11 @@
     color: #888;
 }
 
+.routes-tab-route-name {
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
 .routes-tab-long-name {
     font-size: 0.85em;
     color: #444;
@@ -91,6 +207,24 @@
     font-size: 0.8em;
     color: #888;
     flex-shrink: 0;
+}
+
+.routes-tab-flyto {
+    flex-shrink: 0;
+    margin-left: 4px;
+    padding: 0 5px;
+    font-size: 0.85em;
+    line-height: 1.4;
+    border: 1px solid #888;
+    border-radius: 3px;
+    background: transparent;
+    color: #0876c7;
+    cursor: pointer;
+}
+
+.routes-tab-flyto:hover {
+    background: #dcecf9;
+    border-color: #0876c7;
 }
 
 .routes-tab-variants {

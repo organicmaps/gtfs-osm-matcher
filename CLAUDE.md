@@ -51,8 +51,8 @@ Component/layout tree, side-panel tabs, and context consumers are documented in 
 - `OSM_DATA` (`src/services/OSMData.ts`) — singleton store of live OSM elements + tracked edits (create node with negative id, move, change tags), consumed via `subscribe` + `useSyncExternalStore`. `OSM_QUERY_QUEUE` fills it from Overpass (z16 tiles, deduped, 1 s throttle) and the OSM API.
 
 **Hash routing, bidirectionally synced** (`src/uielements/routing.ts`):
-- URL shape: `#/match-report/{region}` plus `/selection/{id}` (`/preview/{id}` is read as the same thing, for links from before the preview became a view of the report). The category is **not** in the URL — deep links recover it from the region's index.tsv row.
-- `useHash()`/`useHashRoute(parser)` are the read direction; a `useEffect` on `selection` in `app.tsx` writes the hash. Keep both directions in mind when touching selection logic.
+- URL shape: `#/match-report/{region}` plus `/selection/<stop|route>/{id}` (`/preview/{id}` and a bare `/selection/{id}` are still read as a stop, for links from before route deep-links landed). The category is **not** in the URL — deep links recover it from the region's index.tsv row. A `/selection/route/{id}` deep-link switches App to the routes tab; `RoutesTab` reads the same hash and expands + flies to that route.
+- `useHash()`/`useHashRoute(parser)` are the read direction; a `useEffect` on `selection` in `app.tsx` writes the stop hash, and `RoutePill`'s "Open in routes panel" link writes the route hash. Keep both directions in mind when touching selection logic.
 - Cross-component signal: `onReportSelect` dispatches a `ShouldUpdateBounds` window event; `report.tsx` listens at module level to arm a one-shot `fitBounds` to the region bbox.
 
 **Map rendering:**

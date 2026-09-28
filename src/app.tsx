@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import { MatchReportSelector } from './uielements/report-selector';
 import { SelectionInfo } from './uielements/selection-info';
 import { MapTools } from './uielements/map-tools';
-import { parseUrlReportRegion, useHashRoute } from './uielements/routing';
+import { parseUrlReportRegion, parseSelectionHash, useHashRoute } from './uielements/routing';
 import { cls } from './uielements/cls';
 import { OSM_DATA } from './services/OSMData';
 import { Changes } from './uielements/editor/changes';
@@ -179,7 +179,7 @@ export function App() {
         // GTFS ids are free-form UTF-8 and do occur with spaces, '#' or '/': a '#'
         // truncates the hash and parseSelectionHash's [^/]+ cuts at a slash.
         const encoded = encodeURIComponent(id);
-        hash += `/selection/${encoded}`;
+        hash += `/selection/stop/${encoded}`;
       }
 
       window.location.hash = hash;
@@ -188,6 +188,18 @@ export function App() {
 
 
   const reportRegion = useHashRoute(parseUrlReportRegion);
+  const hashSelection = useHashRoute(parseSelectionHash);
+
+  // A route deep-link (`#/match-report/{region}/selection/route/{id}`) opens with the
+  // routes tab ahead of the report. The user can still switch away; this only re-fires
+  // when the hash actually changes to a different route, so a manual tab switch is not
+  // fought. The matching route expand + fly happens in RoutesTab, which also reads the
+  // hash — the tab switch and the route expand stay decoupled, sharing only the URL.
+  useEffect(() => {
+    if (hashSelection?.kind === 'route') {
+      setActiveTab('routes');
+    }
+  }, [hashSelection?.kind, hashSelection?.id]);
 
   return (
     <>

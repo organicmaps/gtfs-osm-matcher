@@ -4,7 +4,6 @@ import { RoutesMap, type FullRouteDisplayEntry } from "./routes";
 import { cls } from "./cls";
 import { getRouteVariants, type RouteVariant } from "../services/routeVariants";
 import { memoFetch } from "../services/memoFetch";
-import { osmFeatureUrl } from "../services/OSMData";
 
 import "./route-list.css";
 
@@ -18,6 +17,8 @@ export type RouteIndexEntry = {
     byteOffset: number;
     byteLength: number;
     matchStatus?: string;
+    modeIgnored?: boolean;
+    color?: string;
 };
 
 export type RouteWithVariants = {
@@ -47,29 +48,29 @@ type RoutePillProps = {
     variants: RouteVariant[];
     selectedRouteId: string | null;
     selectedVariantInx: number | null;
+    reportRegion: string;
     onSelectRoute: (routeId: string) => void;
     onSelectVariant: (routeId: string, variantInx: number) => void;
 };
 
-function RoutePill({ route: r, variants, selectedRouteId, selectedVariantInx, onSelectRoute, onSelectVariant }: RoutePillProps) {
+function RoutePill({ route: r, variants, selectedRouteId, selectedVariantInx, reportRegion, onSelectRoute, onSelectVariant }: RoutePillProps) {
     const isSelected = selectedRouteId === r.routeId;
-    const osmRelId = variants.find(v => v.osm)?.osm;
     return (
         <span
             onClick={() => onSelectRoute(r.routeId)}
             className={cls('route-pill', (!selectedRouteId || isSelected) && 'route-pill--selected')}>
             {r.shortName || r.routeId}
             {r.matchStatus &&
-                <span className={cls('route-match-badge', `route-match-badge--${r.matchStatus}`)}
-                    title={r.matchStatus === 'matched' ? 'Matched to an OSM relation' : 'No OSM relation matched'}>
-                    {r.matchStatus === 'matched' ? '\u2713' : '\u2717'}
-                </span>}
-            {osmRelId != null &&
-                <a href={osmFeatureUrl(`r${osmRelId}`)} target="_blank" rel="noopener"
-                    onClick={e => e.stopPropagation()}
-                    className="route-osm-link" title="OSM relation">
-                    {'\u2197'}r{osmRelId}
-                </a>}
+                <span className={cls('route-match-dot', `route-match-dot--${r.matchStatus}`)}
+                    title={r.matchStatus === 'matched' ? 'Matched to an OSM relation' : 'No OSM relation matched'}
+                    aria-label={r.matchStatus === 'matched' ? 'Matched' : 'Unmatched'} />}
+            <a href={`#/match-report/${reportRegion}/selection/route/${encodeURIComponent(r.routeId)}`}
+                className="route-open-link"
+                title="Open in routes panel"
+                aria-label="Open in routes panel"
+                onClick={e => e.stopPropagation()}>
+                {'\u2197'}
+            </a>
             {variants.length > 1 &&
                 <span>
                     {' Variants: '}
@@ -225,6 +226,7 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds, sho
         variants: r.variants,
         selectedRouteId,
         selectedVariantInx,
+        reportRegion,
         onSelectRoute: (routeId: string) => {
             setSelectedRouteId(prev => prev === routeId ? null : routeId);
             setSelectedVariantInx(null);

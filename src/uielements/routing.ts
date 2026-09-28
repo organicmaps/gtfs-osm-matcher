@@ -35,6 +35,10 @@ export function parseUrlReportRegion(hashString: string) {
 
 export type SelectionHash = {
     id: string;
+    /** `/selection/stop/…` vs `/selection/route/…`. Legacy bare `/selection/{id}` and
+     *  `/preview/{id}` links are stop links — the preview panel this app no longer has
+     *  only ever pointed at stops. */
+    kind: 'stop' | 'route';
     /**
      * True where the hash said `/preview/`. Those links were written by the preview panel
      * this app no longer has, and some of their ids -- a generated station's, for one -- were
@@ -44,17 +48,20 @@ export type SelectionHash = {
     legacy: boolean;
 };
 
-// `…/selection/{id}` names a stop of the report. `…/preview/{id}` is read as the same
-// thing: the preview used to be a dataset of its own with its own links, and is now a way
-// of drawing the report's stops. Most of those ids are report stops and still resolve; the
-// ones that are not — a generated station the preview minted — are reported as unknown
-// rather than silently ignored. The category is not in the URL at all; it is recovered
+// `…/selection/stop/{id}` names a stop of the report; `…/selection/route/{id}` names a route
+// of `routes.ndjson`. A bare `…/selection/{id}` (no kind) and `…/preview/{id}` are read as a
+// stop: the kind was added when route deep-links landed, and the preview panel this app no
+// longer has only ever pointed at stops. The category is not in the URL; it is recovered
 // from index.tsv. The id is percent-encoded by whoever wrote the hash, since GTFS ids are
 // free-form and a raw '/' would end the segment here.
 export function parseSelectionHash(hashString: string): SelectionHash | undefined {
-    const match = hashString.match(/\/(preview|selection)\/([^/]+)/);
-    if (match) {
-        return { id: decodeId(match[2]), legacy: match[1] === 'preview' };
+    const typed = hashString.match(/\/selection\/(stop|route)\/([^/]+)/);
+    if (typed) {
+        return { id: decodeId(typed[2]), kind: typed[1] as 'stop' | 'route', legacy: false };
+    }
+    const legacy = hashString.match(/\/(selection|preview)\/([^/]+)/);
+    if (legacy) {
+        return { id: decodeId(legacy[2]), kind: 'stop', legacy: legacy[1] === 'preview' };
     }
 }
 

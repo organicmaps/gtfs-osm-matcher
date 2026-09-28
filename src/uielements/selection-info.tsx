@@ -666,7 +666,7 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
                 // GTFS ids are free-form UTF-8: a `#` truncates the link and a `/`
                 // is cut by parseSelectionHash's [^/]+, same as the hash writer in
                 // app.tsx that already encodes.
-                f.mtch.map((m: string) => {return (<li key={m}><a href={`/#/match-report/${reportRegion}/selection/${encodeURIComponent(m)}`}>{m}</a></li>)})
+                f.mtch.map((m: string) => {return (<li key={m}><a href={`/#/match-report/${reportRegion}/selection/stop/${encodeURIComponent(m)}`}>{m}</a></li>)})
             }
             </ul>
         }
