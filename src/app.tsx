@@ -207,7 +207,7 @@ export function App() {
         <SelectionContext value={selectionContext} >
           <OsmMatchesOptionsContext value={osmMatchesOptions} >
             <div id="content-area">
-              <div id="side-panel" className={cls(reportRegion && 'slim')}>
+              <div id="side-panel" className={cls(reportRegion && 'slim', activeTab === 'routes' && reportRegion && 'routes-panel')}>
                 <SidePanelNav
                   reportRegion={reportRegion}
                   selection={selection}

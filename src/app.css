@@ -122,6 +122,12 @@
   width: 20vw;
 }
 
+@media (min-width: 1201px) {
+  #side-panel.slim.routes-panel {
+    width: clamp(480px, 36vw, 760px);
+  }
+}
+
 #side-panel.hidden {
   display: none;
 }
