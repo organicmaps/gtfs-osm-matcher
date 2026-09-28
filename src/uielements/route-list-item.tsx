@@ -47,7 +47,7 @@ export function RouteListItem({ route, expanded, variants, variantLoading,
                             <span title="Scheduled stop positions on this variant">{variant.gtfsIds.length} stops</span>
                             {variant.stopMatch && <span title={`${variant.stopMatch.total} distinct GTFS stop IDs, including alternate IDs` +
                                 (variant.stopMatch.anchored == null ? '' : `; ${variant.stopMatch.anchored} have a final OSM anchor`)}>
-                                {variant.stopMatch.matched}/{variant.stopMatch.total} stop IDs matched
+                                {variant.stopMatch.matched}/{variant.stopMatch.total} stops matched
                             </span>}
                             {variant.osm != null && (
                                 <a href={osmFeatureUrl(`r${variant.osm}`)} target="_blank" rel="noopener"
