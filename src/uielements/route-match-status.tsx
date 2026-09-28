@@ -10,13 +10,13 @@ export function RouteMatchStatus({ route, compact = false }: Props) {
     const stops = route.stopMatch;
     const relationLabel = relation
         ? `Relation variants ${relation.matchedVariants}/${relation.totalVariants}`
-        : route.matchStatus === 'matched' ? 'Relation paired'
-            : route.matchStatus === 'unmatched' ? 'No relation paired' : 'Relations —';
+        : route.matchStatus === 'matched' ? 'Relation'
+            : route.matchStatus === 'unmatched' ? 'Relation' : 'Relations n/a';
     const relationTitle = relation
         ? `${relation.matchedVariants} of ${relation.totalVariants} GTFS variants matched to an OSM route relation`
         : route.matchStatus ? 'Older report: route pairing is known; variant coverage is unavailable'
             : 'Route relation coverage is unavailable in this report';
-    const stopsLabel = stops ? `Stop IDs ${stops.matched}/${stops.total}` : 'Stop IDs —';
+    const stopsLabel = stops ? `Stops ${stops.matched}/${stops.total}` : 'Stops n/a';
     const stopsTitle = stops
         ? `${stops.matched} of ${stops.total} distinct GTFS stops matched to OSM features` +
             (stops.anchored == null ? '; final OSM anchor count unavailable' : `; ${stops.anchored} have a final OSM anchor`)
