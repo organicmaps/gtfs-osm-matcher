@@ -40,6 +40,8 @@ App  (src/app.tsx)
         │   ├── [tab: routes]
         │   │   └── RoutesTab  (src/uielements/routes-tab.tsx)
         │   │       ├── [route index, status + transport-mode filters, ranked search, lazy variant details, per-route fly-to, route deep-link restore]
+        │   │       ├── RouteInfo  (src/uielements/route-info.tsx)  [selected route metadata and match summary]
+        │   │       ├── RouteListItem  (src/uielements/route-list-item.tsx)  [route row and lazy variants]
         │   │       ├── RoutesMap  [selected GTFS route/variant and matched OSM relation ways]
         │   │       └── getOsmRouteGeometry  (src/services/osmRouteGeometry.ts)  [Overpass, cached per relation]
         │   │

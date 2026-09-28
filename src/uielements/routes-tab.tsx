@@ -2,11 +2,12 @@ import { useContext, useEffect, useMemo, useState } from "preact/hooks";
 import { getRouteIndex, type RouteIndexEntry } from "./route-list";
 import { getRouteVariants, type RouteVariant } from "../services/routeVariants";
 import { getOsmRouteGeometry } from "../services/osmRouteGeometry";
-import { osmFeatureUrl } from "../services/OSMData";
 import { RoutesMap, type FullRouteDisplayEntry } from "./routes";
 import { MapContext } from "../app";
 import { parseSelectionHash, useHashRoute } from "./routing";
 import { cls } from "./cls";
+import { RouteInfo } from "./route-info";
+import { RouteListItem } from "./route-list-item";
 
 import "./route-list.css";
 import "./routes-tab.css";
@@ -156,21 +157,7 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
         return [...gtfs, ...osm];
     }, [expandedRoute, index, variantsByRoute, selectedVariantInx, selectedOsmRelationId, osmGeometry]);
 
-    // Derived info for the expanded-route panel: distinct OSM relations matched across
-    // variants, and the total stop count. Empty until the variants have loaded.
-    const expandedInfo = useMemo(() => {
-        if (!expandedRoute) return null;
-        const route = index.find(r => r.routeId === expandedRoute);
-        if (!route) return null;
-        const variants = variantsByRoute[expandedRoute] || [];
-        const osmRels = new Set<number>();
-        let stops = 0;
-        for (const v of variants) {
-            if (v.osm != null) osmRels.add(v.osm);
-            stops += v.gtfsIds.length;
-        }
-        return { route, variants: variants.length, stops, osmRels: [...osmRels] };
-    }, [expandedRoute, index, variantsByRoute]);
+    const expandedRouteEntry = index.find(r => r.routeId === expandedRoute);
 
     const expandRoute = (routeId: string) => {
         if (expandedRoute === routeId) {
@@ -291,87 +278,8 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
                 </>}
             </div>}
 
-            {expandedInfo && (
-                <div className="routes-tab-info">
-                    <div className="routes-tab-info-grid">
-                        <div className="routes-tab-info-item">
-                            <span className="routes-tab-info-label">GTFS ID</span>
-                            <span className="routes-tab-info-value">{expandedInfo.route.routeId}</span>
-                        </div>
-                        <div className="routes-tab-info-item">
-                            <span className="routes-tab-info-label">Short name</span>
-                            <span className="routes-tab-info-value">{expandedInfo.route.shortName || '\u2014'}</span>
-                        </div>
-                        <div className="routes-tab-info-item">
-                            <span className="routes-tab-info-label">Type</span>
-                            <span className="routes-tab-info-value">
-                                {expandedInfo.route.routeType || '\u2014'}
-                                {expandedInfo.route.typeRaw && <span className="routes-tab-info-sub"> ({expandedInfo.route.typeRaw})</span>}
-                            </span>
-                        </div>
-                        {expandedInfo.route.agency && (
-                            <div className="routes-tab-info-item">
-                                <span className="routes-tab-info-label">Agency</span>
-                                <span className="routes-tab-info-value">{expandedInfo.route.agency}</span>
-                            </div>
-                        )}
-                        {expandedInfo.route.matchStatus && (
-                            <div className="routes-tab-info-item">
-                                <span className="routes-tab-info-label">Match</span>
-                                <span className="routes-tab-info-value">
-                                    <span className={cls('route-match-dot',
-                                        `route-match-dot--${expandedInfo.route.matchStatus}`)} />
-                                    {expandedInfo.route.matchStatus}
-                                </span>
-                            </div>
-                        )}
-                        {expandedInfo.route.modeIgnored != null && (
-                            <div className="routes-tab-info-item">
-                                <span className="routes-tab-info-label">Mode ignored</span>
-                                <span className="routes-tab-info-value">{expandedInfo.route.modeIgnored ? 'yes' : 'no'}</span>
-                            </div>
-                        )}
-                        {expandedInfo.route.color && (
-                            <div className="routes-tab-info-item">
-                                <span className="routes-tab-info-label">Color</span>
-                                <span className="routes-tab-info-value">
-                                    <span className="routes-tab-info-swatch"
-                                        style={{ background: `#${expandedInfo.route.color}` }}
-                                        title={`#${expandedInfo.route.color}`} />
-                                    {expandedInfo.route.color}
-                                </span>
-                            </div>
-                        )}
-                        <div className="routes-tab-info-item">
-                            <span className="routes-tab-info-label">Variants</span>
-                            <span className="routes-tab-info-value">{expandedInfo.variants || '\u2026'}</span>
-                        </div>
-                        {expandedInfo.variants > 0 && (
-                            <div className="routes-tab-info-item">
-                                <span className="routes-tab-info-label">Stops</span>
-                                <span className="routes-tab-info-value">{expandedInfo.stops}</span>
-                            </div>
-                        )}
-                        {expandedInfo.osmRels.length > 0 && (
-                            <div className="routes-tab-info-item">
-                                <span className="routes-tab-info-label">OSM rel</span>
-                                <span className="routes-tab-info-value">
-                                    {expandedInfo.osmRels.map((id, i) => (
-                                        <span key={id}>
-                                            {i > 0 && ', '}
-                                            <a href={osmFeatureUrl(`r${id}`)} target="_blank" rel="noopener"
-                                                className="route-osm-link">r{id}</a>
-                                        </span>
-                                    ))}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                    {expandedInfo.route.longName && (
-                        <div className="routes-tab-info-longname">{expandedInfo.route.longName}</div>
-                    )}
-                </div>
-            )}
+            {expandedRouteEntry && <RouteInfo route={expandedRouteEntry}
+                variants={variantsByRoute[expandedRouteEntry.routeId] || []} />}
 
             <div className="routes-tab-filters">
                 {hasMatchData && <>
@@ -419,53 +327,15 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
 
             <div className="routes-tab-list">
                 {filtered.map(r => (
-                    <div key={r.routeId} className="routes-tab-row">
-                        <div className={cls('routes-tab-route-header', expandedRoute === r.routeId && 'routes-tab-route-header--selected')}
-                            onClick={() => expandRoute(r.routeId)}>
-                            <span className="routes-tab-expand">
-                                {expandedRoute === r.routeId ? '▼' : '▶'}
-                            </span>
-                            <span className="routes-tab-route-name">
-                                {r.shortName}
-                            </span>
-                            <span style={{fontSize: '0.75em'}}>({r.routeId})</span>
-                            {r.longName && <span className="routes-tab-long-name">{r.longName}</span>}
-                            {r.matchStatus && (
-                                <span className={cls('route-match-dot',
-                                    `route-match-dot--${r.matchStatus}`)}
-                                    title={r.matchStatus === 'matched' ? 'Matched to an OSM relation' : 'No OSM relation matched'}
-                                    aria-label={r.matchStatus === 'matched' ? 'Matched' : 'Unmatched'} />
-                            )}
-                            <span className="routes-tab-route-type">{r.routeType}</span>
-                            <button type="button" className="routes-tab-flyto"
-                                title="Fly to route on map"
-                                onClick={e => { e.stopPropagation(); flyToRoute(r.routeId); }}>
-                                {'\u21D8'}
-                            </button>
-                        </div>
-                        {expandedRoute === r.routeId && (
-                            <div className="routes-tab-variants">
-                                {variantLoading === r.routeId && <div>Loading variants…</div>}
-                                {(variantsByRoute[r.routeId] || []).map((v, i) => (
-                                    <div key={v.inx}
-                                        className={cls('routes-tab-variant', selectedVariantInx === v.inx && 'routes-tab-variant--selected')}
-                                        onClick={() => setSelectedVariantInx(prev => prev === v.inx ? null : v.inx)}>
-                                        <span>
-                                            #{i + 1}
-                                            {v.dir != null ? ` ${v.dir === 0 ? '\u2191' : '\u2193'}` : ''}
-                                        </span>
-                                        <span>{v.gtfsIds.length} stops</span>
-                                        {v.osm != null && (
-                                            <a href={osmFeatureUrl(`r${v.osm}`)} target="_blank" rel="noopener"
-                                                className="route-osm-link" onClick={e => e.stopPropagation()}>
-                                                ↗ r{v.osm}
-                                            </a>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                    <RouteListItem key={r.routeId} route={r}
+                        expanded={expandedRoute === r.routeId}
+                        variants={variantsByRoute[r.routeId] || []}
+                        variantLoading={variantLoading === r.routeId}
+                        selectedVariantInx={selectedVariantInx}
+                        onExpand={() => expandRoute(r.routeId)}
+                        onSelectVariant={variantInx => setSelectedVariantInx(prev =>
+                            prev === variantInx ? null : variantInx)}
+                        onFlyTo={() => flyToRoute(r.routeId)} />
                 ))}
             </div>
         </div>
