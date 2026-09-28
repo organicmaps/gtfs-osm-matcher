@@ -12,6 +12,8 @@ import { RouteListItem } from "./route-list-item";
 import "./route-list.css";
 import "./routes-tab.css";
 
+type MatchFilter = 'all' | 'matched' | 'partial' | 'unmatched' | 'unknown';
+
 type RoutesTabProps = {
     reportRegion: string;
     active: boolean;
@@ -22,7 +24,8 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
     const [index, setIndex] = useState<RouteIndexEntry[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [filter, setFilter] = useState<'all' | 'matched' | 'unmatched'>('all');
+    const [relationFilter, setRelationFilter] = useState<MatchFilter>('all');
+    const [stopFilter, setStopFilter] = useState<MatchFilter>('all');
     const [search, setSearch] = useState('');
     const [selectedModes, setSelectedModes] = useState<Set<string>>(new Set());
     const [expandedRoute, setExpandedRoute] = useState<string | null>(null);
@@ -59,7 +62,14 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
         return () => { cancelled = true; };
     }, [reportRegion]);
 
-    const hasMatchData = index.some(r => r.matchStatus);
+    const hasRelationMatchData = index.some(r => r.relationMatch);
+    const hasStopMatchData = index.some(r => r.stopMatch);
+    const hasLegacyMatchData = index.some(r => r.matchStatus);
+
+    useEffect(() => {
+        setRelationFilter('all');
+        setStopFilter('all');
+    }, [reportRegion]);
 
     // Modes present in this region, with counts; ordered by frequency so the common
     // ones (Bus, almost always) stay in view when the row wraps.
@@ -75,8 +85,11 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
         const matching = index.filter(r => {
-            if (filter === 'matched' && r.matchStatus !== 'matched') return false;
-            if (filter === 'unmatched' && r.matchStatus !== 'unmatched') return false;
+            if (relationFilter !== 'all') {
+                const relationStatus = hasRelationMatchData ? r.relationMatch?.status || 'unknown' : r.matchStatus || 'unknown';
+                if (relationStatus !== relationFilter) return false;
+            }
+            if (stopFilter !== 'all' && (r.stopMatch?.status || 'unknown') !== stopFilter) return false;
             if (selectedModes.size > 0 && !selectedModes.has(r.routeType || 'Unknown')) return false;
             if (!q) return true;
             return (r.shortName?.toLowerCase().includes(q) ||
@@ -104,11 +117,16 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
         };
 
         return [...matching].sort((a, b) => rank(a) - rank(b));
-    }, [index, filter, search, selectedModes]);
+    }, [index, relationFilter, stopFilter, search, selectedModes, hasRelationMatchData]);
 
-    const matchedCount = index.filter(r => r.matchStatus === 'matched').length;
-    const unmatchedCount = index.filter(r => r.matchStatus === 'unmatched').length;
-    const noDataCount = index.length - matchedCount - unmatchedCount;
+    const statusCounts = (key: 'relationMatch' | 'stopMatch') => ({
+        matched: index.filter(r => r[key]?.status === 'matched').length,
+        partial: index.filter(r => r[key]?.status === 'partial').length,
+        unmatched: index.filter(r => r[key]?.status === 'unmatched').length,
+        unknown: index.filter(r => !r[key]).length,
+    });
+    const relationCounts = statusCounts('relationMatch');
+    const stopCounts = statusCounts('stopMatch');
 
     const selectedVariant = selectedVariantInx === null ? undefined :
         (variantsByRoute[expandedRoute || ''] || []).find(v => v.inx === selectedVariantInx);
@@ -253,18 +271,19 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
         <div className="routes-tab">
             {active && mapEntries.length > 0 && <RoutesMap fullRoutes={mapEntries} />}
             <div className="routes-tab-stats">
-                {hasMatchData ? (
-                    <span>
-                        <span className="route-match-badge route-match-badge--matched">✓ {matchedCount}</span>
-                        {' '}
-                        <span className="route-match-badge route-match-badge--unmatched">✗ {unmatchedCount}</span>
-                        {noDataCount > 0 && <span> — {noDataCount} no data</span>}
-                        {' \u2014 '}
-                        {index.length} total
-                    </span>
-                ) : (
-                    <span>{index.length} routes</span>
-                )}
+                {hasRelationMatchData && <div>
+                    Routes by relation coverage: {relationCounts.matched} complete · {relationCounts.partial} partial · {relationCounts.unmatched} none
+                    {relationCounts.unknown > 0 && ` · ${relationCounts.unknown} no data`}
+                </div>}
+                {hasStopMatchData && <div>
+                    Routes by stop coverage: {stopCounts.matched} complete · {stopCounts.partial} partial · {stopCounts.unmatched} none
+                    {stopCounts.unknown > 0 && ` · ${stopCounts.unknown} no data`}
+                </div>}
+                {!hasRelationMatchData && hasLegacyMatchData && <div>
+                    Relations paired: {index.filter(r => r.matchStatus === 'matched').length} · not paired: {index.filter(r => r.matchStatus === 'unmatched').length}
+                    {!hasStopMatchData && ' · Stop matching unavailable in this report'}
+                </div>}
+                <div>{index.length} routes</div>
             </div>
 
             {expandedRoute && <div className="routes-tab-map-status">
@@ -284,24 +303,30 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
             </div>}
 
             {expandedRouteEntry && <RouteInfo route={expandedRouteEntry}
-                variants={variantsByRoute[expandedRouteEntry.routeId] || []} />}
+                variants={variantsByRoute[expandedRouteEntry.routeId] || []}
+                selectedVariant={selectedVariant} />}
 
             <div className="routes-tab-filters">
-                {hasMatchData && <>
-                    <label className="routes-tab-filter">
-                        <input type="radio" checked={filter === 'all'}
-                            onChange={() => setFilter('all')} /> All
-                    </label>
-                    <label className="routes-tab-filter">
-                        <input type="radio" checked={filter === 'matched'}
-                            onChange={() => setFilter('matched')} /> Matched
-                    </label>
-                    <label className="routes-tab-filter">
-                        <input type="radio" checked={filter === 'unmatched'}
-                            onChange={() => setFilter('unmatched')} /> Unmatched
-                    </label>
-                    {' | '}
-                </>}
+                {(hasRelationMatchData || hasLegacyMatchData) && <label className="routes-tab-filter">
+                    Relations <select value={relationFilter} onChange={e => setRelationFilter((e.target as HTMLSelectElement).value as MatchFilter)}>
+                        <option value="all">All</option>
+                        <option value="matched">{hasRelationMatchData ? 'Complete' : 'Paired'}</option>
+                        {hasRelationMatchData && <option value="partial">Partial</option>}
+                        <option value="unmatched">{hasRelationMatchData ? 'None' : 'Not paired'}</option>
+                        <option value="unknown">No data</option>
+                    </select>
+                </label>}
+                {hasStopMatchData && <label className="routes-tab-filter">
+                    Stops <select value={stopFilter} onChange={e => setStopFilter((e.target as HTMLSelectElement).value as MatchFilter)}>
+                        <option value="all">All</option>
+                        <option value="matched">Complete</option>
+                        <option value="partial">Partial</option>
+                        <option value="unmatched">None</option>
+                        <option value="unknown">No data</option>
+                    </select>
+                </label>}
+                {(hasRelationMatchData || hasLegacyMatchData || hasStopMatchData) &&
+                    <span className="routes-tab-filter">{filtered.length} shown</span>}
                 <input type="text" placeholder="Search routes…"
                     value={search}
                     onInput={e => setSearch((e.target as HTMLInputElement).value)}

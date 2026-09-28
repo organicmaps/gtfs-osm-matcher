@@ -2,6 +2,7 @@ import type { RouteVariant } from "../services/routeVariants";
 import type { RouteIndexEntry } from "./route-list";
 import { osmFeatureUrl } from "../services/OSMData";
 import { cls } from "./cls";
+import { RouteMatchStatus } from "./route-match-status";
 
 type RouteListItemProps = {
     route: RouteIndexEntry;
@@ -24,11 +25,7 @@ export function RouteListItem({ route, expanded, variants, variantLoading,
                 <span className="routes-tab-route-name">{route.shortName}</span>
                 <span style={{ fontSize: '0.75em' }}>({route.routeId})</span>
                 {route.longName && <span className="routes-tab-long-name">{route.longName}</span>}
-                {route.matchStatus && (
-                    <span className={cls('route-match-dot', `route-match-dot--${route.matchStatus}`)}
-                        title={route.matchStatus === 'matched' ? 'Matched to an OSM relation' : 'No OSM relation matched'}
-                        aria-label={route.matchStatus === 'matched' ? 'Matched' : 'Unmatched'} />
-                )}
+                <RouteMatchStatus route={route} />
                 <span className="routes-tab-route-type">{route.routeType}</span>
                 <button type="button" className="routes-tab-flyto"
                     title="Fly to route on map"
@@ -47,13 +44,19 @@ export function RouteListItem({ route, expanded, variants, variantLoading,
                                 #{i + 1}
                                 {variant.dir != null ? ` ${variant.dir === 0 ? '\u2191' : '\u2193'}` : ''}
                             </span>
-                            <span>{variant.gtfsIds.length} stops</span>
+                            <span title="Scheduled stop positions on this variant">{variant.gtfsIds.length} stops</span>
+                            {variant.stopMatch && <span title={`${variant.stopMatch.total} distinct GTFS stop IDs, including alternate IDs` +
+                                (variant.stopMatch.anchored == null ? '' : `; ${variant.stopMatch.anchored} have a final OSM anchor`)}>
+                                {variant.stopMatch.matched}/{variant.stopMatch.total} stop IDs matched
+                            </span>}
                             {variant.osm != null && (
                                 <a href={osmFeatureUrl(`r${variant.osm}`)} target="_blank" rel="noopener"
                                     className="route-osm-link" onClick={e => e.stopPropagation()}>
                                     ↗ r{variant.osm}
                                 </a>
                             )}
+                            {(route.relationMatch || route.matchStatus) && variant.osm == null &&
+                                <span className="route-status route-status--unmatched">No relation</span>}
                         </div>
                     ))}
                 </div>

@@ -4,6 +4,7 @@ import { RoutesMap, type FullRouteDisplayEntry } from "./routes";
 import { cls } from "./cls";
 import { getRouteVariants, type RouteVariant } from "../services/routeVariants";
 import { memoFetch } from "../services/memoFetch";
+import { RouteMatchStatus } from "./route-match-status";
 
 import "./route-list.css";
 
@@ -17,6 +18,8 @@ export type RouteIndexEntry = {
     byteOffset: number;
     byteLength: number;
     matchStatus?: string;
+    relationMatch?: { status: 'matched' | 'partial' | 'unmatched'; matchedVariants: number; totalVariants: number };
+    stopMatch?: { status: 'matched' | 'partial' | 'unmatched'; matched: number; total: number; anchored?: number };
     modeIgnored?: boolean;
     color?: string;
 };
@@ -60,10 +63,7 @@ function RoutePill({ route: r, variants, selectedRouteId, selectedVariantInx, re
             onClick={() => onSelectRoute(r.routeId)}
             className={cls('route-pill', (!selectedRouteId || isSelected) && 'route-pill--selected')}>
             {r.shortName || r.routeId}
-            {r.matchStatus &&
-                <span className={cls('route-match-dot', `route-match-dot--${r.matchStatus}`)}
-                    title={r.matchStatus === 'matched' ? 'Matched to an OSM relation' : 'No OSM relation matched'}
-                    aria-label={r.matchStatus === 'matched' ? 'Matched' : 'Unmatched'} />}
+            <RouteMatchStatus route={r} compact />
             <a href={`#/match-report/${reportRegion}/selection/route/${encodeURIComponent(r.routeId)}`}
                 className="route-open-link"
                 title="Open in routes panel"

@@ -147,6 +147,24 @@
     white-space: nowrap;
 }
 
+.routes-tab-variant-match-detail,
+.routes-tab-stop-links {
+    margin-top: 5px;
+}
+
+.routes-tab-stop-links {
+    overflow-wrap: anywhere;
+}
+
+.routes-tab-stop-links summary {
+    cursor: pointer;
+}
+
+.routes-tab-stop-links-list {
+    max-height: 160px;
+    overflow-y: auto;
+}
+
 .routes-tab-row {
     border-bottom: 1px solid #eee;
 }

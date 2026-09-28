@@ -89,6 +89,30 @@
     background: #c62828;
 }
 
+.route-statuses {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    vertical-align: middle;
+}
+
+.route-status {
+    border: 1px solid currentColor;
+    border-radius: 3px;
+    padding: 0 3px;
+    font-size: 0.78em;
+    white-space: nowrap;
+    color: #777;
+}
+
+.route-status--matched { color: #2e7d32; }
+.route-status--partial { color: #a26100; }
+.route-status--unmatched { color: #c62828; }
+
+.route-statuses--compact .route-status {
+    font-size: 0.72em;
+}
+
 .route-open-link {
     margin-left: 4px;
     font-size: 0.85em;

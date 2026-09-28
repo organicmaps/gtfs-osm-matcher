@@ -17,6 +17,7 @@ App  (src/app.tsx)
         │   │           ├── MatchArrowLayer  (src/uielements/match-arrow.tsx)  [GTFS→OSM arrows on map, matched categories only]
         │   │           ├── HtmlMapMarker  (src/uielements/editor/map-marker.tsx)  [per GTFS feature, clusters only]
         │   │           ├── RouteList  (src/uielements/route-list.tsx)  [route pills + variants]
+        │   │           │   ├── RouteMatchStatus  (src/uielements/route-match-status.tsx)  [relation coverage and stop matching totals]
         │   │           │   └── RoutesMap  (src/uielements/routes.tsx)  [setData into persistent 'routes' map source]
         │   │           ├── AddOsmStopController  (src/uielements/editor/add-stop-controller.tsx)
         │   │           └── OsmElements  [matched + new + surrounding (Overpass, <500 m) elements]
@@ -39,9 +40,11 @@ App  (src/app.tsx)
         │   │
         │   ├── [tab: routes]
         │   │   └── RoutesTab  (src/uielements/routes-tab.tsx)
-        │   │       ├── [route index, status + transport-mode filters, ranked search, lazy variant details, per-route fly-to, route deep-link restore]
-        │   │       ├── RouteInfo  (src/uielements/route-info.tsx)  [selected route metadata and match summary]
+        │   │       ├── [route index, separate relation + stop status filters, transport-mode filters, ranked search, lazy variant details, per-route fly-to, route deep-link restore]
+        │   │       ├── RouteInfo  (src/uielements/route-info.tsx)  [selected route metadata, anchor totals and selected variant's matched stop OSM links]
+        │   │       │   └── RouteMatchStatus  [relation coverage and stop matching totals]
         │   │       ├── RouteListItem  (src/uielements/route-list-item.tsx)  [route row and lazy variants]
+        │   │       │   └── RouteMatchStatus
         │   │       ├── RoutesMap  [selected GTFS route/variant and matched OSM relation ways]
         │   │       └── getOsmRouteGeometry  (src/services/osmRouteGeometry.ts)  [Overpass, cached per relation]
         │   │
