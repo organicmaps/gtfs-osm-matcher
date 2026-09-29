@@ -62,12 +62,13 @@ function RoutePill({ route: r, variants, selectedRouteId, selectedVariantInx, re
             onClick={() => onSelectRoute(r.routeId)}
             className={cls('route-pill', (!selectedRouteId || isSelected) && 'route-pill--selected')}>
             {r.shortName || r.routeId}
-            <RouteMatchStatus route={r} compact />
             <a href={`#/match-report/${reportRegion}/selection/route/${encodeURIComponent(r.routeId)}`}
                 className="route-open-link"
                 title="Open in routes panel"
                 aria-label="Open in routes panel"
-                onClick={e => e.stopPropagation()}>
+                onClick={e => e.stopPropagation()}
+            >
+                <RouteMatchStatus route={r} compact />
                 {'\u2197'}
             </a>
             {variants.length > 1 &&

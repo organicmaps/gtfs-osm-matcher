@@ -1,20 +1,29 @@
 import type { RouteIndexEntry } from "./route-list";
 import { cls } from "./cls";
 
-type Props = { route: RouteIndexEntry; compact?: boolean };
+type Props = { 
+    route: RouteIndexEntry; 
+    compact?: boolean 
+};
 
 export function RouteMatchStatus({ route, compact = false }: Props) {
     if (!route.relationMatch && !route.stopMatch) return null;
 
     const relation = route.relationMatch;
     const stops = route.stopMatch;
+    
+    const relLabelPreface = compact ? 'Rels' : 'Rel. for variants';
+    const stopLabelPreface = compact ? 'Stps' : 'Stops';
+
     const relationLabel = relation
-        ? `Relation variants ${relation.matchedVariants}/${relation.totalVariants}`
+        ? `${relLabelPreface} ${relation.matchedVariants}/${relation.totalVariants}`
         : 'Relations n/a';
+    
     const relationTitle = relation
         ? `${relation.matchedVariants} of ${relation.totalVariants} GTFS variants matched to an OSM route relation`
         : 'Route relation coverage is unavailable in this report';
-    const stopsLabel = stops ? `Stops ${stops.matched}/${stops.total}` : 'Stops n/a';
+    
+    const stopsLabel = stops ? `${stopLabelPreface} ${stops.matched}/${stops.total}` : 'Stops n/a';
     const stopsTitle = stops
         ? `${stops.matched} of ${stops.total} distinct GTFS stops matched to OSM features` +
             (stops.anchored == null ? '; final OSM anchor count unavailable' : `; ${stops.anchored} have a final OSM anchor`)

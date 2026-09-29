@@ -111,11 +111,11 @@
 
 .route-statuses--compact .route-status {
     border: none;
-    font-size: 0.72em;
 }
 
 .route-open-link {
     margin-left: 4px;
+    margin-right: 4px;
     font-size: 0.85em;
     color: #1565c0;
     text-decoration: none;
