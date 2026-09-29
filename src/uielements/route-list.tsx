@@ -17,7 +17,6 @@ export type RouteIndexEntry = {
     agency: string;
     byteOffset: number;
     byteLength: number;
-    matchStatus?: string;
     relationMatch?: { status: 'matched' | 'partial' | 'unmatched'; matchedVariants: number; totalVariants: number };
     stopMatch?: { status: 'matched' | 'partial' | 'unmatched'; matched: number; total: number; anchored?: number };
     modeIgnored?: boolean;

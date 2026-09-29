@@ -44,7 +44,7 @@ export function RouteInfo({ route, variants, selectedVariant }: RouteInfoProps) 
                         <span className="routes-tab-info-value">{route.agency}</span>
                     </div>
                 )}
-                {(route.matchStatus || route.relationMatch || route.stopMatch) && (
+                {(route.relationMatch || route.stopMatch) && (
                     <div className="routes-tab-info-item">
                         <span className="routes-tab-info-label">Match quality</span>
                         <span className="routes-tab-info-value">

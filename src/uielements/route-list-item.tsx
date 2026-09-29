@@ -55,7 +55,7 @@ export function RouteListItem({ route, expanded, variants, variantLoading,
                                     ↗ r{variant.osm}
                                 </a>
                             )}
-                            {(route.relationMatch || route.matchStatus) && variant.osm == null &&
+                            {route.relationMatch && variant.osm == null &&
                                 <span className="route-status route-status--unmatched">No relation</span>}
                         </div>
                     ))}
