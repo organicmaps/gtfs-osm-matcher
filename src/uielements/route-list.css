@@ -110,6 +110,7 @@
 .route-status--unmatched { color: #c62828; }
 
 .route-statuses--compact .route-status {
+    border: none;
     font-size: 0.72em;
 }
 
