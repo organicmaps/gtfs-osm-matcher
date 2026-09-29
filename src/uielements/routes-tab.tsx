@@ -269,84 +269,86 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
     return (
         <div className="routes-tab">
             {active && mapEntries.length > 0 && <RoutesMap fullRoutes={mapEntries} />}
-            <div className="routes-tab-stats">
-                {hasRelationMatchData && <div>
-                    Routes by relation coverage: {relationCounts.matched} complete · {relationCounts.partial} partial · {relationCounts.unmatched} none
-                    {relationCounts.unknown > 0 && ` · ${relationCounts.unknown} no data`}
-                </div>}
-                {hasStopMatchData && <div>
-                    Routes by stop coverage: {stopCounts.matched} complete · {stopCounts.partial} partial · {stopCounts.unmatched} none
-                    {stopCounts.unknown > 0 && ` · ${stopCounts.unknown} no data`}
-                </div>}
-                <div>{index.length} routes</div>
-            </div>
-
-            {expandedRoute && <div className="routes-tab-map-status">
-                <span className="routes-tab-legend-gtfs">&nbsp;&nbsp;&mdash;&nbsp;GTFS</span>
-                {selectedOsmRelationId != null && <>
-                    <span className="routes-tab-legend-osm">&nbsp;&nbsp;&mdash;&nbsp;OSM r{selectedOsmRelationId}</span>
-                    {osmLoadingId === selectedOsmRelationId && ' (loading…)'}
-                    {osmGeometry?.relationId === selectedOsmRelationId && osmGeometry.lines.length === 0 &&
-                        ' (no drawable ways)'}
-                    {osmError?.relationId === selectedOsmRelationId &&
-                        <>
-                            <span className="routes-tab-map-error"> — {osmError.message}</span>{' '}
-                            <button type="button" onClick={() => setOsmRetry(retry => retry + 1)}
-                                disabled={osmLoadingId === selectedOsmRelationId}>Retry</button>
-                        </>}
-                </>}
-            </div>}
-
-            {expandedRouteEntry && <RouteInfo route={expandedRouteEntry}
-                variants={variantsByRoute[expandedRouteEntry.routeId] || []}
-                selectedVariant={selectedVariant} />}
-
-            <div className="routes-tab-filters">
-                {hasRelationMatchData && <label className="routes-tab-filter">
-                    Relations <select value={relationFilter} onChange={e => setRelationFilter((e.target as HTMLSelectElement).value as MatchFilter)}>
-                        <option value="all">All routes</option>
-                        <option value="matched">All variants are paired</option>
-                        <option value="partial">Some variants are paired</option>
-                        <option value="unmatched">No variants are paired</option>
-                    </select>
-                </label>}
-                {hasStopMatchData && <label className="routes-tab-filter">
-                    Stops <select value={stopFilter} onChange={e => setStopFilter((e.target as HTMLSelectElement).value as MatchFilter)}>
-                        <option value="all">All routes</option>
-                        <option value="matched">All stops are matched</option>
-                        <option value="partial">Some stops are matched</option>
-                        <option value="unmatched">No stops are matched</option>
-                    </select>
-                </label>}
-                {(hasRelationMatchData || hasStopMatchData) &&
-                    <span className="routes-tab-filter">{filtered.length} shown</span>}
-                <input type="text" placeholder="Search routes…"
-                    value={search}
-                    onInput={e => setSearch((e.target as HTMLInputElement).value)}
-                    className="routes-tab-search" />
-            </div>
-
-            {modes.length > 1 && (
-                <div className="routes-tab-modes">
-                    {modes.map(([mode, count]) => (
-                        <button key={mode} type="button"
-                            className={cls('routes-tab-mode', selectedModes.has(mode) && 'routes-tab-mode--active')}
-                            onClick={() => setSelectedModes(prev => {
-                                const next = new Set(prev);
-                                if (next.has(mode)) next.delete(mode);
-                                else next.add(mode);
-                                return next;
-                            })}
-                            title={`${selectedModes.has(mode) ? 'Hide' : 'Show'} ${count} ${mode} ${count === 1 ? 'route' : 'routes'}`}>
-                            {mode}{' '}<span className="routes-tab-mode-count">{count}</span>
-                        </button>
-                    ))}
-                    {selectedModes.size > 0 && (
-                        <button type="button" className="routes-tab-mode-clear"
-                            onClick={() => setSelectedModes(new Set())}>Clear</button>
-                    )}
+            <div className="routes-tab-header">
+                <div className="routes-tab-stats">
+                    {hasRelationMatchData && <div>
+                        Routes by relation coverage: {relationCounts.matched} complete · {relationCounts.partial} partial · {relationCounts.unmatched} none
+                        {relationCounts.unknown > 0 && ` · ${relationCounts.unknown} no data`}
+                    </div>}
+                    {hasStopMatchData && <div>
+                        Routes by stop coverage: {stopCounts.matched} complete · {stopCounts.partial} partial · {stopCounts.unmatched} none
+                        {stopCounts.unknown > 0 && ` · ${stopCounts.unknown} no data`}
+                    </div>}
+                    <div>{index.length} routes</div>
                 </div>
-            )}
+
+                {expandedRoute && <div className="routes-tab-map-status">
+                    <span className="routes-tab-legend-gtfs">&nbsp;&nbsp;&mdash;&nbsp;GTFS</span>
+                    {selectedOsmRelationId != null && <>
+                        <span className="routes-tab-legend-osm">&nbsp;&nbsp;&mdash;&nbsp;OSM r{selectedOsmRelationId}</span>
+                        {osmLoadingId === selectedOsmRelationId && ' (loading…)'}
+                        {osmGeometry?.relationId === selectedOsmRelationId && osmGeometry.lines.length === 0 &&
+                            ' (no drawable ways)'}
+                        {osmError?.relationId === selectedOsmRelationId &&
+                            <>
+                                <span className="routes-tab-map-error"> — {osmError.message}</span>{' '}
+                                <button type="button" onClick={() => setOsmRetry(retry => retry + 1)}
+                                    disabled={osmLoadingId === selectedOsmRelationId}>Retry</button>
+                            </>}
+                    </>}
+                </div>}
+
+                {expandedRouteEntry && <RouteInfo route={expandedRouteEntry}
+                    variants={variantsByRoute[expandedRouteEntry.routeId] || []}
+                    selectedVariant={selectedVariant} />}
+
+                <div className="routes-tab-filters">
+                    {hasRelationMatchData && <label className="routes-tab-filter">
+                        Relations <select value={relationFilter} onChange={e => setRelationFilter((e.target as HTMLSelectElement).value as MatchFilter)}>
+                            <option value="all">All routes</option>
+                            <option value="matched">All variants are paired</option>
+                            <option value="partial">Some variants are paired</option>
+                            <option value="unmatched">No variants are paired</option>
+                        </select>
+                    </label>}
+                    {hasStopMatchData && <label className="routes-tab-filter">
+                        Stops <select value={stopFilter} onChange={e => setStopFilter((e.target as HTMLSelectElement).value as MatchFilter)}>
+                            <option value="all">All routes</option>
+                            <option value="matched">All stops are matched</option>
+                            <option value="partial">Some stops are matched</option>
+                            <option value="unmatched">No stops are matched</option>
+                        </select>
+                    </label>}
+                    {(hasRelationMatchData || hasStopMatchData) &&
+                        <span className="routes-tab-filter">{filtered.length} shown</span>}
+                    <input type="text" placeholder="Search routes…"
+                        value={search}
+                        onInput={e => setSearch((e.target as HTMLInputElement).value)}
+                        className="routes-tab-search" />
+                </div>
+
+                {modes.length > 1 && (
+                    <div className="routes-tab-modes">
+                        {modes.map(([mode, count]) => (
+                            <button key={mode} type="button"
+                                className={cls('routes-tab-mode', selectedModes.has(mode) && 'routes-tab-mode--active')}
+                                onClick={() => setSelectedModes(prev => {
+                                    const next = new Set(prev);
+                                    if (next.has(mode)) next.delete(mode);
+                                    else next.add(mode);
+                                    return next;
+                                })}
+                                title={`${selectedModes.has(mode) ? 'Hide' : 'Show'} ${count} ${mode} ${count === 1 ? 'route' : 'routes'}`}>
+                                {mode}{' '}<span className="routes-tab-mode-count">{count}</span>
+                            </button>
+                        ))}
+                        {selectedModes.size > 0 && (
+                            <button type="button" className="routes-tab-mode-clear"
+                                onClick={() => setSelectedModes(new Set())}>Clear</button>
+                        )}
+                    </div>
+                )}
+            </div>
 
             <div className="routes-tab-list">
                 {filtered.map(r => (

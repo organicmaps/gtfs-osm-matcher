@@ -1,5 +1,23 @@
 .routes-tab {
     padding: 4px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.routes-tab-header {
+    flex-shrink: 0;
+    max-height: 60%;
+    overflow-y: auto;
+}
+
+.routes-tab-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
 }
 
 .routes-tab-stats {

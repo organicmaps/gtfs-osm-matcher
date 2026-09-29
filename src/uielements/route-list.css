@@ -122,7 +122,8 @@
     cursor: pointer;
 }
 
-.route-open-link:hover {
+.route-open-link:hover,
+.route-open-link:hover .route-status {
     text-decoration: underline;
 }
 

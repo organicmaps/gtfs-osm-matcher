@@ -224,7 +224,7 @@ export function App() {
                   <MatchReportSelector onSelectReport={selectionContext.onReportSelect} />
                 </div>
 
-                <div className={cls(activeTab !== 'routes' && 'tab-hidden')}>
+                <div className={cls('routes-tab-panel', activeTab !== 'routes' && 'tab-hidden')}>
                   {reportRegion && <RoutesTab key={reportRegion} reportRegion={reportRegion} active={activeTab === 'routes'} />}
                 </div>
 
