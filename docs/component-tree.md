@@ -39,7 +39,7 @@ App  (src/app.tsx)
         │   │               draws them at their anchored positions]
         │   │
         │   ├── [tab: routes]
-        │   │   └── RoutesTab  (src/uielements/routes-tab.tsx)
+        │   │   └── RoutesTab  (src/uielements/routes-tab.tsx)  [fixed header with metadata/filters; independently scrollable route list]
         │   │       ├── [route index, separate relation + stop status filters, transport-mode filters, ranked search, lazy variant details, per-route fly-to, route deep-link restore]
         │   │       ├── RouteInfo  (src/uielements/route-info.tsx)  [selected route metadata, anchor totals and selected variant's matched stop OSM links]
         │   │       │   └── RouteMatchStatus  [relation coverage and stop matching totals]
@@ -72,6 +72,11 @@ App  (src/app.tsx)
         ├── #map-tools  (position: absolute, top-right, foldable)
         └── #map-view  (MapLibre GL canvas, fills container)
 ```
+
+The Routes tab constrains the panel to its available height: navigation stays above the tab,
+`.routes-tab-header` holds status, selected route info and filters, and `.routes-tab-list`
+scrolls within the remaining space. Top/bottom overlay buttons return to the active variant (or route header) when it is outside the visible list; filtering it out hides the buttons. The header scrolls only when its content exceeds 60%
+of the tab height, keeping the list accessible on short screens or with expanded stop IDs.
 
 ### Side panel minimize behaviour
 - Minimized state is tracked via `minimized-panel` CSS class on `#content-area` (no React state)

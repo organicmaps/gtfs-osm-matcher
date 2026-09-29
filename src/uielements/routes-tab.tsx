@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useState } from "preact/hooks";
+import { useContext, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { getRouteIndex, type RouteIndexEntry } from "./route-list";
 import { getRouteVariants, type RouteVariant } from "../services/routeVariants";
 import { getOsmRouteGeometry } from "../services/osmRouteGeometry";
@@ -36,6 +36,9 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
     const [osmLoadingId, setOsmLoadingId] = useState<number | null>(null);
     const [osmError, setOsmError] = useState<{ relationId: number; message: string } | null>(null);
     const [osmRetry, setOsmRetry] = useState(0);
+    const listRef = useRef<HTMLDivElement>(null);
+    const activeItemRef = useRef<HTMLElement | null>(null);
+    const [selectionOutside, setSelectionOutside] = useState<'above' | 'below' | null>(null);
 
     // A region switch changes which modes are even present — reset the filter so a
     // stale one does not silently hide everything.
@@ -262,6 +265,51 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
         flyToRoute(routeId);
     }, [active, hashSelection?.kind, hashSelection?.id, index.length]);
 
+    useEffect(() => {
+        const list = listRef.current;
+        const item = active && list
+            ? list.querySelector<HTMLElement>('.routes-tab-variant--selected')
+                || list.querySelector<HTMLElement>('.routes-tab-route-header--selected')
+            : null;
+        activeItemRef.current = item;
+        setSelectionOutside(null);
+        if (!list || !item) return;
+
+        const updateVisibility = () => {
+            const bounds = list.getBoundingClientRect();
+            const selected = item.getBoundingClientRect();
+            setSelectionOutside(bounds.height === 0 || selected.height === 0 ? null
+                : selected.bottom <= bounds.top ? 'above'
+                : selected.top >= bounds.bottom ? 'below' : null);
+        };
+        const observer = new IntersectionObserver(updateVisibility, { root: list });
+        const resizeObserver = new ResizeObserver(updateVisibility);
+        observer.observe(item);
+        resizeObserver.observe(list);
+        resizeObserver.observe(item);
+        // Also catches scroll jumps from one side of the viewport to the other.
+        list.addEventListener('scroll', updateVisibility, { passive: true });
+        updateVisibility();
+        return () => {
+            observer.disconnect();
+            resizeObserver.disconnect();
+            list.removeEventListener('scroll', updateVisibility);
+            activeItemRef.current = null;
+        };
+    }, [active, expandedRoute, selectedVariantInx, filtered, variantsByRoute, loading, error]);
+
+    const scrollToSelection = () => {
+        const list = listRef.current;
+        const item = activeItemRef.current;
+        if (!list || !item) return;
+        const bounds = list.getBoundingClientRect();
+        const selected = item.getBoundingClientRect();
+        list.scrollTo({
+            top: list.scrollTop + selected.top - bounds.top - (list.clientHeight - selected.height) / 2,
+            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+        });
+    };
+
     if (loading) return <div className="routes-tab">Loading routes…</div>;
     if (error) return <div className="routes-tab">Error: {error}</div>;
     if (index.length === 0) return <div className="routes-tab">No routes in this report.</div>;
@@ -350,18 +398,25 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
                 )}
             </div>
 
-            <div className="routes-tab-list">
-                {filtered.map(r => (
-                    <RouteListItem key={r.routeId} route={r}
-                        expanded={expandedRoute === r.routeId}
-                        variants={variantsByRoute[r.routeId] || []}
-                        variantLoading={variantLoading === r.routeId}
-                        selectedVariantInx={selectedVariantInx}
-                        onExpand={() => expandRoute(r.routeId)}
-                        onSelectVariant={variantInx => setSelectedVariantInx(prev =>
-                            prev === variantInx ? null : variantInx)}
-                        onFlyTo={() => flyToRoute(r.routeId)} />
-                ))}
+            <div className="routes-tab-list-area">
+                <div className="routes-tab-list" ref={listRef}>
+                    {filtered.map(r => (
+                        <RouteListItem key={r.routeId} route={r}
+                            expanded={expandedRoute === r.routeId}
+                            variants={variantsByRoute[r.routeId] || []}
+                            variantLoading={variantLoading === r.routeId}
+                            selectedVariantInx={selectedVariantInx}
+                            onExpand={() => expandRoute(r.routeId)}
+                            onSelectVariant={variantInx => setSelectedVariantInx(prev =>
+                                prev === variantInx ? null : variantInx)}
+                            onFlyTo={() => flyToRoute(r.routeId)} />
+                    ))}
+                </div>
+                {selectionOutside && <button type="button"
+                    className={cls('routes-tab-scroll-selection', `routes-tab-scroll-selection--${selectionOutside}`)}
+                    onClick={scrollToSelection}>
+                    {selectionOutside === 'above' ? '↑' : '↓'} Scroll to selected {selectedVariantInx == null ? 'route' : 'variant'}
+                </button>}
             </div>
         </div>
     );
