@@ -39,6 +39,7 @@ export type SelectionContextT = {
   selectionSource: SelectionSourceT;
   updateSelection: (newSelection: SelectionT, eventSource: SelectionSourceT) => void;
   onReportSelect: (reportRegion: string | null) => void;
+  openRoute: (reportRegion: string, routeId: string) => void;
 };
 
 const restorePanel = () =>
@@ -97,7 +98,8 @@ export const SelectionContext = createContext<SelectionContextT>({
   selection: null,
   selectionSource: 'app-init',
   onReportSelect: () => { },
-  updateSelection: () => { }
+  updateSelection: () => { },
+  openRoute: () => { }
 });
 
 /**
@@ -125,6 +127,7 @@ export const OsmMatchesOptionsContext = createContext<OsmMatchesOptionsT>({
 
 export function App() {
   const [activeTab, setActiveTab] = useState<'report' | 'routes' | 'selection' | 'changes'>('report');
+  const [routeOpenVersion, setRouteOpenVersion] = useState(0);
   const [mapContextVal, setMapContextVal] = useState<MapContextT>();
   const [selection, updateSelection] = useState<SelectionT | null>(null);
   const [selectionSource, updateSelectionSource] = useState<SelectionSourceT>('app-init');
@@ -157,6 +160,13 @@ export function App() {
       updateSelectionSource('report-reset');
       setActiveTab('report');
       window.dispatchEvent(new Event('ShouldUpdateBounds'));
+    },
+    openRoute: (reportRegion, routeId) => {
+      window.location.hash = `#/match-report/${reportRegion}/selection/route/${encodeURIComponent(routeId)}`;
+      // Clicking the same link is an action even when the URL does not change.
+      setRouteOpenVersion(version => version + 1);
+      setActiveTab('routes');
+      restorePanel();
     }
   }
 
@@ -190,16 +200,13 @@ export function App() {
   const reportRegion = useHashRoute(parseUrlReportRegion);
   const hashSelection = useHashRoute(parseSelectionHash);
 
-  // A route deep-link (`#/match-report/{region}/selection/route/{id}`) opens with the
-  // routes tab ahead of the report. The user can still switch away; this only re-fires
-  // when the hash actually changes to a different route, so a manual tab switch is not
-  // fought. The matching route expand + fly happens in RoutesTab, which also reads the
-  // hash — the tab switch and the route expand stay decoupled, sharing only the URL.
+  // Browser navigation opens Routes once per URL selection. Explicit link clicks
+  // also increment routeOpenVersion so the same URL can be opened again.
   useEffect(() => {
     if (hashSelection?.kind === 'route') {
       setActiveTab('routes');
     }
-  }, [hashSelection?.kind, hashSelection?.id]);
+  }, [reportRegion, hashSelection?.kind, hashSelection?.id]);
 
   return (
     <>
@@ -225,7 +232,8 @@ export function App() {
                 </div>
 
                 <div className={cls('routes-tab-panel', activeTab !== 'routes' && 'tab-hidden')}>
-                  {reportRegion && <RoutesTab key={reportRegion} reportRegion={reportRegion} active={activeTab === 'routes'} />}
+                  {reportRegion && <RoutesTab key={reportRegion} reportRegion={reportRegion}
+                    active={activeTab === 'routes'} routeOpenVersion={routeOpenVersion} />}
                 </div>
 
                 <div className={cls(activeTab !== 'changes' && 'tab-hidden')}>

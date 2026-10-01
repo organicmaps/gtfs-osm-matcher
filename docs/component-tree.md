@@ -78,6 +78,13 @@ The Routes tab constrains the panel to its available height: navigation stays ab
 scrolls within the remaining space. Top/bottom overlay buttons return to the active variant (or route header) when it is outside the visible list; filtering it out hides the buttons. The header scrolls only when its content exceeds 60%
 of the tab height, keeping the list accessible on short screens or with expanded stop IDs.
 
+Route-pill links call `SelectionContext.openRoute`, which restores the panel, opens Routes,
+writes the route URL, and increments `routeOpenVersion` so repeated links work. `RoutesTab`
+consumes each URL/version once; switching tabs preserves subsequent manual selections.
+Opening a linked route clears filters only if they hide it. New selections, tab changes,
+and unmounting cancel pending camera moves; variant loads may still populate the mounted
+tab's cache without moving the map or clearing another route's loading indicator.
+
 ### Side panel minimize behaviour
 - Minimized state is tracked via `minimized-panel` CSS class on `#content-area` (no React state)
 - Desktop: `#side-panel` becomes `position: absolute`, floats top-left over the map; map fills full width
@@ -87,8 +94,8 @@ of the tab height, keeping the list accessible on short screens or with expanded
 
 | Context | Provider | Consumers |
 |---|---|---|
-| `MapContext` | `App` | `MatchReport`, `StopsLayer`, `RegionMarkersLayer`, `RoutesMap`, `MatchArrowLayer`, `HtmlMapMarker`, `LocateMe`, `AddOsmStopController`, `MoveController` |
-| `SelectionContext` | `App` | `MatchReport`, `SelectionInfo`, `OsmListElement` |
+| `MapContext` | `App` | `MatchReport`, `StopsLayer`, `RegionMarkersLayer`, `RoutesTab`, `RoutesMap`, `MatchArrowLayer`, `HtmlMapMarker`, `LocateMe`, `AddOsmStopController`, `MoveController` |
+| `SelectionContext` | `App` | `MatchReport`, `SelectionInfo`, `RoutePill`, `OsmListElement` |
 | `OsmMatchesOptionsContext` | `App` | `MatchReport` (publishes `osmMatchesAvailable`), `OsmMatchesSwitch` (hidden when unavailable) |
 
 ## OSMData event system

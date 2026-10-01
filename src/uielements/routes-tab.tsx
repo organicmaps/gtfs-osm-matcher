@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { getRouteIndex, type RouteIndexEntry } from "./route-list";
 import { getRouteVariants, type RouteVariant } from "../services/routeVariants";
 import { getOsmRouteGeometry } from "../services/osmRouteGeometry";
@@ -17,9 +17,10 @@ type MatchFilter = 'all' | 'matched' | 'partial' | 'unmatched';
 type RoutesTabProps = {
     reportRegion: string;
     active: boolean;
+    routeOpenVersion: number;
 };
 
-export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
+export function RoutesTab({ reportRegion, active, routeOpenVersion }: RoutesTabProps) {
     const map = useContext(MapContext)?.map;
     const [index, setIndex] = useState<RouteIndexEntry[]>([]);
     const [loading, setLoading] = useState(false);
@@ -39,6 +40,18 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
     const listRef = useRef<HTMLDivElement>(null);
     const activeItemRef = useRef<HTMLElement | null>(null);
     const [selectionOutside, setSelectionOutside] = useState<'above' | 'below' | null>(null);
+    const flyGeneration = useRef(0);
+    const cacheGeneration = useRef(0);
+    const consumedRouteSelection = useRef<string | null>(null);
+
+    useLayoutEffect(() => {
+        return () => { flyGeneration.current++; };
+    }, [active, reportRegion, map]);
+
+    useLayoutEffect(() => {
+        // App keys RoutesTab by reportRegion, so changing feeds unmounts this cache.
+        return () => { cacheGeneration.current++; };
+    }, []);
 
     // A region switch changes which modes are even present — reset the filter so a
     // stale one does not silently hide everything.
@@ -180,7 +193,28 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
 
     const expandedRouteEntry = index.find(r => r.routeId === expandedRoute);
 
+    const loadVariants = (entry: RouteIndexEntry) => {
+        const routeId = entry.routeId;
+        const cached = variantsByRoute[routeId];
+        if (cached) return Promise.resolve(cached);
+        const generation = cacheGeneration.current;
+        setVariantLoading(routeId);
+        return getRouteVariants(reportRegion, routeId, entry.byteOffset, entry.byteLength)
+            .then(variants => {
+                if (generation === cacheGeneration.current) {
+                    setVariantsByRoute(prev => ({ ...prev, [routeId]: variants }));
+                }
+                return variants;
+            })
+            .finally(() => {
+                if (generation === cacheGeneration.current) {
+                    setVariantLoading(prev => prev === routeId ? null : prev);
+                }
+            });
+    };
+
     const expandRoute = (routeId: string) => {
+        flyGeneration.current++;
         if (expandedRoute === routeId) {
             if (selectedVariantInx !== null) {
                 setSelectedVariantInx(null);
@@ -194,15 +228,9 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
         if (variantsByRoute[routeId]) return;
         const entry = index.find(r => r.routeId === routeId);
         if (!entry) return;
-        setVariantLoading(routeId);
-        getRouteVariants(reportRegion, routeId, entry.byteOffset, entry.byteLength)
-            .then(variants => {
-                setVariantsByRoute(prev => ({ ...prev, [routeId]: variants }));
-                setVariantLoading(null);
-            })
+        loadVariants(entry)
             .catch(e => {
                 console.error('Failed to load variants for', routeId, e);
-                setVariantLoading(null);
             });
     };
 
@@ -211,24 +239,15 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
     // so the button works on a collapsed row too — and also expands the row so the
     // route is actually drawn alongside the camera move.
     const flyToRoute = (routeId: string) => {
-        if (!map) return;
+        const generation = ++flyGeneration.current;
+        if (!active || !map) return;
         const entry = index.find(r => r.routeId === routeId);
         if (!entry) return;
-        if (expandedRoute !== routeId) {
-            setExpandedRoute(routeId);
-            setSelectedVariantInx(null);
-            if (!variantsByRoute[routeId]) setVariantLoading(routeId);
-        }
-        const cached = variantsByRoute[routeId];
-        const variantsPromise = cached
-            ? Promise.resolve(cached)
-            : getRouteVariants(reportRegion, routeId, entry.byteOffset, entry.byteLength);
-        variantsPromise
+        setExpandedRoute(routeId);
+        setSelectedVariantInx(null);
+        loadVariants(entry)
             .then(variants => {
-                if (!variantsByRoute[routeId]) {
-                    setVariantsByRoute(prev => ({ ...prev, [routeId]: variants }));
-                    setVariantLoading(null);
-                }
+                if (generation !== flyGeneration.current) return;
                 let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
                 let n = 0;
                 for (const v of variants) {
@@ -247,23 +266,33 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
             })
             .catch(e => {
                 console.error('flyToRoute failed for', routeId, e);
-                setVariantLoading(null);
             });
     };
 
     // Route deep-link (`#/match-report/{region}/selection/route/{id}`): expand + fly to
     // the named route. App already switched the tab to 'routes'; this does the rest.
-    // Waits for the index to load so the route's byte range is known before fetching
-    // variants. A repeated identical hash does not refire, so a manual collapse/expand
-    // here is not fought.
+    // Consume a navigation once, preserving subsequent manual selections on tab return.
     const hashSelection = useHashRoute(parseSelectionHash);
     useEffect(() => {
-        if (!active || hashSelection?.kind !== 'route' || index.length === 0) return;
+        if (hashSelection?.kind !== 'route') {
+            consumedRouteSelection.current = null;
+            return;
+        }
+        if (!active || !map) return;
         const routeId = hashSelection.id;
-        if (expandedRoute === routeId) return;
+        const selectionKey = JSON.stringify([reportRegion, hashSelection.kind, routeId, routeOpenVersion]);
+        if (consumedRouteSelection.current === selectionKey) return;
         if (!index.some(r => r.routeId === routeId)) return;
+        consumedRouteSelection.current = selectionKey;
+        if (!filtered.some(r => r.routeId === routeId)) {
+            setRelationFilter('all');
+            setStopFilter('all');
+            setSelectedModes(new Set());
+            setSearch('');
+        }
         flyToRoute(routeId);
-    }, [active, hashSelection?.kind, hashSelection?.id, index.length]);
+    }, [active, map, reportRegion, hashSelection?.kind, hashSelection?.id,
+        routeOpenVersion, index, filtered]);
 
     useEffect(() => {
         const list = listRef.current;
@@ -407,8 +436,10 @@ export function RoutesTab({ reportRegion, active }: RoutesTabProps) {
                             variantLoading={variantLoading === r.routeId}
                             selectedVariantInx={selectedVariantInx}
                             onExpand={() => expandRoute(r.routeId)}
-                            onSelectVariant={variantInx => setSelectedVariantInx(prev =>
-                                prev === variantInx ? null : variantInx)}
+                            onSelectVariant={variantInx => {
+                                flyGeneration.current++;
+                                setSelectedVariantInx(prev => prev === variantInx ? null : variantInx);
+                            }}
                             onFlyTo={() => flyToRoute(r.routeId)} />
                     ))}
                 </div>

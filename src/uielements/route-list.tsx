@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useContext, useEffect, useMemo, useState } from "preact/hooks";
+import { SelectionContext } from "../app";
 import { DATA_BASE_URL } from "../config";
 import { RoutesMap, type FullRouteDisplayEntry } from "./routes";
 import { cls } from "./cls";
@@ -56,6 +57,7 @@ type RoutePillProps = {
 };
 
 function RoutePill({ route: r, variants, selectedRouteId, selectedVariantInx, reportRegion, onSelectRoute, onSelectVariant }: RoutePillProps) {
+    const { openRoute } = useContext(SelectionContext);
     const isSelected = selectedRouteId === r.routeId;
     return (
         <span
@@ -66,7 +68,12 @@ function RoutePill({ route: r, variants, selectedRouteId, selectedVariantInx, re
                 className="route-open-link"
                 title="Open in routes panel"
                 aria-label="Open in routes panel"
-                onClick={e => e.stopPropagation()}
+                onClick={e => {
+                    e.stopPropagation();
+                    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+                    e.preventDefault();
+                    openRoute(reportRegion, r.routeId);
+                }}
             >
                 <RouteMatchStatus route={r} compact />
                 {'\u2197'}
