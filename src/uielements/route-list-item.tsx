@@ -3,6 +3,7 @@ import type { RouteIndexEntry } from "./route-list";
 import { osmFeatureUrl } from "../services/OSMData";
 import { cls } from "./cls";
 import { RouteMatchStatus } from "./route-match-status";
+import "./fly-to.css";
 
 type RouteListItemProps = {
     route: RouteIndexEntry;
@@ -27,7 +28,7 @@ export function RouteListItem({ route, expanded, variants, variantLoading,
                 {route.longName && <span className="routes-tab-long-name">{route.longName}</span>}
                 <RouteMatchStatus route={route} />
                 <span className="routes-tab-route-type">{route.routeType}</span>
-                <button type="button" className="routes-tab-flyto"
+                <button type="button" className="fly-to-button"
                     title="Fly to route on map"
                     onClick={e => { e.stopPropagation(); onFlyTo(); }}>
                     {'\u21D8'}

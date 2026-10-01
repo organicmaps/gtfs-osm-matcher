@@ -262,24 +262,6 @@
     flex-shrink: 0;
 }
 
-.routes-tab-flyto {
-    flex-shrink: 0;
-    margin-left: 4px;
-    padding: 0 5px;
-    font-size: 0.85em;
-    line-height: 1.4;
-    border: 1px solid #888;
-    border-radius: 3px;
-    background: transparent;
-    color: #0876c7;
-    cursor: pointer;
-}
-
-.routes-tab-flyto:hover {
-    background: #dcecf9;
-    border-color: #0876c7;
-}
-
 .routes-tab-variants {
     padding: 3px 0 3px 1.5em;
 }
