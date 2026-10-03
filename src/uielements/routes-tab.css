@@ -1,0 +1,284 @@
+.routes-tab {
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.routes-tab-header {
+    flex-shrink: 0;
+    max-height: 60%;
+    overflow-y: auto;
+}
+
+.routes-tab-list-area {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.routes-tab-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+}
+
+.routes-tab-scroll-selection {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: calc(100% - 24px);
+    z-index: 1;
+    padding: 5px 12px;
+    border: 1px solid #0876c7;
+    border-radius: 16px;
+    background: #fff;
+    color: #0876c7;
+    box-shadow: 0 2px 6px #0003;
+    cursor: pointer;
+}
+
+.routes-tab-scroll-selection:hover {
+    background: #dcecf9;
+}
+
+.routes-tab-scroll-selection--above { top: 6px; }
+.routes-tab-scroll-selection--below { bottom: 6px; }
+
+.routes-tab-stats {
+    font-size: 0.85em;
+    margin-bottom: 6px;
+    color: #555;
+}
+
+.routes-tab-filters {
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.routes-tab-filter {
+    font-size: 0.85em;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.routes-tab-search {
+    flex: 1;
+    min-width: 100px;
+    padding: 2px 6px;
+    font-size: 0.85em;
+    border: 1px solid #666;
+    border-radius: 3px;
+}
+
+.routes-tab-modes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.routes-tab-mode {
+    font-size: 0.8em;
+    padding: 1px 8px;
+    border: 1px solid #888;
+    border-radius: 10px;
+    background: transparent;
+    cursor: pointer;
+    user-select: none;
+    line-height: 1.4;
+}
+
+.routes-tab-mode:hover {
+    border-color: #0876c7;
+    color: #0876c7;
+}
+
+.routes-tab-mode--active {
+    background: #0876c7;
+    border-color: #0876c7;
+    color: #fff;
+}
+
+.routes-tab-mode--active:hover {
+    color: #fff;
+}
+
+.routes-tab-mode-count {
+    font-size: 0.85em;
+    opacity: 0.7;
+}
+
+.routes-tab-mode-clear {
+    font-size: 0.8em;
+    padding: 1px 8px;
+    border: 1px solid #c62828;
+    border-radius: 10px;
+    background: transparent;
+    color: #c62828;
+    cursor: pointer;
+    line-height: 1.4;
+}
+
+.routes-tab-info {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fafafa;
+    padding: 6px 8px;
+    margin-bottom: 8px;
+    font-size: 0.85em;
+}
+
+.routes-tab-info-grid {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 14px;
+    row-gap: 3px;
+}
+
+.routes-tab-info-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.routes-tab-info-label {
+    color: #888;
+    font-size: 0.9em;
+}
+
+.routes-tab-info-value {
+    color: #222;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.routes-tab-info-sub {
+    color: #888;
+    font-size: 0.9em;
+}
+
+.routes-tab-info-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 1px solid #666;
+    border-radius: 2px;
+}
+
+.routes-tab-info-longname {
+    margin-top: 4px;
+    color: #444;
+    font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.routes-tab-variant-match-detail,
+.routes-tab-stop-links {
+    margin-top: 5px;
+}
+
+.routes-tab-stop-links {
+    overflow-wrap: anywhere;
+}
+
+.routes-tab-stop-links summary {
+    cursor: pointer;
+}
+
+.routes-tab-row {
+    border-bottom: 1px solid #eee;
+}
+
+.routes-tab-route-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+    cursor: pointer;
+}
+
+.routes-tab-route-header--selected {
+    background: #f3f3f3;
+}
+
+.routes-tab-map-status {
+    margin-bottom: 6px;
+    font-size: 0.85em;
+}
+
+.routes-tab-legend-gtfs {
+    color: #c00;
+    font-weight: bold;
+}
+
+.routes-tab-legend-osm {
+    color: #0876c7;
+    font-weight: bold;
+}
+
+.routes-tab-map-error {
+    color: #a00;
+}
+
+.routes-tab-expand {
+    font-size: 0.75em;
+    width: 1em;
+    color: #888;
+}
+
+.routes-tab-route-name {
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.routes-tab-long-name {
+    font-size: 0.85em;
+    color: #444;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+
+.routes-tab-route-type {
+    font-size: 0.8em;
+    color: #888;
+    flex-shrink: 0;
+}
+
+.routes-tab-variants {
+    padding: 3px 0 3px 1.5em;
+}
+
+.routes-tab-variant {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 0;
+    font-size: 0.85em;
+    color: #555;
+    cursor: pointer;
+}
+
+.routes-tab-variant--selected {
+    background: #dcecf9;
+    color: #124d75;
+    font-weight: bold;
+}

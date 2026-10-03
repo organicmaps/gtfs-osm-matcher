@@ -76,8 +76,9 @@ const NOT_DISSOLVED_REASON: { [code: string]: string } = {
 
 export type SelectionInfoProps = {
     selection: SelectionT | null
+    showRouteMap: boolean
 }
-export function SelectionInfo({ selection }: SelectionInfoProps) {
+export function SelectionInfo({ selection, showRouteMap }: SelectionInfoProps) {
     const properties = selection?.feature.properties;
     const datasetName = selection?.datasetName;
     const reportRegion = selection?.reportRegion;
@@ -91,7 +92,7 @@ export function SelectionInfo({ selection }: SelectionInfoProps) {
         <div id={"selection-info"} className={cls(!selection && "hidden")}>
             {selection && <button className="close-button" onClick={() => onReportSelect(null)} title="Close selection">&times;</button>}
             {properties && reportRegion &&
-                <MatchInfo {...{ datasetName, properties, geometry, reportRegion, idTags }} />}
+                <MatchInfo {...{ datasetName, properties, geometry, reportRegion, idTags, showRouteMap }} />}
         </div>
     </>
     )
@@ -135,8 +136,9 @@ type MatchInfoProps = {
     reportRegion: string
     datasetName?: string
     idTags?: { [k: string]: number }
+    showRouteMap: boolean
 }
-function MatchInfo({ datasetName, properties, geometry, idTags, reportRegion }: MatchInfoProps) {
+function MatchInfo({ datasetName, properties, geometry, idTags, reportRegion, showRouteMap }: MatchInfoProps) {
 
     const [loading, setLoading] = useState(false);
 
@@ -328,7 +330,7 @@ function MatchInfo({ datasetName, properties, geometry, idTags, reportRegion }: 
             {markersGtfs}
         </div>}
 
-        <RouteList reportRegion={reportRegion} routeIds={routeIdList} routeTypes={routeTypes} gtfsStopIds={gtfsStopIds} />
+        <RouteList reportRegion={reportRegion} routeIds={routeIdList} routeTypes={routeTypes} gtfsStopIds={gtfsStopIds} showRouteMap={showRouteMap} />
 
         <div className={"edit-actions"}>
             <AddOsmStopController id={properties.gtfsStopId} code={properties.gtfsStopCode} routeTypes={routeTypes} {...{ name, idTags }} />
@@ -664,7 +666,7 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
                 // GTFS ids are free-form UTF-8: a `#` truncates the link and a `/`
                 // is cut by parseSelectionHash's [^/]+, same as the hash writer in
                 // app.tsx that already encodes.
-                f.mtch.map((m: string) => {return (<li key={m}><a href={`/#/match-report/${reportRegion}/selection/${encodeURIComponent(m)}`}>{m}</a></li>)})
+                f.mtch.map((m: string) => {return (<li key={m}><a href={`/#/match-report/${reportRegion}/selection/stop/${encodeURIComponent(m)}`}>{m}</a></li>)})
             }
             </ul>
         }
