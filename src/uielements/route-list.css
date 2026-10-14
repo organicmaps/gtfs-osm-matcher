@@ -54,3 +54,86 @@
 .route-type-group-header {
     margin-right: 4px;
 }
+
+.route-match-badge {
+    display: inline-block;
+    margin-left: 4px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.route-match-badge--matched {
+    color: #2e7d32;
+}
+
+.route-match-badge--unmatched {
+    color: #c62828;
+}
+
+/* The 8px coloured dot used inline next to a route name — distinct from
+   .route-match-badge, which is the text "✓ N / ✗ M" counter in the stats row. */
+.route-match-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin: 0 3px;
+    vertical-align: middle;
+}
+
+.route-match-dot--matched {
+    background: #2e7d32;
+}
+
+.route-match-dot--unmatched {
+    background: #c62828;
+}
+
+.route-statuses {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    vertical-align: middle;
+}
+
+.route-status {
+    border: 1px solid currentColor;
+    border-radius: 3px;
+    padding: 0 3px;
+    font-size: 0.78em;
+    white-space: nowrap;
+    color: #777;
+}
+
+.route-status--matched { color: #2e7d32; }
+.route-status--partial { color: #a26100; }
+.route-status--unmatched { color: #c62828; }
+
+.route-statuses--compact .route-status {
+    border: none;
+}
+
+.route-open-link {
+    margin-left: 4px;
+    margin-right: 4px;
+    font-size: 0.85em;
+    color: #1565c0;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.route-open-link:hover,
+.route-open-link:hover .route-status {
+    text-decoration: underline;
+}
+
+.route-osm-link {
+    margin-left: 4px;
+    font-size: 0.85em;
+    color: #1565c0;
+    text-decoration: none;
+}
+
+.route-osm-link:hover {
+    text-decoration: underline;
+}

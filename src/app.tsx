@@ -9,10 +9,11 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import { MatchReportSelector } from './uielements/report-selector';
 import { SelectionInfo } from './uielements/selection-info';
 import { MapTools } from './uielements/map-tools';
-import { parseUrlReportRegion, useHashRoute } from './uielements/routing';
+import { parseUrlReportRegion, parseSelectionHash, useHashRoute } from './uielements/routing';
 import { cls } from './uielements/cls';
 import { OSM_DATA } from './services/OSMData';
 import { Changes } from './uielements/editor/changes';
+import { RoutesTab } from './uielements/routes-tab';
 import { useSyncExternalStore } from 'preact/compat';
 
 export type MapContextT = {
@@ -38,6 +39,7 @@ export type SelectionContextT = {
   selectionSource: SelectionSourceT;
   updateSelection: (newSelection: SelectionT, eventSource: SelectionSourceT) => void;
   onReportSelect: (reportRegion: string | null) => void;
+  openRoute: (reportRegion: string, routeId: string) => void;
 };
 
 const restorePanel = () =>
@@ -48,8 +50,8 @@ const togglePanel = () =>
 type SidePanelNavProps = {
   reportRegion: string | undefined;
   selection: SelectionT | null;
-  activeTab: 'report' | 'selection' | 'changes';
-  setActiveTab: (tab: 'report' | 'selection' | 'changes') => void;
+  activeTab: 'report' | 'routes' | 'selection' | 'changes';
+  setActiveTab: (tab: 'report' | 'routes' | 'selection' | 'changes') => void;
   onBackToReports: () => void;
 }
 
@@ -69,6 +71,9 @@ function SidePanelNav({ reportRegion, selection, activeTab, setActiveTab, onBack
       {reportRegion && <>
         <span className={cls('tab', activeTab === 'report' && 'tab-active')}
           onClick={() => { restorePanel(); setActiveTab('report'); }}>Report</span>
+        <span className={'tab-sep'}>|</span>
+        <span className={cls('tab', activeTab === 'routes' && 'tab-active')}
+          onClick={() => { restorePanel(); setActiveTab('routes'); }}>Routes</span>
         <span className={'tab-sep'}>|</span>
       </>}
       {selection && <>
@@ -93,7 +98,8 @@ export const SelectionContext = createContext<SelectionContextT>({
   selection: null,
   selectionSource: 'app-init',
   onReportSelect: () => { },
-  updateSelection: () => { }
+  updateSelection: () => { },
+  openRoute: () => { }
 });
 
 /**
@@ -120,7 +126,8 @@ export const OsmMatchesOptionsContext = createContext<OsmMatchesOptionsT>({
 });
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'report' | 'selection' | 'changes'>('report');
+  const [activeTab, setActiveTab] = useState<'report' | 'routes' | 'selection' | 'changes'>('report');
+  const [routeOpenVersion, setRouteOpenVersion] = useState(0);
   const [mapContextVal, setMapContextVal] = useState<MapContextT>();
   const [selection, updateSelection] = useState<SelectionT | null>(null);
   const [selectionSource, updateSelectionSource] = useState<SelectionSourceT>('app-init');
@@ -153,6 +160,13 @@ export function App() {
       updateSelectionSource('report-reset');
       setActiveTab('report');
       window.dispatchEvent(new Event('ShouldUpdateBounds'));
+    },
+    openRoute: (reportRegion, routeId) => {
+      window.location.hash = `#/match-report/${reportRegion}/selection/route/${encodeURIComponent(routeId)}`;
+      // Clicking the same link is an action even when the URL does not change.
+      setRouteOpenVersion(version => version + 1);
+      setActiveTab('routes');
+      restorePanel();
     }
   }
 
@@ -175,7 +189,7 @@ export function App() {
         // GTFS ids are free-form UTF-8 and do occur with spaces, '#' or '/': a '#'
         // truncates the hash and parseSelectionHash's [^/]+ cuts at a slash.
         const encoded = encodeURIComponent(id);
-        hash += `/selection/${encoded}`;
+        hash += `/selection/stop/${encoded}`;
       }
 
       window.location.hash = hash;
@@ -184,6 +198,15 @@ export function App() {
 
 
   const reportRegion = useHashRoute(parseUrlReportRegion);
+  const hashSelection = useHashRoute(parseSelectionHash);
+
+  // Browser navigation opens Routes once per URL selection. Explicit link clicks
+  // also increment routeOpenVersion so the same URL can be opened again.
+  useEffect(() => {
+    if (hashSelection?.kind === 'route') {
+      setActiveTab('routes');
+    }
+  }, [reportRegion, hashSelection?.kind, hashSelection?.id]);
 
   return (
     <>
@@ -191,7 +214,7 @@ export function App() {
         <SelectionContext value={selectionContext} >
           <OsmMatchesOptionsContext value={osmMatchesOptions} >
             <div id="content-area">
-              <div id="side-panel" className={cls(reportRegion && 'slim')}>
+              <div id="side-panel" className={cls(reportRegion && 'slim', activeTab === 'routes' && reportRegion && 'routes-panel')}>
                 <SidePanelNav
                   reportRegion={reportRegion}
                   selection={selection}
@@ -201,16 +224,21 @@ export function App() {
                 />
 
                 <div className={cls(activeTab !== 'selection' && 'tab-hidden')}>
-                  <SelectionInfo selection={selection} />
+                  <SelectionInfo selection={selection} showRouteMap={activeTab !== 'routes'} />
                 </div>
 
                 <div className={cls(activeTab !== 'report' && 'tab-hidden')}>
                   <MatchReportSelector onSelectReport={selectionContext.onReportSelect} />
                 </div>
 
-              <div className={cls(activeTab !== 'changes' && 'tab-hidden')}>
-                <Changes osmData={OSM_DATA} region={reportRegion} />
-              </div>
+                <div className={cls('routes-tab-panel', activeTab !== 'routes' && 'tab-hidden')}>
+                  {reportRegion && <RoutesTab key={reportRegion} reportRegion={reportRegion}
+                    active={activeTab === 'routes'} routeOpenVersion={routeOpenVersion} />}
+                </div>
+
+                <div className={cls(activeTab !== 'changes' && 'tab-hidden')}>
+                  <Changes osmData={OSM_DATA} region={reportRegion} />
+                </div>
 
               </div>
               <div id="map-container">

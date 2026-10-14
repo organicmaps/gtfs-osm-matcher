@@ -122,6 +122,29 @@
   width: 20vw;
 }
 
+#side-panel.routes-panel {
+  overflow: hidden;
+  min-height: 0;
+}
+
+#side-panel.routes-panel > .report-nav {
+  flex-shrink: 0;
+}
+
+.routes-tab-panel:not(.tab-hidden) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (min-width: 1201px) {
+  #side-panel.slim.routes-panel {
+    width: clamp(480px, 36vw, 760px);
+  }
+}
+
 #side-panel.hidden {
   display: none;
 }

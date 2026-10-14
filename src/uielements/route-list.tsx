@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useContext, useEffect, useMemo, useState } from "preact/hooks";
+import { SelectionContext } from "../app";
 import { DATA_BASE_URL } from "../config";
 import { RoutesMap, type FullRouteDisplayEntry } from "./routes";
 import { cls } from "./cls";
 import { getRouteVariants, type RouteVariant } from "../services/routeVariants";
 import { memoFetch } from "../services/memoFetch";
+import { RouteMatchStatus } from "./route-match-status";
 
 import "./route-list.css";
 
-type RouteIndexEntry = {
+export type RouteIndexEntry = {
     routeId: string;
     shortName: string;
     longName: string;
@@ -16,16 +18,20 @@ type RouteIndexEntry = {
     agency: string;
     byteOffset: number;
     byteLength: number;
+    relationMatch?: { status: 'matched' | 'partial' | 'unmatched'; matchedVariants: number; totalVariants: number };
+    stopMatch?: { status: 'matched' | 'partial' | 'unmatched'; matched: number; total: number; anchored?: number };
+    modeIgnored?: boolean;
+    color?: string;
 };
 
-type RouteWithVariants = {
+export type RouteWithVariants = {
     index: RouteIndexEntry;
     variants: RouteVariant[];
 };
 
 const routeIndexCache: { [region: string]: Promise<RouteIndexEntry[]> } = {};
 
-function getRouteIndex(reportRegion: string): Promise<RouteIndexEntry[]> {
+export function getRouteIndex(reportRegion: string): Promise<RouteIndexEntry[]> {
     return memoFetch(routeIndexCache, reportRegion, () =>
         fetch(`${DATA_BASE_URL}/${reportRegion}/routes.ndjson`)
             .then(r => {
@@ -45,17 +51,33 @@ type RoutePillProps = {
     variants: RouteVariant[];
     selectedRouteId: string | null;
     selectedVariantInx: number | null;
+    reportRegion: string;
     onSelectRoute: (routeId: string) => void;
     onSelectVariant: (routeId: string, variantInx: number) => void;
 };
 
-function RoutePill({ route: r, variants, selectedRouteId, selectedVariantInx, onSelectRoute, onSelectVariant }: RoutePillProps) {
+function RoutePill({ route: r, variants, selectedRouteId, selectedVariantInx, reportRegion, onSelectRoute, onSelectVariant }: RoutePillProps) {
+    const { openRoute } = useContext(SelectionContext);
     const isSelected = selectedRouteId === r.routeId;
     return (
         <span
             onClick={() => onSelectRoute(r.routeId)}
             className={cls('route-pill', (!selectedRouteId || isSelected) && 'route-pill--selected')}>
             {r.shortName || r.routeId}
+            <a href={`#/match-report/${reportRegion}/selection/route/${encodeURIComponent(r.routeId)}`}
+                className="route-open-link"
+                title="Open in routes panel"
+                aria-label="Open in routes panel"
+                onClick={e => {
+                    e.stopPropagation();
+                    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+                    e.preventDefault();
+                    openRoute(reportRegion, r.routeId);
+                }}
+            >
+                <RouteMatchStatus route={r} compact />
+                {'\u2197'}
+            </a>
             {variants.length > 1 &&
                 <span>
                     {' Variants: '}
@@ -77,9 +99,10 @@ type RouteListProps = {
     routeIds: string[];
     routeTypes?: string;
     gtfsStopIds: string[];
+    showRouteMap: boolean;
 };
 
-export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: RouteListProps) {
+export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds, showRouteMap }: RouteListProps) {
     const [routeIndex, setRouteIndex] = useState<RouteIndexEntry[]>([]);
     const [routesWithVariants, setRoutesWithVariants] = useState<RouteWithVariants[]>([]);
     const [loading, setLoading] = useState(false);
@@ -158,7 +181,8 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
                         const allVariants = await getRouteVariants(
                             reportRegion, entry.routeId, entry.byteOffset, entry.byteLength);
                         const variants = allVariants.filter(v =>
-                            v.gtfsIds.some(id => gtfsStopIds.includes(id)));
+                            v.gtfsIds.some(id => gtfsStopIds.includes(id)) ||
+                            v.alternateGtfsIds?.some(id => gtfsStopIds.includes(id)));
                         return variants.length > 0 ? { index: entry, variants } : null;
                     })
                 );
@@ -209,6 +233,7 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
         variants: r.variants,
         selectedRouteId,
         selectedVariantInx,
+        reportRegion,
         onSelectRoute: (routeId: string) => {
             setSelectedRouteId(prev => prev === routeId ? null : routeId);
             setSelectedVariantInx(null);
@@ -244,7 +269,7 @@ export function RouteList({ reportRegion, routeIds, routeTypes, gtfsStopIds }: R
 
     return (
         <div>
-            {routesWithVariants.length > 0 && <RoutesMap fullRoutes={fullRouteEntries} />}
+            {showRouteMap && routesWithVariants.length > 0 && <RoutesMap fullRoutes={fullRouteEntries} />}
             {routeTypeHeader}
             {grouped.size > 1 ? (
                 <div>

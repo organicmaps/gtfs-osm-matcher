@@ -378,9 +378,10 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
     }, [rowsById, selectRow]);
 
     // Deep-link restore for a stop selection: the category is recovered from the
-    // index row (it is no longer encoded in the URL).
+    // index row (it is no longer encoded in the URL). Route deep-links are handled
+    // in RoutesTab; ignore them here so they don't surface as "No stop {id}" banners.
     useEffect(() => {
-        if (!hashSelection || rows.length === 0) return;
+        if (!hashSelection || hashSelection.kind !== 'stop' || rows.length === 0) return;
         const id = hashSelection.id;
 
         if (selection?.feature.properties.gtfsStopId === id ||
@@ -407,7 +408,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         updateSelectedDatasets(prev => prev[row.code] ? prev : { ...prev, [row.code]: true });
 
         selectRow(row, 'url-hash');
-    }, [hashSelection?.id, rowsById]);
+    }, [hashSelection?.kind, hashSelection?.id, rowsById]);
 
     useEffect(() => {
         if (map && selectionSource === 'url-hash' && selection) {

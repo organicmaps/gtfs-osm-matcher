@@ -47,12 +47,12 @@ Component/layout tree, side-panel tabs, and context consumers are documented in 
 
 **Global state** (`src/app.tsx`):
 - `MapContext` → `{ map, loaded: Promise<Map>, layerControls }`. Await `loaded` before adding images/overlays — don't race `map.loaded()`.
-- `SelectionContext` → `{ selection, selectionSource, updateSelection(sel, source), onReportSelect }`. `selectionSource` (`'map-click' | 'url-hash' | …`) matters: e.g. only `url-hash` selections trigger a flyTo.
+- `SelectionContext` → `{ selection, selectionSource, updateSelection(sel, source), onReportSelect, openRoute(region, routeId) }`. `selectionSource` (`'map-click' | 'url-hash' | …`) matters: e.g. only `url-hash` stop selections trigger a flyTo. `openRoute` opens the Routes tab even when its URL is unchanged.
 - `OSM_DATA` (`src/services/OSMData.ts`) — singleton store of live OSM elements + tracked edits (create node with negative id, move, change tags), consumed via `subscribe` + `useSyncExternalStore`. `OSM_QUERY_QUEUE` fills it from Overpass (z16 tiles, deduped, 1 s throttle) and the OSM API.
 
 **Hash routing, bidirectionally synced** (`src/uielements/routing.ts`):
-- URL shape: `#/match-report/{region}` plus `/selection/{id}` (`/preview/{id}` is read as the same thing, for links from before the preview became a view of the report). The category is **not** in the URL — deep links recover it from the region's index.tsv row.
-- `useHash()`/`useHashRoute(parser)` are the read direction; a `useEffect` on `selection` in `app.tsx` writes the hash. Keep both directions in mind when touching selection logic.
+- URL shape: `#/match-report/{region}` plus `/selection/<stop|route>/{id}` (`/preview/{id}` and a bare `/selection/{id}` are still read as a stop, for links from before route deep-links landed). The category is **not** in the URL — deep links recover it from the region's index.tsv row. A `/selection/route/{id}` deep-link switches App to the routes tab; `RoutesTab` reads the same hash and expands + flies to that route.
+- `useHash()`/`useHashRoute(parser)` are the read direction; a `useEffect` on `selection` in `app.tsx` writes the stop hash. `RoutePill` calls `SelectionContext.openRoute` for ordinary clicks, which writes the route hash and increments `routeOpenVersion`; modified clicks keep normal link behavior. `RoutesTab` consumes each URL/version once, preserving manual selections on tab return. A new link clears filters if they hide its route. Pending camera moves are canceled by newer selections, tab changes, or unmounting. Keep both directions in mind when touching selection logic.
 - Cross-component signal: `onReportSelect` dispatches a `ShouldUpdateBounds` window event; `report.tsx` listens at module level to arm a one-shot `fitBounds` to the region bbox.
 
 **Map rendering:**

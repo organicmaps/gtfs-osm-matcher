@@ -6,8 +6,12 @@ export type RouteVariant = {
     route: number;
     latlon: number[];
     gtfsIds: string[];
+    alternateGtfsIds?: string[];
     dir?: number;
     inx: number;
+    osm?: number;
+    stopMatch?: { status: 'matched' | 'partial' | 'unmatched'; matched: number; total: number; anchored?: number };
+    osmStopIds?: Record<string, string[]>;
 };
 
 // Cache keyed by region+routeId — independent of which stop, panel or selection triggered
