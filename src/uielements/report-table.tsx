@@ -60,13 +60,11 @@ function SortableHeader<T extends string>({ column, currentSortColumn, sortDirec
 type ReportTableProps = {
     reports: ReportRow[];
     onSelectReport?: (reportRegion: string | null) => void;
-    foldByName?: string[];
 }
-export function ReportTable({ reports, onSelectReport, foldByName = [] }: ReportTableProps) {
+export function ReportTable({ reports, onSelectReport }: ReportTableProps) {
     const sortingColumns = ['region', 'gtfsDate', 'matchPercent', 'liveUpdates', 'total', 'matched', 'empty', 'noMatch'] as const;
     const [sortColumn, setSortColumn] = useState<typeof sortingColumns[number]>('region');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-    const [unfoldedPrefix, setUnfoldedPrefix] = useState<string | null>(null);
     const [infoForRegion, setInfoForRegion] = useState<string | null>(null);
 
     const toggleInfo = (region: string) => {
@@ -122,7 +120,7 @@ export function ReportTable({ reports, onSelectReport, foldByName = [] }: Report
         <table className="report-table">
             <thead>
                 <tr>
-                    <SortableHeader column={'region'} label={'Region'}
+                    <SortableHeader column={'region'} label={'Feed'}
                         currentSortColumn={sortColumn}
                         sortDirection={sortDirection}
                         onSort={handleHeaderClick} />
@@ -149,52 +147,7 @@ export function ReportTable({ reports, onSelectReport, foldByName = [] }: Report
                 </tr>
             </thead>
             <tbody>
-                {(() => {
-                    const rows: any[] = [];
-                    const groups: Record<string, ReportRow[]> = {};
-                    const normalReports: ReportRow[] = [];
-
-                    sortedReports.forEach(report => {
-                        const prefix = foldByName.find(p => report.region.startsWith(p));
-                        if (prefix) {
-                            if (!groups[prefix]) groups[prefix] = [];
-                            groups[prefix].push(report);
-                        } else {
-                            normalReports.push(report);
-                        }
-                    });
-
-                    // Add normal reports and prefix groups to rows in the order they appear.
-                    
-                    const processedPrefixes = new Set<string>();
-                    
-                    sortedReports.forEach(report => {
-                        const prefix = foldByName.find(p => report.region.startsWith(p));
-                        if (!prefix) {
-                            rows.push(renderReportRow(report, onSelectReport, infoForRegion, toggleInfo));
-                        } else if (!processedPrefixes.has(prefix)) {
-                            processedPrefixes.add(prefix);
-                            const group = groups[prefix];
-                            const isUnfolded = unfoldedPrefix === prefix;
-                            
-                            rows.push(
-                                <tr key={prefix} className="fold-header" onClick={() => setUnfoldedPrefix(isUnfolded ? null : prefix)}>
-                                    <td colSpan={6} style={{ cursor: 'pointer', fontWeight: 'bold' }}>
-                                        {prefix} <span className="feed-count">{group.length} feeds</span> {isUnfolded ? '▼' : '▶'}
-                                    </td>
-                                </tr>
-                            );
-                            
-                            if (isUnfolded) {
-                                group.forEach(groupedReport => {
-                                    rows.push(renderReportRow(groupedReport, onSelectReport, infoForRegion, toggleInfo, "grouped-row"));
-                                });
-                            }
-                        }
-                    });
-
-                    return rows;
-                })()}
+                {sortedReports.map(report => renderReportRow(report, onSelectReport, infoForRegion, toggleInfo))}
             </tbody>
         </table>
     );

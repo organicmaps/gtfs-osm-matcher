@@ -72,12 +72,6 @@ export type Report = {
         gtfsTimeStamp: number
         generationTimeStamp: number
         matcherVersion: number | string
-        gtfsBbox?: {
-            left: number
-            right: number
-            top: number
-            bottom: number
-        }
     };
 
 }
@@ -147,20 +141,21 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         console.log('reportData', reportData);
     }
 
-    useEffect(() => {
-        if (map && matchMeta?.gtfsBbox && shouldUpdateBoundsSignal.value) {
-            const { left, bottom, right, top } = matchMeta.gtfsBbox;
-            map.fitBounds([
-                [left, bottom],
-                [right, top]
-            ], {
-                padding: 50
-            });
-            shouldUpdateBoundsSignal.value = false;
-        }
-    }, [map, matchMeta, shouldUpdateBoundsSignal]);
-
     const [rows, setRows] = useState<IndexRow[]>([]);
+    useEffect(() => {
+        if (!map || !shouldUpdateBoundsSignal.value || rows.length === 0) return;
+        let west = Infinity, east = -Infinity, south = Infinity, north = -Infinity;
+        for (const row of rows) {
+            if (!Number.isFinite(row.lon) || !Number.isFinite(row.lat)) continue;
+            west = Math.min(west, row.lon);
+            east = Math.max(east, row.lon);
+            south = Math.min(south, row.lat);
+            north = Math.max(north, row.lat);
+        }
+        if (!Number.isFinite(west)) return;
+        map.fitBounds([[west, south], [east, north]], { padding: 50 });
+        shouldUpdateBoundsSignal.value = false;
+    }, [map, rows]);
     const [selectedDatasets, updateSelectedDatasets] = useState<DatatsetsSelectonT>(defaultSets);
     // Shared with the selection panel: the same switch appears there, so the state cannot
     // live in this component's own dataset map.

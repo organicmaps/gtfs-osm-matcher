@@ -1,8 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { parseUrlReportRegion, useHashRoute } from "./routing";
 import { MatchReport, type Report } from "./report";
-import { ReportTable } from "./report-table";
-import { RegionMarkersLayer } from "./region-markers";
+import { RegionTree, type RegionTreeData } from "./region-tree";
 import { cls } from "./cls";
 import { DATA_BASE_URL } from "../config";
 import "./report-selector.css";
@@ -13,7 +12,7 @@ type MatchReportSelectorProps = {
 export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps) {
     
     const [matchReports, setMatchReports] = useState<Report[]>([]);
-    const [foldByName, setFoldByName] = useState<string[]>([]);
+    const [regionTree, setRegionTree] = useState<RegionTreeData>();
 
     const reportRegion = useHashRoute(parseUrlReportRegion);
 
@@ -22,9 +21,9 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
             .then(r => r.json())
             .then(data => {
                 setMatchReports(data.matchedRegions);
-                setFoldByName(data.foldByName || []);
+                setRegionTree(data.regionTree);
             });
-    }, [setMatchReports, setFoldByName]);
+    }, [setMatchReports, setRegionTree]);
 
     const reports = matchReports.map((report) => {
         const {region, source, version, liveUpdates, matchMeta} = report;
@@ -69,13 +68,12 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
 
     return (
         <div className={"report-list-panel"}>
-            <RegionMarkersLayer reports={matchReports} onSelectReport={onSelectReport} />
-            <h2>Available match reports</h2>
+            <h2>Feeds by Organic Maps region</h2>
             <div className={'reports'}>
-                <ReportTable
+                <RegionTree
+                    tree={regionTree}
                     reports={reports}
                     onSelectReport={onSelectReport}
-                    foldByName={foldByName}
                 />
             </div>
             <div className={"report-list-footer"}>

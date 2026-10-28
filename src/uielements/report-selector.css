@@ -10,6 +10,65 @@
     border-collapse: collapse;
 }
 
+.region-browser-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75em;
+    margin-bottom: 0.75em;
+}
+
+.region-browser-tools input {
+    flex: 1;
+    min-width: 15em;
+    padding: 0.5em;
+}
+
+.region-browser-mode {
+    display: flex;
+    gap: 0.25em;
+}
+
+.region-browser-mode button, .region-tree-choice, .region-tree-toggle {
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+}
+
+.region-browser-mode button { padding: 0.5em; }
+.region-browser-mode button.active, .region-tree-choice.selected { background: #e7f4ef; color: #12736a; }
+
+.region-browser-body {
+    display: grid;
+    grid-template-columns: minmax(13em, 19em) minmax(0, 1fr);
+    gap: 1em;
+    align-items: start;
+}
+
+.region-browser-tree {
+    max-height: 70vh;
+    overflow: auto;
+    border: 1px solid #ddd;
+    border-radius: 0.4em;
+    padding: 0.4em;
+}
+
+.region-tree-line { display: flex; align-items: center; }
+.region-tree-toggle, .region-tree-spacer { width: 1.5em; flex: 0 0 1.5em; text-align: center; }
+.region-tree-choice { display: flex; gap: 0.5em; align-items: center; justify-content: space-between; width: 100%; padding: 0.4em; text-align: left; border-radius: 0.3em; }
+.region-tree-choice:hover, .region-tree-toggle:hover { background: #f1f5f3; }
+.region-tree-choice span:first-child { overflow-wrap: anywhere; }
+.region-tree-count { font-size: 0.85em; color: #666; white-space: nowrap; }
+.region-tree-children { margin-left: 0.6em; padding-left: 0.5em; border-left: 1px solid #ddd; }
+.region-tree-roots { border-top: 1px solid #ddd; margin-top: 0.4em; padding-top: 0.4em; }
+.region-browser-reports { min-width: 0; overflow-x: auto; }
+.region-browser-reports h3 { margin: 0 0 0.4em; }
+
+@media (max-width: 760px) {
+    .region-browser-body { display: block; }
+    .region-browser-tree { max-height: 16em; margin-bottom: 1em; }
+}
+
 .report-table th, .report-table td {
     padding: 0.5em;
     text-align: left;
@@ -58,33 +117,6 @@
 
 .report-datasets {
     border-top: 1px solid #ddd;
-}
-
-.fold-header {
-    background-color: #f0f0f0;
-    cursor: pointer;
-}
-
-.fold-header:hover {
-    background-color: #e0e0e0 !important;
-}
-
-.fold-header td {
-    border-bottom: 2px solid #ccc !important;
-}
-
-.feed-count {
-    color: #666;
-    font-weight: normal;
-    font-size: 0.9em;
-}
-
-.grouped-row {
-    background-color: #fafafa;
-}
-
-.grouped-row td:first-child {
-    padding-left: 2em;
 }
 
 .info-badge {
