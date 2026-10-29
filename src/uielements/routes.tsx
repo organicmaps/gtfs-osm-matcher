@@ -56,12 +56,10 @@ export function RoutesMap({ fullRoutes = [] }: RoutesMapProps) {
             setMapStylesReady(true);
         };
 
-        if (map.loaded()) {
-            createRouteLayers();
-        }
-        else {
-            map.once('load', createRouteLayers);
-        }
+        // addSource needs the parsed style, not the first full render. The
+        // stylesheet is set when style.load fires, including after setStyle.
+        if (map.style?.stylesheet) createRouteLayers();
+        else map.once('style.load', createRouteLayers);
 
     }, [map, layerControls, setMapStylesReady]);
 
