@@ -5,11 +5,6 @@
     overflow-y: auto;
 }
 
-.report-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
 .region-browser-tools {
     display: flex;
     flex-wrap: wrap;
@@ -23,20 +18,14 @@
     padding: 0.5em;
 }
 
-.region-browser-mode {
-    display: flex;
-    gap: 0.25em;
-}
-
-.region-browser-mode button, .region-tree-choice, .region-tree-toggle {
+.region-tree-choice {
     border: 0;
     background: transparent;
     cursor: pointer;
     font: inherit;
 }
 
-.region-browser-mode button { padding: 0.5em; }
-.region-browser-mode button.active, .region-tree-choice.selected { background: #e7f4ef; color: #12736a; }
+.region-tree-choice.selected { background: #e7f4ef; color: #12736a; }
 
 .region-browser-body {
     display: grid;
@@ -53,51 +42,30 @@
     padding: 0.4em;
 }
 
-.region-tree-line { display: flex; align-items: center; }
-.region-tree-toggle, .region-tree-spacer { width: 1.5em; flex: 0 0 1.5em; text-align: center; }
 .region-tree-choice { display: flex; gap: 0.5em; align-items: center; justify-content: space-between; width: 100%; padding: 0.4em; text-align: left; border-radius: 0.3em; }
-.region-tree-choice:hover, .region-tree-toggle:hover { background: #f1f5f3; }
-.region-tree-choice span:first-child { overflow-wrap: anywhere; }
+.region-tree-choice:hover { background: #f1f5f3; }
+.region-tree-name { display: flex; align-items: baseline; min-width: 0; overflow-wrap: anywhere; }
+.region-tree-chevron { display: inline-block; width: 1.2em; flex: 0 0 1.2em; }
 .region-tree-count { font-size: 0.85em; color: #666; white-space: nowrap; }
 .region-tree-children { margin-left: 0.6em; padding-left: 0.5em; border-left: 1px solid #ddd; }
-.region-tree-roots { border-top: 1px solid #ddd; margin-top: 0.4em; padding-top: 0.4em; }
-.region-browser-reports { min-width: 0; overflow-x: auto; }
-.region-browser-reports h3 { margin: 0 0 0.4em; }
+.region-browser-detail { min-width: 0; }
+.region-browser-detail h3 { margin: 0 0 0.4em; }
+.region-browser-summary { display: flex; flex-wrap: wrap; gap: 0.4em 1.3em; color: #555; margin-bottom: 0.8em; }
+.region-browser-subregions { display: grid; gap: 0.4em; margin-bottom: 1em; }
+.region-browser-subregions button { display: flex; justify-content: space-between; gap: 0.7em; width: 100%; border: 1px solid #ddd; border-radius: 0.35em; padding: 0.6em; background: #fff; cursor: pointer; font: inherit; text-align: left; }
+.region-browser-subregions button:hover { background: #f1f5f3; }
+.region-browser-feeds { display: grid; gap: 0.6em; }
+.region-feed { border: 1px solid #ddd; border-radius: 0.35em; padding: 0.75em; }
+.region-feed-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5em; font-weight: bold; }
+.region-feed-heading a { overflow-wrap: anywhere; }
+.region-feed-live { color: #12736a; font-size: 0.85em; font-weight: normal; }
+.region-feed-meta { display: flex; flex-wrap: wrap; gap: 0.25em 1em; margin-top: 0.4em; color: #555; font-size: 0.9em; }
+.region-feed-details { margin-top: 0.5em; color: #555; font-size: 0.9em; }
+.region-feed-details a { overflow-wrap: anywhere; }
 
 @media (max-width: 760px) {
     .region-browser-body { display: block; }
     .region-browser-tree { max-height: 16em; margin-bottom: 1em; }
-}
-
-.report-table th, .report-table td {
-    padding: 0.5em;
-    text-align: left;
-    border-bottom: 1px solid #eee;
-}
-
-.report-table th {
-    background-color: #f5f5f5;
-    font-weight: bold;
-    cursor: pointer;
-}
-
-.report-table tr:hover {
-    background-color: #f9f9f9;
-}
-
-.hl-green {
-    background-color: #d4edda !important;
-    color: #155724;
-}
-
-.hl-yellow {
-    background-color: #fff3cd !important;
-    color: #856404;
-}
-
-.hl-red {
-    background-color: #f8d7da !important;
-    color: #721c24;
 }
 
 .report-list-footer {
@@ -111,42 +79,6 @@
     text-decoration: underline;
 }
 
-.float-right {
-    float: right;
-}
-
 .report-datasets {
     border-top: 1px solid #ddd;
-}
-
-.info-badge {
-    display: inline-block;
-    margin-right: 0.35em;
-    cursor: pointer;
-    font-size: 1.1em;
-    color: #6c757d;
-    vertical-align: baseline;
-}
-
-.info-badge:hover {
-    color: #0056b3;
-}
-
-.info-badge-content {
-    margin-top: 0.25em;
-    padding: 0.3em 0.5em;
-    font-size: 0.85em;
-
-    color: #555;
-    background: #f8f9fa;
-    border: 1px solid #e9ecef;
-}
-
-.info-badge-content a {
-    display: inline-block;
-    max-width: 15em;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    vertical-align: top;
 }

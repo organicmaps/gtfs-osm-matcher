@@ -1,5 +1,25 @@
 import { useMemo, useState } from "preact/hooks";
-import { ReportTable, type ReportRow } from "./report-table";
+
+export type ReportRow = {
+    region: string;
+    info?: {
+        source?: string;
+        version?: string;
+        matcherVersion: string;
+        gtfsTimeStamp: number;
+        generationTimeStamp: number;
+    };
+    gtfsDate: Date | null;
+    matched: number | undefined;
+    matchPercent: number | undefined;
+    liveUpdates?: boolean;
+    matchStats?: {
+        total: number;
+        matchId: number;
+        noMatch: number;
+        empty: number;
+    };
+};
 
 export type RegionTreeData = {
     nodes: { id: string; parent?: string; leaf: boolean }[];
@@ -12,17 +32,20 @@ type Props = {
     onSelectReport?: (reportRegion: string | null) => void;
 };
 
+const UNASSIGNED = '__unassigned';
+const dateFormatter = new Intl.DateTimeFormat(navigator.language,
+    { year: 'numeric', month: 'short', day: 'numeric' });
+
 export function RegionTree({ tree, reports, onSelectReport }: Props) {
-    const [mode, setMode] = useState<'home' | 'coverage'>('home');
-    const [selected, setSelected] = useState('all');
+    const [selected, setSelected] = useState<string | null>(null);
     const [search, setSearch] = useState('');
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
     const model = useMemo(() => {
-        const nodes = new Map((tree?.nodes || []).map(n => [n.id, n]));
+        const nodes = new Map((tree?.nodes || []).map(node => [node.id, node]));
         const children = new Map<string, string[]>();
         for (const node of nodes.values()) {
-            const parent = node.parent || '';
+            const parent = node.parent && nodes.has(node.parent) ? node.parent : '';
             if (!children.has(parent)) children.set(parent, []);
             children.get(parent)!.push(node.id);
         }
@@ -32,58 +55,41 @@ export function RegionTree({ tree, reports, onSelectReport }: Props) {
                 .replaceAll('_', ' · ');
         };
         for (const ids of children.values()) ids.sort((a, b) => label(a).localeCompare(label(b)));
-        const chain = (id: string) => {
-            const result: string[] = [];
-            const seen = new Set<string>();
-            while (nodes.has(id) && !seen.has(id)) {
-                result.unshift(id);
-                seen.add(id);
-                id = nodes.get(id)!.parent || '';
-            }
-            return result;
-        };
-        const placement = new Map((tree?.feeds || []).map(f => [f.slug, f]));
-        return { nodes, children, label, chain, placement };
+        const placement = new Map((tree?.feeds || []).map(feed => [feed.slug, feed.home]));
+        return { nodes, children, label, placement };
     }, [tree]);
 
-    const q = search.trim().toLocaleLowerCase();
-    const filtered = reports.filter(report => {
-        if (!q) return true;
-        const feed = model.placement.get(report.region);
-        const ids = [
-            ...model.chain(feed?.home || ''),
-            ...(feed?.coverageRegions || []).flatMap(id => model.chain(id)),
-        ];
-        return [report.region, feed?.home || '', ...(feed?.coverageRegions || []),
-            ...ids, ...ids.map(model.label)]
-            .some(value => value.toLocaleLowerCase().includes(q));
-    });
-
-    const counts = new Map<string, Set<string>>();
-    let networks = 0;
-    let unassigned = 0;
-    for (const report of filtered) {
-        const feed = model.placement.get(report.region);
-        if (!feed) { unassigned++; continue; }
-        if (!model.nodes.has(feed.home)) networks++;
-        const ids = mode === 'home' ? [feed.home] : (feed.coverageRegions || []);
-        for (const id of ids) for (const ancestor of model.chain(id)) {
-            if (!counts.has(ancestor)) counts.set(ancestor, new Set());
-            counts.get(ancestor)!.add(report.region);
-        }
+    const query = search.trim().toLocaleLowerCase();
+    const matchingReports = reports.filter(report => !query || report.region.toLocaleLowerCase().includes(query));
+    const directFeeds = new Map<string, ReportRow[]>();
+    for (const report of matchingReports) {
+        const home = model.placement.get(report.region);
+        const id = home && model.nodes.has(home) ? home : UNASSIGNED;
+        if (!directFeeds.has(id)) directFeeds.set(id, []);
+        directFeeds.get(id)!.push(report);
     }
 
-    const visible = filtered.filter(report => {
-        if (selected === 'all') return true;
-        const feed = model.placement.get(report.region);
-        if (selected === '__unassigned') return !feed;
-        if (selected === '__networks') return !!feed && !model.nodes.has(feed.home);
-        if (!feed) return false;
-        const ids = mode === 'home' ? [feed.home] : (feed.coverageRegions || []);
-        return ids.some(id => model.chain(id).includes(selected));
-    });
+    const counts = new Map<string, number>();
+    const countFeeds = (id: string): number => {
+        const count = (directFeeds.get(id)?.length || 0)
+            + (model.children.get(id) || []).reduce((total, child) => total + countFeeds(child), 0);
+        counts.set(id, count);
+        return count;
+    };
+    for (const root of model.children.get('') || []) countFeeds(root);
+
+    const childRegions = (id: string | null) => (model.children.get(id || '') || [])
+        .filter(child => !query || counts.get(child) || model.label(child).toLocaleLowerCase().includes(query));
+    const activeId = selected && (selected === UNASSIGNED || model.nodes.has(selected)) ? selected : null;
+    const activeChildren = activeId === UNASSIGNED ? [] : childRegions(activeId);
+    const activeFeeds = activeId ? directFeeds.get(activeId) || [] : [];
+    const sortedFeeds = [...activeFeeds].sort((a, b) =>
+        Number(!!b.liveUpdates) - Number(!!a.liveUpdates)
+        || (b.matchStats?.total || 0) - (a.matchStats?.total || 0)
+        || a.region.localeCompare(b.region));
 
     const toggle = (id: string) => {
+        setSelected(id);
         setExpanded(previous => {
             const next = new Set(previous);
             if (next.has(id)) next.delete(id); else next.add(id);
@@ -91,44 +97,77 @@ export function RegionTree({ tree, reports, onSelectReport }: Props) {
         });
     };
     const treeNode = (id: string) => {
-        const count = counts.get(id)?.size || 0;
-        if (!count) return null;
-        const childIds = (model.children.get(id) || []).filter(child => counts.has(child));
+        const children = childRegions(id);
+        const count = counts.get(id) || 0;
+        if (query && !count && !model.label(id).toLocaleLowerCase().includes(query)) return null;
         return <div className="region-tree-node" key={id}>
-            <div className="region-tree-line">
-                {childIds.length > 0
-                    ? <button type="button" className="region-tree-toggle" aria-label={`${expanded.has(id) ? 'Collapse' : 'Expand'} ${model.label(id)}`} aria-expanded={expanded.has(id)} onClick={() => toggle(id)}>{expanded.has(id) ? '▾' : '▸'}</button>
-                    : <span className="region-tree-spacer" />}
-                <button type="button" className={selected === id ? 'region-tree-choice selected' : 'region-tree-choice'} onClick={() => setSelected(id)}>
-                    <span>{model.label(id)}</span><span className="region-tree-count">{count}</span>
-                </button>
-            </div>
-            {expanded.has(id) && childIds.length > 0 && <div className="region-tree-children">{childIds.map(treeNode)}</div>}
+            <button type="button" className={activeId === id ? 'region-tree-choice selected' : 'region-tree-choice'}
+                aria-expanded={children.length ? expanded.has(id) : undefined}
+                onClick={() => toggle(id)}>
+                <span className="region-tree-name"><span className="region-tree-chevron">{children.length ? (expanded.has(id) ? '▾' : '▸') : ''}</span>{model.label(id)}</span>
+                <span className="region-tree-count">{count}</span>
+            </button>
+            {(expanded.has(id) || query) && children.length > 0 &&
+                <div className="region-tree-children">{children.map(treeNode)}</div>}
         </div>;
     };
 
-    const title = selected === 'all' ? 'All feeds' : selected === '__networks' ? 'Networks'
-        : selected === '__unassigned' ? 'No published region' : model.label(selected);
-
     return <div className="region-browser">
         <div className="region-browser-tools">
-            <input type="search" value={search} onInput={event => setSearch(event.currentTarget.value)} placeholder="Search feeds or regions" aria-label="Search feeds or regions" />
-            {tree && <div className="region-browser-mode" aria-label="Region relationship">
-                <button type="button" className={mode === 'home' ? 'active' : ''} onClick={() => setMode('home')}>Assigned homes</button>
-                <button type="button" className={mode === 'coverage' ? 'active' : ''} onClick={() => setMode('coverage')}>Served coverage</button>
-            </div>}
+            <input type="search" value={search} onInput={event => setSearch(event.currentTarget.value)}
+                placeholder="Search feeds" aria-label="Search feeds" />
         </div>
         <div className="region-browser-body">
-            {tree && <nav className="region-browser-tree" aria-label="Organic Maps regions">
-                <button type="button" className={selected === 'all' ? 'region-tree-choice selected' : 'region-tree-choice'} onClick={() => setSelected('all')}><span>All feeds</span><span className="region-tree-count">{filtered.length}</span></button>
-                <button type="button" className={selected === '__networks' ? 'region-tree-choice selected' : 'region-tree-choice'} onClick={() => setSelected('__networks')}><span>Networks</span><span className="region-tree-count">{networks}</span></button>
-                <button type="button" className={selected === '__unassigned' ? 'region-tree-choice selected' : 'region-tree-choice'} onClick={() => setSelected('__unassigned')}><span>No published region</span><span className="region-tree-count">{unassigned}</span></button>
-                <div className="region-tree-roots">{(model.children.get('') || []).map(treeNode)}</div>
-            </nav>}
-            <div className="region-browser-reports">
-                <h3>{title} <span className="region-tree-count">{visible.length}</span></h3>
-                {visible.length ? <ReportTable reports={visible} onSelectReport={onSelectReport} /> : <p>No feeds in this view.</p>}
-            </div>
+            <nav className="region-browser-tree" aria-label="Organic Maps regions">
+                {(model.children.get('') || []).map(treeNode)}
+                {(directFeeds.get(UNASSIGNED)?.length || 0) > 0 &&
+                    <button type="button" className={activeId === UNASSIGNED ? 'region-tree-choice selected' : 'region-tree-choice'}
+                        onClick={() => setSelected(UNASSIGNED)}>
+                        <span className="region-tree-name">Unassigned</span>
+                        <span className="region-tree-count">{directFeeds.get(UNASSIGNED)!.length}</span>
+                    </button>}
+            </nav>
+            <section className="region-browser-detail" aria-live="polite">
+                <h3>{activeId === UNASSIGNED ? 'Unassigned feeds' : activeId ? model.label(activeId) : 'Regions'}</h3>
+                <div className="region-browser-summary">
+                    <span>{activeChildren.length} subregions</span>
+                    <span>{activeId ? activeFeeds.length : matchingReports.length} GTFS feeds{activeId && activeId !== UNASSIGNED && (counts.get(activeId) || 0) > activeFeeds.length
+                        ? ` directly · ${counts.get(activeId)} including subregions` : ''}</span>
+                </div>
+                {activeChildren.length > 0 && <div className="region-browser-subregions">
+                    {activeChildren.map(id => <button type="button" key={id} onClick={() => toggle(id)}>
+                        <span>{model.label(id)}</span><span className="region-tree-count">{counts.get(id) || 0} feeds</span>
+                    </button>)}
+                </div>}
+                {sortedFeeds.length > 0 && <div className="region-browser-feeds">
+                    {sortedFeeds.map(report => <FeedCard key={report.region} report={report} onSelectReport={onSelectReport} />)}
+                </div>}
+                {activeId && !activeChildren.length && !activeFeeds.length && <p>No feeds in this region.</p>}
+            </section>
         </div>
     </div>;
+}
+
+function FeedCard({ report, onSelectReport }: { report: ReportRow; onSelectReport?: Props['onSelectReport'] }) {
+    const { region, info, liveUpdates, gtfsDate, matchStats, matched, matchPercent } = report;
+    const reportDate = info?.generationTimeStamp ? new Date(info.generationTimeStamp) : null;
+    return <article className="region-feed">
+        <div className="region-feed-heading">
+            <a onClick={() => onSelectReport?.(region)} href={`#/match-report/${region}`}>{region}</a>
+            {liveUpdates && <span className="region-feed-live">Live updates</span>}
+        </div>
+        <div className="region-feed-meta">
+            <span>{(matchStats?.total || 0).toLocaleString()} stops</span>
+            <span>GTFS {gtfsDate ? dateFormatter.format(gtfsDate) : 'date unavailable'}</span>
+            {reportDate && <span>Report updated {dateFormatter.format(reportDate)}</span>}
+            <span>{matchPercent !== undefined ? `${matchPercent.toFixed(0)}% matched (${matched} of ${matchStats?.total})` : 'Match unavailable'}</span>
+            {matchStats && <span>{matchStats.empty} empty · {matchStats.noMatch} unmatched</span>}
+        </div>
+        {(info?.source || info?.version || info?.matcherVersion) && <details className="region-feed-details">
+            <summary>Details</summary>
+            {info.source && <div>Source: <a href={info.source} target="_blank" rel="noopener noreferrer">{info.source}</a></div>}
+            {info.version && <div>Report version: {info.version}</div>}
+            {info.matcherVersion && <div>Matcher version: {info.matcherVersion}</div>}
+        </details>}
+    </article>;
 }
