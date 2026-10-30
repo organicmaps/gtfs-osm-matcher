@@ -41,8 +41,9 @@ const defaultSets = { nom: true, nos: true } as DatatsetsSelectonT;
 
 export type Report = {
     region: string;
-    version: string;
     source?: string;
+    credit?: string;
+    license?: string;
 
     idTags: {
         [key: string]: number

@@ -13,6 +13,8 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
     
     const [matchReports, setMatchReports] = useState<Report[]>([]);
     const [regionTree, setRegionTree] = useState<RegionTreeData>();
+    const [reportUpdated, setReportUpdated] = useState<number>();
+    const [matcherVersion, setMatcherVersion] = useState<number>();
 
     const reportRegion = useHashRoute(parseUrlReportRegion);
 
@@ -21,12 +23,22 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
             .then(r => r.json())
             .then(data => {
                 setMatchReports(data.matchedRegions);
-                setRegionTree(data.regionTree);
+                setReportUpdated(data.matchRunTs);
+                setMatcherVersion(data.matcherVersion);
+                if (data.regionTreeAvailable) {
+                    fetch(`${DATA_BASE_URL}/region-tree.json`)
+                        .then(r => {
+                            if (!r.ok) throw new Error(`Region tree unavailable: ${r.status}`);
+                            return r.json();
+                        })
+                        .then(setRegionTree)
+                        .catch(() => setRegionTree(undefined));
+                }
             });
-    }, [setMatchReports, setRegionTree]);
+    }, []);
 
     const reports = matchReports.map((report) => {
-        const {region, source, version, liveUpdates, matchMeta} = report;
+        const {region, source, credit, license, liveUpdates, matchMeta} = report;
 
         const gtfsDate = matchMeta?.gtfsTimeStamp ? 
                 new Date(matchMeta.gtfsTimeStamp) : 
@@ -34,16 +46,14 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
 
         const matchStats = report?.matchStats;
         const matched = matchStats && (matchStats.total - matchStats.noMatch - matchStats.empty);
-        const matchPercent = matched && matched / matchStats.total * 100;
+        const matchPercent = matchStats?.total ? (matched ?? 0) / matchStats.total * 100 : undefined;
 
         return {
             region,
             info: { 
                 source,
-                version,
-                matcherVersion: String(matchMeta?.matcherVersion ?? ''),
-                gtfsTimeStamp: matchMeta.gtfsTimeStamp,
-                generationTimeStamp: matchMeta.generationTimeStamp,
+                credit,
+                license,
             },
             gtfsDate,
             matched,
@@ -69,6 +79,10 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
     return (
         <div className={"report-list-panel"}>
             <h2>Feeds by Organic Maps region</h2>
+            <div className="report-list-meta">
+                {reportUpdated && <span>Report updated {new Date(reportUpdated).toLocaleDateString()}</span>}
+                {matcherVersion !== undefined && <span>Matcher version: {matcherVersion}</span>}
+            </div>
             <div className={'reports'}>
                 <RegionTree
                     tree={regionTree}

@@ -4,10 +4,8 @@ export type ReportRow = {
     region: string;
     info?: {
         source?: string;
-        version?: string;
-        matcherVersion: string;
-        gtfsTimeStamp: number;
-        generationTimeStamp: number;
+        credit?: string;
+        license?: string;
     };
     gtfsDate: Date | null;
     matched: number | undefined;
@@ -39,6 +37,7 @@ const dateFormatter = new Intl.DateTimeFormat(navigator.language,
 export function RegionTree({ tree, reports, onSelectReport }: Props) {
     const [selected, setSelected] = useState<string | null>(null);
     const [search, setSearch] = useState('');
+    const [showEmpty, setShowEmpty] = useState(false);
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
     const model = useMemo(() => {
@@ -80,26 +79,48 @@ export function RegionTree({ tree, reports, onSelectReport }: Props) {
 
     const childRegions = (id: string | null) => (model.children.get(id || '') || [])
         .filter(child => !query || counts.get(child) || model.label(child).toLocaleLowerCase().includes(query));
-    const activeId = selected && (selected === UNASSIGNED || model.nodes.has(selected)) ? selected : null;
-    const activeChildren = activeId === UNASSIGNED ? [] : childRegions(activeId);
+    const visibleTreeChildren = (id: string | null) => childRegions(id)
+        .filter(child => showEmpty || query || counts.get(child));
+    const activeId = !tree ? UNASSIGNED
+        : selected && (selected === UNASSIGNED || model.nodes.has(selected)) ? selected : null;
     const activeFeeds = activeId ? directFeeds.get(activeId) || [] : [];
+    const activeChildren = activeId && activeFeeds.length ? childRegions(activeId)
+        .filter(child => directFeeds.get(child)?.length) : [];
     const sortedFeeds = [...activeFeeds].sort((a, b) =>
         Number(!!b.liveUpdates) - Number(!!a.liveUpdates)
         || (b.matchStats?.total || 0) - (a.matchStats?.total || 0)
         || a.region.localeCompare(b.region));
 
     const toggle = (id: string) => {
-        setSelected(id);
+        if (expanded.has(id)) {
+            setSelected(id);
+            setExpanded(previous => {
+                const next = new Set(previous);
+                next.delete(id);
+                return next;
+            });
+            return;
+        }
+
+        let target = id;
+        const path = [id];
+        while (!directFeeds.get(target)?.length) {
+            const populatedChildren = (model.children.get(target) || [])
+                .filter(child => counts.get(child));
+            if (populatedChildren.length !== 1) break;
+            target = populatedChildren[0];
+            path.push(target);
+        }
+        setSelected(target);
         setExpanded(previous => {
             const next = new Set(previous);
-            if (next.has(id)) next.delete(id); else next.add(id);
+            for (const region of path) next.add(region);
             return next;
         });
     };
     const treeNode = (id: string) => {
-        const children = childRegions(id);
+        const children = visibleTreeChildren(id);
         const count = counts.get(id) || 0;
-        if (query && !count && !model.label(id).toLocaleLowerCase().includes(query)) return null;
         return <div className="region-tree-node" key={id}>
             <button type="button" className={activeId === id ? 'region-tree-choice selected' : 'region-tree-choice'}
                 aria-expanded={children.length ? expanded.has(id) : undefined}
@@ -112,62 +133,75 @@ export function RegionTree({ tree, reports, onSelectReport }: Props) {
         </div>;
     };
 
-    return <div className="region-browser">
+    return <div className={tree ? 'region-browser' : 'region-browser region-browser-flat'}>
         <div className="region-browser-tools">
             <input type="search" value={search} onInput={event => setSearch(event.currentTarget.value)}
                 placeholder="Search feeds" aria-label="Search feeds" />
+            <label className="region-browser-show-empty">
+                <input type="checkbox" checked={showEmpty} onChange={event => setShowEmpty(event.currentTarget.checked)} />
+                Show empty regions
+            </label>
         </div>
         <div className="region-browser-body">
-            <nav className="region-browser-tree" aria-label="Organic Maps regions">
-                {(model.children.get('') || []).map(treeNode)}
+            {tree && <nav className="region-browser-tree" aria-label="Organic Maps regions">
+                {visibleTreeChildren(null).map(treeNode)}
                 {(directFeeds.get(UNASSIGNED)?.length || 0) > 0 &&
                     <button type="button" className={activeId === UNASSIGNED ? 'region-tree-choice selected' : 'region-tree-choice'}
                         onClick={() => setSelected(UNASSIGNED)}>
                         <span className="region-tree-name">Unassigned</span>
                         <span className="region-tree-count">{directFeeds.get(UNASSIGNED)!.length}</span>
                     </button>}
-            </nav>
+            </nav>}
             <section className="region-browser-detail" aria-live="polite">
-                <h3>{activeId === UNASSIGNED ? 'Unassigned feeds' : activeId ? model.label(activeId) : 'Regions'}</h3>
+                <h3>{!tree ? 'Feeds' : activeId === UNASSIGNED ? 'Unassigned feeds' : activeId ? model.label(activeId) : 'Feeds'}</h3>
                 <div className="region-browser-summary">
-                    <span>{activeChildren.length} subregions</span>
                     <span>{activeId ? activeFeeds.length : matchingReports.length} GTFS feeds{activeId && activeId !== UNASSIGNED && (counts.get(activeId) || 0) > activeFeeds.length
                         ? ` directly · ${counts.get(activeId)} including subregions` : ''}</span>
+                    {activeChildren.length > 0 && <span>{activeChildren.length} subregions with feeds</span>}
                 </div>
-                {activeChildren.length > 0 && <div className="region-browser-subregions">
-                    {activeChildren.map(id => <button type="button" key={id} onClick={() => toggle(id)}>
-                        <span>{model.label(id)}</span><span className="region-tree-count">{counts.get(id) || 0} feeds</span>
-                    </button>)}
-                </div>}
                 {sortedFeeds.length > 0 && <div className="region-browser-feeds">
                     {sortedFeeds.map(report => <FeedCard key={report.region} report={report} onSelectReport={onSelectReport} />)}
                 </div>}
-                {activeId && !activeChildren.length && !activeFeeds.length && <p>No feeds in this region.</p>}
+                {activeChildren.length > 0 && <div className="region-browser-subregions">
+                    {activeChildren.map(id => <button type="button" key={id} onClick={() => toggle(id)}>
+                        <span>{model.label(id)}</span><span className="region-tree-count">{directFeeds.get(id)!.length} feeds</span>
+                    </button>)}
+                </div>}
+                {!activeId && <p>Select a region in the tree to see its feeds.</p>}
+                {activeId && !activeFeeds.length && (counts.get(activeId) || 0) > 0 &&
+                    <p>Select a subregion in the tree to see its feeds.</p>}
+                {activeId && !activeFeeds.length && !counts.get(activeId) &&
+                    <p>{query ? 'No matching feeds in this region.' : 'No feeds assigned to this region.'}</p>}
             </section>
         </div>
     </div>;
 }
 
 function FeedCard({ report, onSelectReport }: { report: ReportRow; onSelectReport?: Props['onSelectReport'] }) {
-    const { region, info, liveUpdates, gtfsDate, matchStats, matched, matchPercent } = report;
-    const reportDate = info?.generationTimeStamp ? new Date(info.generationTimeStamp) : null;
+    const { region, info, liveUpdates, gtfsDate, matchStats, matchPercent } = report;
+    const daysSinceGtfs = gtfsDate ? Math.ceil((Date.now() - gtfsDate.getTime()) / 86400000) : null;
+    const dateHighlight = daysSinceGtfs === null ? '' : daysSinceGtfs <= 14 ? 'hl-green' : daysSinceGtfs <= 45 ? 'hl-yellow' : 'hl-red';
+    const matchHighlight = matchPercent === undefined ? '' : matchPercent >= 85 ? 'hl-green' : matchPercent >= 75 ? 'hl-yellow' : 'hl-red';
     return <article className="region-feed">
         <div className="region-feed-heading">
             <a onClick={() => onSelectReport?.(region)} href={`#/match-report/${region}`}>{region}</a>
+            {matchStats && <span className="region-feed-stops">{matchStats.total.toLocaleString()} stops</span>}
             {liveUpdates && <span className="region-feed-live">Live updates</span>}
         </div>
         <div className="region-feed-meta">
-            <span>{(matchStats?.total || 0).toLocaleString()} stops</span>
-            <span>GTFS {gtfsDate ? dateFormatter.format(gtfsDate) : 'date unavailable'}</span>
-            {reportDate && <span>Report updated {dateFormatter.format(reportDate)}</span>}
-            <span>{matchPercent !== undefined ? `${matchPercent.toFixed(0)}% matched (${matched} of ${matchStats?.total})` : 'Match unavailable'}</span>
-            {matchStats && <span>{matchStats.empty} empty · {matchStats.noMatch} unmatched</span>}
+            <span className={`region-feed-highlight ${dateHighlight}`}>
+                GTFS {gtfsDate ? dateFormatter.format(gtfsDate) : 'date unavailable'}
+                {daysSinceGtfs !== null && daysSinceGtfs > 0 && ` (${daysSinceGtfs} days)`}
+            </span>
+            <span className={`region-feed-highlight ${matchHighlight}`}>
+                {matchPercent !== undefined ? `${matchPercent.toFixed(0)}% matched` : 'Match unavailable'}
+            </span>
         </div>
-        {(info?.source || info?.version || info?.matcherVersion) && <details className="region-feed-details">
+        {(info?.source || info?.credit || info?.license) && <details className="region-feed-details">
             <summary>Details</summary>
             {info.source && <div>Source: <a href={info.source} target="_blank" rel="noopener noreferrer">{info.source}</a></div>}
-            {info.version && <div>Report version: {info.version}</div>}
-            {info.matcherVersion && <div>Matcher version: {info.matcherVersion}</div>}
+            {info.credit && <div>Credit: {info.credit}</div>}
+            {info.license && <div>License: {info.license}</div>}
         </details>}
     </article>;
 }

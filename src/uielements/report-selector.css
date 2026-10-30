@@ -12,11 +12,20 @@
     margin-bottom: 0.75em;
 }
 
-.region-browser-tools input {
+.region-browser-tools input[type="search"] {
     flex: 1;
     min-width: 15em;
     padding: 0.5em;
 }
+
+.region-browser-show-empty {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+    white-space: nowrap;
+}
+
+.report-list-meta { display: flex; flex-wrap: wrap; gap: 0.25em 1em; margin-bottom: 0.75em; color: #555; }
 
 .region-tree-choice {
     border: 0;
@@ -29,10 +38,12 @@
 
 .region-browser-body {
     display: grid;
-    grid-template-columns: minmax(13em, 19em) minmax(0, 1fr);
+    grid-template-columns: minmax(7.8em, 11.4em) minmax(0, 1fr);
     gap: 1em;
     align-items: start;
 }
+.region-browser-flat .region-browser-body { display: block; }
+.region-browser-flat .region-browser-tools { display: none; }
 
 .region-browser-tree {
     max-height: 70vh;
@@ -51,15 +62,20 @@
 .region-browser-detail { min-width: 0; }
 .region-browser-detail h3 { margin: 0 0 0.4em; }
 .region-browser-summary { display: flex; flex-wrap: wrap; gap: 0.4em 1.3em; color: #555; margin-bottom: 0.8em; }
-.region-browser-subregions { display: grid; gap: 0.4em; margin-bottom: 1em; }
+.region-browser-subregions { display: grid; gap: 0.4em; margin-top: 1em; }
 .region-browser-subregions button { display: flex; justify-content: space-between; gap: 0.7em; width: 100%; border: 1px solid #ddd; border-radius: 0.35em; padding: 0.6em; background: #fff; cursor: pointer; font: inherit; text-align: left; }
 .region-browser-subregions button:hover { background: #f1f5f3; }
 .region-browser-feeds { display: grid; gap: 0.6em; }
 .region-feed { border: 1px solid #ddd; border-radius: 0.35em; padding: 0.75em; }
 .region-feed-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5em; font-weight: bold; }
 .region-feed-heading a { overflow-wrap: anywhere; }
+.region-feed-stops { color: #555; font-size: 0.85em; font-weight: normal; white-space: nowrap; }
 .region-feed-live { color: #12736a; font-size: 0.85em; font-weight: normal; }
 .region-feed-meta { display: flex; flex-wrap: wrap; gap: 0.25em 1em; margin-top: 0.4em; color: #555; font-size: 0.9em; }
+.region-feed-highlight { padding: 0.1em 0.3em; border-radius: 0.2em; }
+.region-feed-highlight.hl-green { background: #d4edda; color: #155724; }
+.region-feed-highlight.hl-yellow { background: #fff3cd; color: #856404; }
+.region-feed-highlight.hl-red { background: #f8d7da; color: #721c24; }
 .region-feed-details { margin-top: 0.5em; color: #555; font-size: 0.9em; }
 .region-feed-details a { overflow-wrap: anywhere; }
 
