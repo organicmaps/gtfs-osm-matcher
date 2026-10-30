@@ -83,8 +83,8 @@ export function RegionTree({ tree, reports, onSelectReport }: Props) {
         .filter(child => showEmpty || query || counts.get(child));
     const activeId = !tree ? UNASSIGNED
         : selected && (selected === UNASSIGNED || model.nodes.has(selected)) ? selected : null;
-    const activeFeeds = activeId ? directFeeds.get(activeId) || [] : [];
-    const activeChildren = activeId && activeFeeds.length ? childRegions(activeId)
+    const activeFeeds = query ? matchingReports : activeId ? directFeeds.get(activeId) || [] : [];
+    const activeChildren = !query && activeId && activeFeeds.length ? childRegions(activeId)
         .filter(child => directFeeds.get(child)?.length) : [];
     const sortedFeeds = [...activeFeeds].sort((a, b) =>
         Number(!!b.liveUpdates) - Number(!!a.liveUpdates)
@@ -153,9 +153,9 @@ export function RegionTree({ tree, reports, onSelectReport }: Props) {
                     </button>}
             </nav>}
             <section className="region-browser-detail" aria-live="polite">
-                <h3>{!tree ? 'Feeds' : activeId === UNASSIGNED ? 'Unassigned feeds' : activeId ? model.label(activeId) : 'Feeds'}</h3>
+                <h3>{query ? 'Search results' : !tree ? 'Feeds' : activeId === UNASSIGNED ? 'Unassigned feeds' : activeId ? model.label(activeId) : 'Feeds'}</h3>
                 <div className="region-browser-summary">
-                    <span>{activeId ? activeFeeds.length : matchingReports.length} GTFS feeds{activeId && activeId !== UNASSIGNED && (counts.get(activeId) || 0) > activeFeeds.length
+                    <span>{query || activeId ? activeFeeds.length : matchingReports.length} GTFS feeds{!query && activeId && activeId !== UNASSIGNED && (counts.get(activeId) || 0) > activeFeeds.length
                         ? ` directly · ${counts.get(activeId)} including subregions` : ''}</span>
                     {activeChildren.length > 0 && <span>{activeChildren.length} subregions with feeds</span>}
                 </div>
@@ -167,11 +167,12 @@ export function RegionTree({ tree, reports, onSelectReport }: Props) {
                         <span>{model.label(id)}</span><span className="region-tree-count">{directFeeds.get(id)!.length} feeds</span>
                     </button>)}
                 </div>}
-                {!activeId && <p>Select a region in the tree to see its feeds.</p>}
-                {activeId && !activeFeeds.length && (counts.get(activeId) || 0) > 0 &&
+                {query && !activeFeeds.length && <p>No matching feeds.</p>}
+                {!query && !activeId && <p>Select a region in the tree to see its feeds.</p>}
+                {!query && activeId && !activeFeeds.length && (counts.get(activeId) || 0) > 0 &&
                     <p>Select a subregion in the tree to see its feeds.</p>}
-                {activeId && !activeFeeds.length && !counts.get(activeId) &&
-                    <p>{query ? 'No matching feeds in this region.' : 'No feeds assigned to this region.'}</p>}
+                {!query && activeId && !activeFeeds.length && !counts.get(activeId) &&
+                    <p>No feeds assigned to this region.</p>}
             </section>
         </div>
     </div>;
