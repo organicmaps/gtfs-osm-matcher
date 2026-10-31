@@ -1,8 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { parseUrlReportRegion, useHashRoute } from "./routing";
 import { MatchReport, type Report } from "./report";
-import { ReportTable } from "./report-table";
-import { RegionMarkersLayer } from "./region-markers";
+import { RegionTree, type RegionTreeData, type FeedRegionsData } from "./region-tree";
 import { cls } from "./cls";
 import { DATA_BASE_URL } from "../config";
 import "./report-selector.css";
@@ -13,38 +12,55 @@ type MatchReportSelectorProps = {
 export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps) {
     
     const [matchReports, setMatchReports] = useState<Report[]>([]);
-    const [foldByName, setFoldByName] = useState<string[]>([]);
+    const [regionTree, setRegionTree] = useState<RegionTreeData>();
+    const [feedRegions, setFeedRegions] = useState<FeedRegionsData>();
+    const [reportUpdated, setReportUpdated] = useState<number>();
+    const [matcherVersion, setMatcherVersion] = useState<number>();
 
     const reportRegion = useHashRoute(parseUrlReportRegion);
 
     useEffect(() => {
+        const regionData = Promise.all([
+            fetch(`${DATA_BASE_URL}/region-tree.json`),
+            fetch(`${DATA_BASE_URL}/feed-regions.json?t=${Date.now()}`),
+        ]).then(async ([treeResponse, feedsResponse]) => {
+            if (!treeResponse.ok || !feedsResponse.ok) throw new Error('Region data unavailable');
+            return Promise.all([treeResponse.json(), feedsResponse.json()]);
+        }).catch(() => null);
         fetch(`${DATA_BASE_URL}/match-report.json?t=${Date.now()}`)
             .then(r => r.json())
             .then(data => {
                 setMatchReports(data.matchedRegions);
-                setFoldByName(data.foldByName || []);
+                setReportUpdated(data.matchRunTs);
+                setMatcherVersion(data.matcherVersion);
+                if (data.regionTreeFile === 'region-tree.json'
+                        && data.feedRegionsFile === 'feed-regions.json') {
+                    regionData.then(files => {
+                        if (!files) return;
+                        setRegionTree(files[0]);
+                        setFeedRegions(files[1]);
+                    });
+                }
             });
-    }, [setMatchReports, setFoldByName]);
+    }, []);
 
     const reports = matchReports.map((report) => {
-        const {region, source, version, liveUpdates, matchMeta} = report;
+        const {region, source, credit, license, liveUpdates, gtfsTimeStamp} = report;
 
-        const gtfsDate = matchMeta?.gtfsTimeStamp ? 
-                new Date(matchMeta.gtfsTimeStamp) : 
+        const gtfsDate = gtfsTimeStamp ?
+                new Date(gtfsTimeStamp) :
                 null;
 
         const matchStats = report?.matchStats;
         const matched = matchStats && (matchStats.total - matchStats.noMatch - matchStats.empty);
-        const matchPercent = matched && matched / matchStats.total * 100;
+        const matchPercent = matchStats?.total ? (matched ?? 0) / matchStats.total * 100 : undefined;
 
         return {
             region,
             info: { 
                 source,
-                version,
-                matcherVersion: String(matchMeta?.matcherVersion ?? ''),
-                gtfsTimeStamp: matchMeta.gtfsTimeStamp,
-                generationTimeStamp: matchMeta.generationTimeStamp,
+                credit,
+                license,
             },
             gtfsDate,
             matched,
@@ -69,13 +85,17 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
 
     return (
         <div className={"report-list-panel"}>
-            <RegionMarkersLayer reports={matchReports} onSelectReport={onSelectReport} />
-            <h2>Available match reports</h2>
+            <h2>Feeds by Organic Maps region</h2>
+            <div className="report-list-meta">
+                {reportUpdated && <span>Report updated {new Date(reportUpdated).toLocaleDateString()}</span>}
+                {matcherVersion !== undefined && <span>Matcher version: {matcherVersion}</span>}
+            </div>
             <div className={'reports'}>
-                <ReportTable
+                <RegionTree
+                    tree={regionTree}
+                    feedRegions={feedRegions}
                     reports={reports}
                     onSelectReport={onSelectReport}
-                    foldByName={foldByName}
                 />
             </div>
             <div className={"report-list-footer"}>

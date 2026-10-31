@@ -41,8 +41,9 @@ const defaultSets = { nom: true, nos: true } as DatatsetsSelectonT;
 
 export type Report = {
     region: string;
-    version: string;
     source?: string;
+    credit?: string;
+    license?: string;
 
     idTags: {
         [key: string]: number
@@ -64,21 +65,7 @@ export type Report = {
         empty: number;
     };
 
-    matchMeta: {
-        coveredPbfSources: {
-            path: string,
-            fileTimestamp: number
-        }[]
-        gtfsTimeStamp: number
-        generationTimeStamp: number
-        matcherVersion: number | string
-        gtfsBbox?: {
-            left: number
-            right: number
-            top: number
-            bottom: number
-        }
-    };
+    gtfsTimeStamp: number;
 
 }
 
@@ -139,7 +126,6 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
     const map = useContext(MapContext)?.map;
 
     const hashSelection = parseSelectionHash(useHash());
-    const matchMeta = reportData.matchMeta;
     const idTags = reportData.idTags;
 
     if (import.meta.env.DEV) {
@@ -147,20 +133,21 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         console.log('reportData', reportData);
     }
 
-    useEffect(() => {
-        if (map && matchMeta?.gtfsBbox && shouldUpdateBoundsSignal.value) {
-            const { left, bottom, right, top } = matchMeta.gtfsBbox;
-            map.fitBounds([
-                [left, bottom],
-                [right, top]
-            ], {
-                padding: 50
-            });
-            shouldUpdateBoundsSignal.value = false;
-        }
-    }, [map, matchMeta, shouldUpdateBoundsSignal]);
-
     const [rows, setRows] = useState<IndexRow[]>([]);
+    useEffect(() => {
+        if (!map || !shouldUpdateBoundsSignal.value || rows.length === 0) return;
+        let west = Infinity, east = -Infinity, south = Infinity, north = -Infinity;
+        for (const row of rows) {
+            if (!Number.isFinite(row.lon) || !Number.isFinite(row.lat)) continue;
+            west = Math.min(west, row.lon);
+            east = Math.max(east, row.lon);
+            south = Math.min(south, row.lat);
+            north = Math.max(north, row.lat);
+        }
+        if (!Number.isFinite(west)) return;
+        map.fitBounds([[west, south], [east, north]], { padding: 50 });
+        shouldUpdateBoundsSignal.value = false;
+    }, [map, rows]);
     const [selectedDatasets, updateSelectedDatasets] = useState<DatatsetsSelectonT>(defaultSets);
     // Shared with the selection panel: the same switch appears there, so the state cannot
     // live in this component's own dataset map.
@@ -509,13 +496,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         <UnassignedOsmLayer key={reportRegion} layerKey={reportRegion} data={unassigned}
             onClick={handleUnmatchedOsmClick} />;
 
-    const gtfsTS = new Date(matchMeta.gtfsTimeStamp).toUTCString();
-    const osmSourcesTS = matchMeta.coveredPbfSources.map(({ path, fileTimestamp }) => {
-        return <div>
-            <label>{path} </label><div className={"ts-value"}>{new Date(fileTimestamp).toUTCString()}</div>
-        </div>
-    });
-
+    const gtfsTS = new Date(reportData.gtfsTimeStamp).toUTCString();
     return (<div>
         <h2 className={"report-header"}>{reportRegion}</h2>
         {indexError && <div className={"report-load-error"} role={"alert"}>{indexError}</div>}
@@ -535,10 +516,6 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
                 <label>Stop dissolution </label>
                 <div className={"ts-value"}>{reportData.dissolution}</div>
             </div>}
-            <div className={"section"}>
-                <label>OSM Sources timestamps</label>
-                {osmSourcesTS}
-            </div>
         </div>
     </div>)
 
