@@ -21,20 +21,25 @@ export type ReportRow = {
 
 export type RegionTreeData = {
     nodes: { id: string; parent?: string; leaf: boolean }[];
-    feeds: { slug: string; home: string; coverageRegions?: string[] }[];
+};
+
+export type FeedRegionsData = {
+    feeds?: { slug: string; home: string; coverageRegions?: string[] }[];
 };
 
 type Props = {
     tree?: RegionTreeData;
+    feedRegions?: FeedRegionsData;
     reports: ReportRow[];
     onSelectReport?: (reportRegion: string | null) => void;
 };
 
 const UNASSIGNED = '__unassigned';
+const NETWORKS = '__networks';
 const dateFormatter = new Intl.DateTimeFormat(navigator.language,
     { year: 'numeric', month: 'short', day: 'numeric' });
 
-export function RegionTree({ tree, reports, onSelectReport }: Props) {
+export function RegionTree({ tree, feedRegions, reports, onSelectReport }: Props) {
     const [selected, setSelected] = useState<string | null>(null);
     const [search, setSearch] = useState('');
     const [showEmpty, setShowEmpty] = useState(false);
@@ -54,16 +59,17 @@ export function RegionTree({ tree, reports, onSelectReport }: Props) {
                 .replaceAll('_', ' · ');
         };
         for (const ids of children.values()) ids.sort((a, b) => label(a).localeCompare(label(b)));
-        const placement = new Map((tree?.feeds || []).map(feed => [feed.slug, feed.home]));
+        const placement = new Map((feedRegions?.feeds || []).map(feed => [feed.slug, feed.home]));
         return { nodes, children, label, placement };
-    }, [tree]);
+    }, [tree, feedRegions]);
 
     const query = search.trim().toLocaleLowerCase();
     const matchingReports = reports.filter(report => !query || report.region.toLocaleLowerCase().includes(query));
     const directFeeds = new Map<string, ReportRow[]>();
     for (const report of matchingReports) {
         const home = model.placement.get(report.region);
-        const id = home && model.nodes.has(home) ? home : UNASSIGNED;
+        const id = home && model.nodes.has(home) ? home
+            : home?.startsWith('network-') ? NETWORKS : UNASSIGNED;
         if (!directFeeds.has(id)) directFeeds.set(id, []);
         directFeeds.get(id)!.push(report);
     }
@@ -82,7 +88,7 @@ export function RegionTree({ tree, reports, onSelectReport }: Props) {
     const visibleTreeChildren = (id: string | null) => childRegions(id)
         .filter(child => showEmpty || query || counts.get(child));
     const activeId = !tree ? UNASSIGNED
-        : selected && (selected === UNASSIGNED || model.nodes.has(selected)) ? selected : null;
+        : selected && (selected === UNASSIGNED || selected === NETWORKS || model.nodes.has(selected)) ? selected : null;
     const activeFeeds = query ? matchingReports : activeId ? directFeeds.get(activeId) || [] : [];
     const activeChildren = !query && activeId && activeFeeds.length ? childRegions(activeId)
         .filter(child => directFeeds.get(child)?.length) : [];
@@ -145,6 +151,12 @@ export function RegionTree({ tree, reports, onSelectReport }: Props) {
         <div className="region-browser-body">
             {tree && <nav className="region-browser-tree" aria-label="Organic Maps regions">
                 {visibleTreeChildren(null).map(treeNode)}
+                {(directFeeds.get(NETWORKS)?.length || 0) > 0 &&
+                    <button type="button" className={activeId === NETWORKS ? 'region-tree-choice selected' : 'region-tree-choice'}
+                        onClick={() => setSelected(NETWORKS)}>
+                        <span className="region-tree-name">Networks</span>
+                        <span className="region-tree-count">{directFeeds.get(NETWORKS)!.length}</span>
+                    </button>}
                 {(directFeeds.get(UNASSIGNED)?.length || 0) > 0 &&
                     <button type="button" className={activeId === UNASSIGNED ? 'region-tree-choice selected' : 'region-tree-choice'}
                         onClick={() => setSelected(UNASSIGNED)}>
@@ -153,26 +165,30 @@ export function RegionTree({ tree, reports, onSelectReport }: Props) {
                     </button>}
             </nav>}
             <section className="region-browser-detail" aria-live="polite">
-                <h3>{query ? 'Search results' : !tree ? 'Feeds' : activeId === UNASSIGNED ? 'Unassigned feeds' : activeId ? model.label(activeId) : 'Feeds'}</h3>
-                <div className="region-browser-summary">
-                    <span>{query || activeId ? activeFeeds.length : matchingReports.length} GTFS feeds{!query && activeId && activeId !== UNASSIGNED && (counts.get(activeId) || 0) > activeFeeds.length
-                        ? ` directly · ${counts.get(activeId)} including subregions` : ''}</span>
-                    {activeChildren.length > 0 && <span>{activeChildren.length} subregions with feeds</span>}
+                <div className="region-browser-detail-header">
+                    <h3>{query ? 'Search results' : !tree ? 'Feeds' : activeId === UNASSIGNED ? 'Unassigned feeds' : activeId === NETWORKS ? 'Networks' : activeId ? model.label(activeId) : 'Feeds'}</h3>
+                    <div className="region-browser-summary">
+                        <span>{query || activeId ? activeFeeds.length : matchingReports.length} GTFS feeds{!query && activeId && activeId !== UNASSIGNED && (counts.get(activeId) || 0) > activeFeeds.length
+                            ? ` directly · ${counts.get(activeId)} including subregions` : ''}</span>
+                        {activeChildren.length > 0 && <span>{activeChildren.length} subregions with feeds</span>}
+                    </div>
                 </div>
-                {sortedFeeds.length > 0 && <div className="region-browser-feeds">
-                    {sortedFeeds.map(report => <FeedCard key={report.region} report={report} onSelectReport={onSelectReport} />)}
-                </div>}
-                {activeChildren.length > 0 && <div className="region-browser-subregions">
-                    {activeChildren.map(id => <button type="button" key={id} onClick={() => toggle(id)}>
-                        <span>{model.label(id)}</span><span className="region-tree-count">{directFeeds.get(id)!.length} feeds</span>
-                    </button>)}
-                </div>}
-                {query && !activeFeeds.length && <p>No matching feeds.</p>}
-                {!query && !activeId && <p>Select a region in the tree to see its feeds.</p>}
-                {!query && activeId && !activeFeeds.length && (counts.get(activeId) || 0) > 0 &&
-                    <p>Select a subregion in the tree to see its feeds.</p>}
-                {!query && activeId && !activeFeeds.length && !counts.get(activeId) &&
-                    <p>No feeds assigned to this region.</p>}
+                <div className="region-browser-detail-scroll">
+                    {sortedFeeds.length > 0 && <div className="region-browser-feeds">
+                        {sortedFeeds.map(report => <FeedCard key={report.region} report={report} onSelectReport={onSelectReport} />)}
+                    </div>}
+                    {activeChildren.length > 0 && <div className="region-browser-subregions">
+                        {activeChildren.map(id => <button type="button" key={id} onClick={() => toggle(id)}>
+                            <span>{model.label(id)}</span><span className="region-tree-count">{directFeeds.get(id)!.length} feeds</span>
+                        </button>)}
+                    </div>}
+                    {query && !activeFeeds.length && <p>No matching feeds.</p>}
+                    {!query && !activeId && <p>Select a region in the tree to see its feeds.</p>}
+                    {!query && activeId && !activeFeeds.length && (counts.get(activeId) || 0) > 0 &&
+                        <p>Select a subregion in the tree to see its feeds.</p>}
+                    {!query && activeId && !activeFeeds.length && !counts.get(activeId) &&
+                        <p>No feeds assigned to this region.</p>}
+                </div>
             </section>
         </div>
     </div>;

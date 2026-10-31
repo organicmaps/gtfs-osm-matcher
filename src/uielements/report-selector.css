@@ -1,9 +1,30 @@
-.report-list-panel {
-    padding: 1em;
+.report-list-tab:not(.tab-hidden) {
+    display: flex;
+    flex-direction: column;
     flex: 1;
     min-height: 0;
-    overflow-y: auto;
+    overflow: hidden;
 }
+
+.report-list-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    padding: 1em;
+    overflow: hidden;
+}
+
+.report-list-panel h2 { margin-top: 0; }
+.report-list-panel .reports { flex: 1; min-height: 0; }
+.region-browser { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.region-browser-tools { flex-shrink: 0; }
+.region-browser-body { flex: 1; min-height: 0; }
+.region-browser-detail { display: flex; flex-direction: column; min-height: 0; }
+.region-browser-detail-header { flex-shrink: 0; }
+.region-browser-detail-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+.region-browser-detail-scroll > :last-child { margin-bottom: 0; }
+.report-list-footer { flex-shrink: 0; }
 
 .region-browser-tools {
     display: flex;
@@ -40,13 +61,14 @@
     display: grid;
     grid-template-columns: minmax(7.8em, 11.4em) minmax(0, 1fr);
     gap: 1em;
-    align-items: start;
+    align-items: stretch;
 }
-.region-browser-flat .region-browser-body { display: block; }
+.region-browser-flat .region-browser-body { display: flex; }
 .region-browser-flat .region-browser-tools { display: none; }
+.region-browser-flat .region-browser-detail { flex: 1; }
 
 .region-browser-tree {
-    max-height: 70vh;
+    min-height: 0;
     overflow: auto;
     border: 1px solid #ddd;
     border-radius: 0.4em;
@@ -80,8 +102,9 @@
 .region-feed-details a { overflow-wrap: anywhere; }
 
 @media (max-width: 760px) {
-    .region-browser-body { display: block; }
-    .region-browser-tree { max-height: 16em; margin-bottom: 1em; }
+    .region-browser-body { display: flex; flex-direction: column; }
+    .region-browser-tree { flex: 0 0 min(16em, 35%); margin-bottom: 1em; }
+    .region-browser-detail { flex: 1; }
 }
 
 .report-list-footer {

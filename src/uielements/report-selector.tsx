@@ -1,7 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { parseUrlReportRegion, useHashRoute } from "./routing";
 import { MatchReport, type Report } from "./report";
-import { RegionTree, type RegionTreeData } from "./region-tree";
+import { RegionTree, type RegionTreeData, type FeedRegionsData } from "./region-tree";
 import { cls } from "./cls";
 import { DATA_BASE_URL } from "../config";
 import "./report-selector.css";
@@ -13,35 +13,42 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
     
     const [matchReports, setMatchReports] = useState<Report[]>([]);
     const [regionTree, setRegionTree] = useState<RegionTreeData>();
+    const [feedRegions, setFeedRegions] = useState<FeedRegionsData>();
     const [reportUpdated, setReportUpdated] = useState<number>();
     const [matcherVersion, setMatcherVersion] = useState<number>();
 
     const reportRegion = useHashRoute(parseUrlReportRegion);
 
     useEffect(() => {
+        const regionData = Promise.all([
+            fetch(`${DATA_BASE_URL}/region-tree.json`),
+            fetch(`${DATA_BASE_URL}/feed-regions.json?t=${Date.now()}`),
+        ]).then(async ([treeResponse, feedsResponse]) => {
+            if (!treeResponse.ok || !feedsResponse.ok) throw new Error('Region data unavailable');
+            return Promise.all([treeResponse.json(), feedsResponse.json()]);
+        }).catch(() => null);
         fetch(`${DATA_BASE_URL}/match-report.json?t=${Date.now()}`)
             .then(r => r.json())
             .then(data => {
                 setMatchReports(data.matchedRegions);
                 setReportUpdated(data.matchRunTs);
                 setMatcherVersion(data.matcherVersion);
-                if (data.regionTreeAvailable) {
-                    fetch(`${DATA_BASE_URL}/region-tree.json`)
-                        .then(r => {
-                            if (!r.ok) throw new Error(`Region tree unavailable: ${r.status}`);
-                            return r.json();
-                        })
-                        .then(setRegionTree)
-                        .catch(() => setRegionTree(undefined));
+                if (data.regionTreeFile === 'region-tree.json'
+                        && data.feedRegionsFile === 'feed-regions.json') {
+                    regionData.then(files => {
+                        if (!files) return;
+                        setRegionTree(files[0]);
+                        setFeedRegions(files[1]);
+                    });
                 }
             });
     }, []);
 
     const reports = matchReports.map((report) => {
-        const {region, source, credit, license, liveUpdates, matchMeta} = report;
+        const {region, source, credit, license, liveUpdates, gtfsTimeStamp} = report;
 
-        const gtfsDate = matchMeta?.gtfsTimeStamp ? 
-                new Date(matchMeta.gtfsTimeStamp) : 
+        const gtfsDate = gtfsTimeStamp ?
+                new Date(gtfsTimeStamp) :
                 null;
 
         const matchStats = report?.matchStats;
@@ -86,6 +93,7 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
             <div className={'reports'}>
                 <RegionTree
                     tree={regionTree}
+                    feedRegions={feedRegions}
                     reports={reports}
                     onSelectReport={onSelectReport}
                 />

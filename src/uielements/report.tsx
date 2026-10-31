@@ -65,15 +65,7 @@ export type Report = {
         empty: number;
     };
 
-    matchMeta: {
-        coveredPbfSources: {
-            path: string,
-            fileTimestamp: number
-        }[]
-        gtfsTimeStamp: number
-        generationTimeStamp: number
-        matcherVersion: number | string
-    };
+    gtfsTimeStamp: number;
 
 }
 
@@ -134,7 +126,6 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
     const map = useContext(MapContext)?.map;
 
     const hashSelection = parseSelectionHash(useHash());
-    const matchMeta = reportData.matchMeta;
     const idTags = reportData.idTags;
 
     if (import.meta.env.DEV) {
@@ -505,13 +496,7 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
         <UnassignedOsmLayer key={reportRegion} layerKey={reportRegion} data={unassigned}
             onClick={handleUnmatchedOsmClick} />;
 
-    const gtfsTS = new Date(matchMeta.gtfsTimeStamp).toUTCString();
-    const osmSourcesTS = matchMeta.coveredPbfSources.map(({ path, fileTimestamp }) => {
-        return <div>
-            <label>{path} </label><div className={"ts-value"}>{new Date(fileTimestamp).toUTCString()}</div>
-        </div>
-    });
-
+    const gtfsTS = new Date(reportData.gtfsTimeStamp).toUTCString();
     return (<div>
         <h2 className={"report-header"}>{reportRegion}</h2>
         {indexError && <div className={"report-load-error"} role={"alert"}>{indexError}</div>}
@@ -531,10 +516,6 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
                 <label>Stop dissolution </label>
                 <div className={"ts-value"}>{reportData.dissolution}</div>
             </div>}
-            <div className={"section"}>
-                <label>OSM Sources timestamps</label>
-                {osmSourcesTS}
-            </div>
         </div>
     </div>)
 

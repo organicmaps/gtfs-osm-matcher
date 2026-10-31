@@ -29,8 +29,7 @@ App  (src/app.tsx)
         │   │
         │   ├── [tab: report]  (always mounted to keep map layers active)
         │   │   └── MatchReportSelector  (src/uielements/report-selector.tsx)
-        │   │       ├── RegionMarkersLayer  [when no report selected — region circles/bboxes on map]
-        │   │       ├── ReportTable  [when no report selected]  (src/uielements/report-table.tsx)
+        │   │       ├── RegionTree  [when no report selected; independently scrolling tree and feed list]
         │   │       └── MatchReport  [when report region in URL hash]  (src/uielements/report.tsx)
         │   │           ├── OsmMatchesSwitch  (src/uielements/switch.tsx)  [shared with SelectionInfo]
         │   │           ├── UnassignedOsmLayer  [osm-index-stops.tsv.gz; its own dataset checkbox, independent of the anchor switch]
@@ -72,6 +71,10 @@ App  (src/app.tsx)
         ├── #map-tools  (position: absolute, top-right, foldable)
         └── #map-view  (MapLibre GL canvas, fills container)
 ```
+
+The region browser keeps the report title and update metadata above its tree and feed list,
+and the contact footer below. The tree and selected region's feed list scroll independently;
+the selected region heading and feed count remain visible above the feed list.
 
 The Routes tab constrains the panel to its available height: navigation stays above the tab,
 `.routes-tab-header` holds status, selected route info and filters, and `.routes-tab-list`
