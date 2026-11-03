@@ -30,7 +30,7 @@ export function MatchReportSelector({ onSelectReport }: MatchReportSelectorProps
         fetch(`${DATA_BASE_URL}/match-report.json?t=${Date.now()}`)
             .then(r => r.json())
             .then(data => {
-                setMatchReports(data.matchedRegions);
+                setMatchReports(data.matchedRegions ?? []);
                 setReportUpdated(data.matchRunTs);
                 setMatcherVersion(data.matcherVersion);
                 if (data.regionTreeFile === 'region-tree.json'
