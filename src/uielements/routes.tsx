@@ -1,7 +1,8 @@
 import { useContext, useEffect, useMemo, useState } from "preact/hooks";
 import { MapContext } from "../app";
 import { routesStyling } from "./routes-styling";
-import type { GeoJSONSource } from "maplibre-gl";
+import type { GeoJSONSource, GeoJSONSourceSpecification } from "maplibre-gl";
+import type { Feature, FeatureCollection } from "geojson";
 
 export type FullRouteDisplayEntry = {
     routeKey: string;
@@ -23,7 +24,7 @@ export function RoutesMap({ fullRoutes = [] }: RoutesMapProps) {
     // whenever its parent does, and a fresh array identity makes the effect below
     // wipe the source to an empty FeatureCollection before setting it again --
     // visible as a flash on every unrelated state change.
-    const allFeatures = useMemo(() => fullRoutes.map(({ routeKey, coordinates, kind }) => ({
+    const allFeatures = useMemo(() => fullRoutes.map(({ routeKey, coordinates, kind }): Feature => ({
         type: 'Feature',
         geometry: {
             type: 'LineString',
@@ -75,24 +76,32 @@ export function RoutesMap({ fullRoutes = [] }: RoutesMapProps) {
             return;
         }
 
-        if (map.getSource('routes')) {
-            (map.getSource('routes') as GeoJSONSource).setData({
-                type: 'FeatureCollection',
-                // @ts-ignore
-                features: allFeatures
-            });
+        const data: FeatureCollection = {
+            type: 'FeatureCollection',
+            features: allFeatures
+        };
+
+        // Draw the data and mirror it into the stored overlay spec as well:
+        // setBaseStyle rebuilds the style from that spec, so replaying the empty
+        // collection it was declared with would clear the route until the selection
+        // changes. StopsLayer keeps its own spec in step the same way.
+        (routesStyling.sources.routes as GeoJSONSourceSpecification).data = data;
+
+        const source = map.getSource('routes') as GeoJSONSource | undefined;
+        if (source) {
+            source.setData(data);
         }
         else {
             console.warn('Map source routes not ready');
         }
 
         return () => {
-            if (map.getSource('routes')) {
-                (map.getSource('routes') as GeoJSONSource).setData({
-                    type: 'FeatureCollection',
-                    features: []
-                });
-            }
+            const empty: FeatureCollection = {
+                type: 'FeatureCollection',
+                features: []
+            };
+            (routesStyling.sources.routes as GeoJSONSourceSpecification).data = empty;
+            (map.getSource('routes') as GeoJSONSource | undefined)?.setData(empty);
         };
 
     }, [map, allFeatures, mapStylesReady]);
