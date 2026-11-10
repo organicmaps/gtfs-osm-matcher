@@ -21,22 +21,34 @@
 
 .route-pill--loading {
     cursor: default;
-
-    background: linear-gradient(90deg, #e1e1e1, #5b5b5b);
-    background-size: 200% 200%;
-    animation: gradient-shift 4s linear infinite;
+    position: relative;
+    /* Faint track under the sweeping arc — the pill's own border, dimmed. */
+    border-color: #ccc;
 }
 
-@keyframes gradient-shift {
-    0% {
-        background-position: 0% 50%;
-    }
-    50% {
-        background-position: 100% 50%;
-    }
-    100% {
-        background-position: 0% 50%;
-    }
+.route-pill--loading::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    padding: 2px;
+    background: conic-gradient(from var(--route-pill-angle), transparent 45%, #333);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    animation: route-pill-spin 2.1s linear infinite;
+    pointer-events: none;
+}
+
+@property --route-pill-angle {
+    syntax: "<angle>";
+    initial-value: 0deg;
+    inherits: false;
+}
+
+@keyframes route-pill-spin {
+    to { --route-pill-angle: 360deg; }
 }
 
 .route-variant {
