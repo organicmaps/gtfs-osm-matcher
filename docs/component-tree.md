@@ -29,8 +29,7 @@ App  (src/app.tsx)
         │   │
         │   ├── [tab: report]  (always mounted to keep map layers active)
         │   │   └── MatchReportSelector  (src/uielements/report-selector.tsx)
-        │   │       ├── RegionMarkersLayer  [when no report selected — region circles/bboxes on map]
-        │   │       ├── ReportTable  [when no report selected]  (src/uielements/report-table.tsx)
+        │   │       ├── RegionTree  [when no report selected; independently scrolling tree and feed list]
         │   │       └── MatchReport  [when report region in URL hash]  (src/uielements/report.tsx)
         │   │           ├── OsmMatchesSwitch  (src/uielements/switch.tsx)  [shared with SelectionInfo]
         │   │           ├── UnassignedOsmLayer  [osm-index-stops.tsv.gz; its own dataset checkbox, independent of the anchor switch]
@@ -73,6 +72,10 @@ App  (src/app.tsx)
         └── #map-view  (MapLibre GL canvas, fills container)
 ```
 
+The region browser keeps the report title and update metadata above its tree and feed list,
+and the contact footer below. The tree and selected region's feed list scroll independently;
+the selected region heading and feed count remain visible above the feed list.
+
 The Routes tab constrains the panel to its available height: navigation stays above the tab,
 `.routes-tab-header` holds status, selected route info and filters, and `.routes-tab-list`
 scrolls within the remaining space. Top/bottom overlay buttons return to the active variant (or route header) when it is outside the visible list; filtering it out hides the buttons. The header scrolls only when its content exceeds 60%
@@ -94,7 +97,7 @@ tab's cache without moving the map or clearing another route's loading indicator
 
 | Context | Provider | Consumers |
 |---|---|---|
-| `MapContext` | `App` | `MatchReport`, `StopsLayer`, `RegionMarkersLayer`, `RoutesTab`, `RoutesMap`, `MatchArrowLayer`, `HtmlMapMarker`, `LocateMe`, `AddOsmStopController`, `MoveController` |
+| `MapContext` | `App` | `MatchReport`, `StopsLayer`, `RoutesTab`, `RoutesMap`, `MatchArrowLayer`, `HtmlMapMarker`, `LocateMe`, `AddOsmStopController`, `MoveController` |
 | `SelectionContext` | `App` | `MatchReport`, `SelectionInfo`, `RoutePill`, `OsmListElement` |
 | `OsmMatchesOptionsContext` | `App` | `MatchReport` (publishes `osmMatchesAvailable`), `OsmMatchesSwitch` (hidden when unavailable) |
 

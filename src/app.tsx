@@ -227,7 +227,7 @@ export function App() {
                   <SelectionInfo selection={selection} showRouteMap={activeTab !== 'routes'} />
                 </div>
 
-                <div className={cls(activeTab !== 'report' && 'tab-hidden')}>
+                <div className={cls(!reportRegion && 'report-list-tab', activeTab !== 'report' && 'tab-hidden')}>
                   <MatchReportSelector onSelectReport={selectionContext.onReportSelect} />
                 </div>
 

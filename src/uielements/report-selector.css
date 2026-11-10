@@ -1,44 +1,110 @@
-.report-list-panel {
-    padding: 1em;
+.report-list-tab:not(.tab-hidden) {
+    display: flex;
+    flex-direction: column;
     flex: 1;
     min-height: 0;
-    overflow-y: auto;
+    overflow: hidden;
 }
 
-.report-table {
-    width: 100%;
-    border-collapse: collapse;
+.report-list-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    padding: 1em;
+    overflow: hidden;
 }
 
-.report-table th, .report-table td {
+.report-list-panel h2 { margin-top: 0; }
+.report-list-panel .reports { flex: 1; min-height: 0; }
+.region-browser { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.region-browser-tools { flex-shrink: 0; }
+.region-browser-body { flex: 1; min-height: 0; }
+.region-browser-detail { display: flex; flex-direction: column; min-height: 0; }
+.region-browser-detail-header { flex-shrink: 0; }
+.region-browser-detail-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+.region-browser-detail-scroll > :last-child { margin-bottom: 0; }
+.report-list-footer { flex-shrink: 0; }
+
+.region-browser-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75em;
+    margin-bottom: 0.75em;
+}
+
+.region-browser-tools input[type="search"] {
+    flex: 1;
+    min-width: 15em;
     padding: 0.5em;
-    text-align: left;
-    border-bottom: 1px solid #eee;
 }
 
-.report-table th {
-    background-color: #f5f5f5;
-    font-weight: bold;
+.region-browser-show-empty {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+    white-space: nowrap;
+}
+
+.report-list-meta { display: flex; flex-wrap: wrap; gap: 0.25em 1em; margin-bottom: 0.75em; color: #555; }
+
+.region-tree-choice {
+    border: 0;
+    background: transparent;
     cursor: pointer;
+    font: inherit;
 }
 
-.report-table tr:hover {
-    background-color: #f9f9f9;
+.region-tree-choice.selected { background: #e7f4ef; color: #12736a; }
+
+.region-browser-body {
+    display: grid;
+    grid-template-columns: minmax(7.8em, 11.4em) minmax(0, 1fr);
+    gap: 1em;
+    align-items: stretch;
+}
+.region-browser-flat .region-browser-body { display: flex; }
+.region-browser-flat .region-browser-tools { display: none; }
+.region-browser-flat .region-browser-detail { flex: 1; }
+
+.region-browser-tree {
+    min-height: 0;
+    overflow: auto;
+    border: 1px solid #ddd;
+    border-radius: 0.4em;
+    padding: 0.4em;
 }
 
-.hl-green {
-    background-color: #d4edda !important;
-    color: #155724;
-}
+.region-tree-choice { display: flex; gap: 0.5em; align-items: center; justify-content: space-between; width: 100%; padding: 0.4em; text-align: left; border-radius: 0.3em; }
+.region-tree-choice:hover { background: #f1f5f3; }
+.region-tree-name { display: flex; align-items: baseline; min-width: 0; overflow-wrap: anywhere; }
+.region-tree-chevron { display: inline-block; width: 1.2em; flex: 0 0 1.2em; }
+.region-tree-count { font-size: 0.85em; color: #666; white-space: nowrap; }
+.region-tree-children { margin-left: 0.6em; padding-left: 0.5em; border-left: 1px solid #ddd; }
+.region-browser-detail { min-width: 0; }
+.region-browser-detail h3 { margin: 0 0 0.4em; }
+.region-browser-summary { display: flex; flex-wrap: wrap; gap: 0.4em 1.3em; color: #555; margin-bottom: 0.8em; }
+.region-browser-subregions { display: grid; gap: 0.4em; margin-top: 1em; }
+.region-browser-subregions button { display: flex; justify-content: space-between; gap: 0.7em; width: 100%; border: 1px solid #ddd; border-radius: 0.35em; padding: 0.6em; background: #fff; cursor: pointer; font: inherit; text-align: left; }
+.region-browser-subregions button:hover { background: #f1f5f3; }
+.region-browser-feeds { display: grid; gap: 0.6em; }
+.region-feed { border: 1px solid #ddd; border-radius: 0.35em; padding: 0.75em; }
+.region-feed-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5em; font-weight: bold; }
+.region-feed-heading a { overflow-wrap: anywhere; }
+.region-feed-stops { color: #555; font-size: 0.85em; font-weight: normal; white-space: nowrap; }
+.region-feed-live { color: #12736a; font-size: 0.85em; font-weight: normal; }
+.region-feed-meta { display: flex; flex-wrap: wrap; gap: 0.25em 1em; margin-top: 0.4em; color: #555; font-size: 0.9em; }
+.region-feed-highlight { padding: 0.1em 0.3em; border-radius: 0.2em; }
+.region-feed-highlight.hl-green { background: #d4edda; color: #155724; }
+.region-feed-highlight.hl-yellow { background: #fff3cd; color: #856404; }
+.region-feed-highlight.hl-red { background: #f8d7da; color: #721c24; }
+.region-feed-details { margin-top: 0.5em; color: #555; font-size: 0.9em; }
+.region-feed-details a { overflow-wrap: anywhere; }
 
-.hl-yellow {
-    background-color: #fff3cd !important;
-    color: #856404;
-}
-
-.hl-red {
-    background-color: #f8d7da !important;
-    color: #721c24;
+@media (max-width: 760px) {
+    .region-browser-body { display: flex; flex-direction: column; }
+    .region-browser-tree { flex: 0 0 min(16em, 35%); margin-bottom: 1em; }
+    .region-browser-detail { flex: 1; }
 }
 
 .report-list-footer {
@@ -52,69 +118,6 @@
     text-decoration: underline;
 }
 
-.float-right {
-    float: right;
-}
-
 .report-datasets {
     border-top: 1px solid #ddd;
-}
-
-.fold-header {
-    background-color: #f0f0f0;
-    cursor: pointer;
-}
-
-.fold-header:hover {
-    background-color: #e0e0e0 !important;
-}
-
-.fold-header td {
-    border-bottom: 2px solid #ccc !important;
-}
-
-.feed-count {
-    color: #666;
-    font-weight: normal;
-    font-size: 0.9em;
-}
-
-.grouped-row {
-    background-color: #fafafa;
-}
-
-.grouped-row td:first-child {
-    padding-left: 2em;
-}
-
-.info-badge {
-    display: inline-block;
-    margin-right: 0.35em;
-    cursor: pointer;
-    font-size: 1.1em;
-    color: #6c757d;
-    vertical-align: baseline;
-}
-
-.info-badge:hover {
-    color: #0056b3;
-}
-
-.info-badge-content {
-    margin-top: 0.25em;
-    padding: 0.3em 0.5em;
-    font-size: 0.85em;
-
-    color: #555;
-    background: #f8f9fa;
-    border: 1px solid #e9ecef;
-}
-
-.info-badge-content a {
-    display: inline-block;
-    max-width: 15em;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    vertical-align: top;
 }
