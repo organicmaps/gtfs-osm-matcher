@@ -4,7 +4,7 @@ import type { Map } from "maplibre-gl";
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { DATA_BASE_URL } from "../config";
 import { satMapStyle } from "./styling";
-import { LayerControls } from "./layers-controls";
+import { LayerControls, type Overlay, type OverlaySpecification } from "./layers-controls";
 
 maplibregl.setWorkerUrl(workerUrl);
 
@@ -164,7 +164,7 @@ function attachStopStructureToggle(map: Map, layerControls: LayerControls,
 
     // A single-zoom archive with two layers: `stops`, a point per stop carrying what the
     // nearest road says about it, and `bays`, a line joining the two sides of a pair.
-    const spec = {
+    const spec: OverlaySpecification = {
         sources: {
             [STRUCTURE_SOURCE]: {
                 type: 'vector' as const,
@@ -205,6 +205,7 @@ function attachStopStructureToggle(map: Map, layerControls: LayerControls,
     };
 
     let shown = false;
+    let structureOverlay: Overlay | null = null;
     // Which press is current. The handler awaits, so two quick presses overlap and the map
     // must end up where the last of them asked for -- not where the slowest one finishes.
     let press = 0;
@@ -244,16 +245,20 @@ function attachStopStructureToggle(map: Map, layerControls: LayerControls,
         }
 
         // Awaited, like every other overlay here: addSource throws "Style is not done
-        // loading" before the first load, and addOverlayImmediate registers the overlay
-        // before it adds it -- so a press during startup used to leave the control holding
-        // a layer the map does not have, and the button dead from then on.
+        // loading" before the first load, so a press during startup used to leave the
+        // control holding a layer the map does not have, and the button dead from then on.
         await loaded;
         if (thisPress !== press) {
             // Pressed again while this one was waiting; that press owns the outcome.
             return;
         }
 
-        wanted ? layerControls.addOverlayImmediate(spec) : layerControls.removeOverlayImmediate(spec);
+        if (wanted) {
+            structureOverlay = layerControls.addOverlayImmediate(spec);
+        } else {
+            structureOverlay?.remove();
+            structureOverlay = null;
+        }
         if (wanted && map.getZoom() < STRUCTURE_ZOOM && map.getZoom() >= NEAR_ENOUGH_ZOOM) {
             // Nothing exists below the archive's own zoom, so zooming in is the difference
             // between a toggle that draws and one that appears to do nothing. Only from

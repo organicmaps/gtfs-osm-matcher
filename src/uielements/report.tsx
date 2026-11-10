@@ -1,7 +1,8 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { MapContext, SelectionContext, OsmMatchesOptionsContext } from "../app";
 import { loadSvgWithColors } from "../map/map";
-import type { GeoJSONSource, MapGeoJSONFeature, MapMouseEvent } from "maplibre-gl";
+import type { MapGeoJSONFeature, MapMouseEvent } from "maplibre-gl";
+import type { Overlay, OverlaySpecification } from "../map/layers-controls";
 import type { FeatureCollection } from "geojson";
 
 import "./report.css"
@@ -573,46 +574,44 @@ function StopsLayer({ layerKey, data, selectedCodes, onClick }: StopsLayerProps)
     const selectedRef = useRef(selectedCodes);
     selectedRef.current = selectedCodes;
 
-    // The click handler, held rather than listed in the deps below: re-creating the source
-    // is not how this layer changes -- osm matches flips every stop's geometry, and tearing
-    // the source down on each flip drops the layer often enough that the switch stops
-    // appearing to work. onClick is a new function on every App render, so without this the
-    // map would keep calling the one it was mounted with.
+    // The click handler and the data are read through refs at the moment the overlay
+    // finally registers: the creating effect is keyed on the map and the layer id, so
+    // it does not re-run for them, and both may have changed while the icons and the
+    // style were still loading.
     const onClickRef = useRef(onClick);
     onClickRef.current = onClick;
 
-    // Stored layer/source spec — addOverlayImmediate keeps it by reference, so
-    // mutating its `filter` keeps base-style switches consistent.
-    const specRef = useRef<any>(null);
+    const dataRef = useRef(data);
+    dataRef.current = data;
+
+    // The registered overlay, null until the style is ready to accept sources.
+    const overlayRef = useRef<Overlay | null>(null);
 
     useEffect(() => {
         if (!map || !stylingControls) return;
 
-        const layerSpec = {
-            'id': layerId,
-            'type': 'symbol',
-            'source': sourceId,
-            'filter': buildFilter(selectedRef.current),
-            'layout': {
-                'icon-image': ['case',
-                    ['boolean', ['get', 'dissolved'], false], DISSOLVED_ICON,
-                    ['concat', 'stop-', ['get', 'subcategory']],
-                ] as any,
-                'icon-size': 0.2,
-                'icon-allow-overlap': true,
-            }
+        const stopsStyle: OverlaySpecification = {
+            sources: {
+                [sourceId]: {
+                    'type': 'geojson',
+                    'data': data
+                }
+            },
+            layers: [{
+                'id': layerId,
+                'type': 'symbol',
+                'source': sourceId,
+                'filter': buildFilter(selectedRef.current),
+                'layout': {
+                    'icon-image': ['case',
+                        ['boolean', ['get', 'dissolved'], false], DISSOLVED_ICON,
+                        ['concat', 'stop-', ['get', 'subcategory']],
+                    ] as any,
+                    'icon-size': 0.2,
+                    'icon-allow-overlap': true,
+                }
+            }]
         };
-
-        const source = {
-            'type': 'geojson',
-            'data': data
-        };
-
-        const stopsStyle = {
-            sources: { [sourceId]: source },
-            layers: [layerSpec]
-        };
-        specRef.current = stopsStyle;
 
         const handleClick = (e: MapLayerClickEvent) => {
             onClickRef.current?.(e.features?.[0]);
@@ -638,8 +637,11 @@ function StopsLayer({ layerKey, data, selectedCodes, onClick }: StopsLayerProps)
             subscription.promiseFulfiled = true;
             if (subscription.canceled) return;
 
-            // @ts-ignore
-            stylingControls.addOverlayImmediate(stopsStyle);
+            const overlay = stylingControls.addOverlayImmediate(stopsStyle);
+            overlayRef.current = overlay;
+            overlay.setSourceData(sourceId, dataRef.current);
+            overlay.setLayerFilter(layerId, buildFilter(selectedRef.current));
+
             if (onClick) {
                 map.on('click', layerId, handleClick);
             }
@@ -648,8 +650,8 @@ function StopsLayer({ layerKey, data, selectedCodes, onClick }: StopsLayerProps)
         return () => {
             subscription.canceled = true;
             if (subscription.promiseFulfiled) {
-                // @ts-ignore
-                stylingControls.removeOverlayImmediate(stopsStyle);
+                overlayRef.current?.remove();
+                overlayRef.current = null;
                 if (onClick) {
                     map.off('click', layerId, handleClick);
                 }
@@ -657,29 +659,16 @@ function StopsLayer({ layerKey, data, selectedCodes, onClick }: StopsLayerProps)
         };
     }, [map, stylingControls, layerId, sourceId]);
 
-    // New geometry — osm matches moving every stop to where the matcher anchored it — goes
-    // to the live source. The spec keeps a copy so a base-style switch re-adds the layer
-    // with what is on screen rather than with what it was created from.
+    // New geometry (osm matches moving every stop to where the matcher anchored it) goes
+    // through the handle, which stores it for base-style switches as well as drawing it.
     useEffect(() => {
-        if (!map) return;
-        if (specRef.current) {
-            specRef.current.sources[sourceId].data = data;
-        }
-        const source = map.getSource(sourceId) as GeoJSONSource | undefined;
-        source?.setData(data);
-    }, [map, data, sourceId]);
+        overlayRef.current?.setSourceData(sourceId, data);
+    }, [data, sourceId]);
 
-    // Update visibility when the selected sub-categories change.
+    // Category toggles only change the filter of the one source.
     useEffect(() => {
-        if (!map) return;
-        const filter = buildFilter(selectedCodes);
-        if (specRef.current) {
-            specRef.current.layers[0].filter = filter;
-        }
-        if (map.getLayer(layerId)) {
-            map.setFilter(layerId, filter);
-        }
-    }, [map, layerId, selectedCodes.join(',')]);
+        overlayRef.current?.setLayerFilter(layerId, buildFilter(selectedCodes));
+    }, [layerId, selectedCodes.join(',')]);
 
     return <></>;
 }
@@ -710,18 +699,20 @@ function UnassignedOsmLayer({ layerKey, data, onClick }: UnassignedOsmLayerProps
     const sourceId = `unassigned-osm-${layerKey}`;
     const layerId = `unassigned-osm-${layerKey}`;
 
-    const specRef = useRef<any>(null);
-
-    // Read through a ref for the same reason the stops layer does: the effect below is keyed
-    // on the map and the layer id, so a handler captured directly would be the one from the
-    // render that created the layer.
+    // Read through refs for the same reason the stops layer does: the creating effect is
+    // keyed on the map and the layer id, and both may change before it registers.
     const onClickRef = useRef(onClick);
     onClickRef.current = onClick;
+
+    const dataRef = useRef(data);
+    dataRef.current = data;
+
+    const overlayRef = useRef<Overlay | null>(null);
 
     useEffect(() => {
         if (!map || !stylingControls) return;
 
-        const spec = {
+        const spec: OverlaySpecification = {
             sources: {
                 [sourceId]: { 'type': 'geojson', 'data': data },
             },
@@ -747,7 +738,6 @@ function UnassignedOsmLayer({ layerKey, data, onClick }: UnassignedOsmLayerProps
                 },
             }],
         };
-        specRef.current = spec;
 
         const handleClick = (e: MapLayerClickEvent) => {
             onClickRef.current?.(e.features?.[0]);
@@ -759,9 +749,11 @@ function UnassignedOsmLayer({ layerKey, data, onClick }: UnassignedOsmLayerProps
         mapLoaded?.then(() => {
             subscription.promiseFulfiled = true;
             if (subscription.canceled) return;
-            // @ts-ignore — the same immediate add the report's own overlays use, so the layer
-            // survives a base-style switch.
-            stylingControls.addOverlayImmediate(spec);
+
+            const overlay = stylingControls.addOverlayImmediate(spec);
+            overlayRef.current = overlay;
+            overlay.setSourceData(sourceId, dataRef.current);
+
             map.on('click', layerId, handleClick);
             map.on('mouseenter', layerId, showPointer);
             map.on('mouseleave', layerId, hidePointer);
@@ -779,20 +771,15 @@ function UnassignedOsmLayer({ layerKey, data, onClick }: UnassignedOsmLayerProps
                 map.off('mouseenter', layerId, showPointer);
                 map.off('mouseleave', layerId, hidePointer);
                 hidePointer();
-                // @ts-ignore
-                stylingControls.removeOverlayImmediate(spec);
+                overlayRef.current?.remove();
+                overlayRef.current = null;
             }
         };
     }, [map, stylingControls, layerId, sourceId]);
 
     useEffect(() => {
-        if (!map) return;
-        if (specRef.current) {
-            specRef.current.sources[sourceId].data = data;
-        }
-        const source = map.getSource(sourceId) as GeoJSONSource | undefined;
-        source?.setData(data);
-    }, [map, data, sourceId]);
+        overlayRef.current?.setSourceData(sourceId, data);
+    }, [data, sourceId]);
 
     return <></>;
 }

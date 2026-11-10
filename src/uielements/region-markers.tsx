@@ -1,6 +1,7 @@
 import { useContext, useEffect, useMemo } from "preact/hooks";
 import { MapContext } from "../app";
 import type { Report } from "./report";
+import type { Overlay, OverlaySpecification } from "../map/layers-controls";
 
 const BBOX_SOURCE = 'region-bbox';
 const BBOX_FILL_LAYER = 'region-bbox-fill';
@@ -70,7 +71,7 @@ export function RegionMarkersLayer({ reports, onSelectReport }: Props) {
     useEffect(() => {
         if (!map || !stylingControls || !mapLoaded) return;
 
-        const overlayStyle = {
+        const overlayStyle: OverlaySpecification = {
             sources: {
                 [BBOX_SOURCE]: {
                     type: 'geojson' as const,
@@ -245,13 +246,18 @@ export function RegionMarkersLayer({ reports, onSelectReport }: Props) {
             setHover(null);
         };
 
-        const subscription = { canceled: false, promiseFulfilled: false, resolvedMap: null as typeof map | null };
+        const subscription = {
+            canceled: false,
+            promiseFulfilled: false,
+            resolvedMap: null as typeof map | null,
+            overlay: null as Overlay | null,
+        };
 
         mapLoaded.then(resolvedMap => {
             subscription.promiseFulfilled = true;
             subscription.resolvedMap = resolvedMap;
             if (!subscription.canceled) {
-                stylingControls.addOverlayImmediate(overlayStyle);
+                subscription.overlay = stylingControls.addOverlayImmediate(overlayStyle);
                 resolvedMap.on('click', CLUSTERS_LAYER, handleClusterClick);
                 resolvedMap.on('click', CIRCLES_LAYER, handleCircleClick);
                 resolvedMap.on('mouseenter', CLUSTERS_LAYER, handleClusterMouseEnter);
@@ -266,7 +272,7 @@ export function RegionMarkersLayer({ reports, onSelectReport }: Props) {
             setHover(null);
             if (subscription.promiseFulfilled && subscription.resolvedMap) {
                 const m = subscription.resolvedMap;
-                stylingControls.removeOverlayImmediate(overlayStyle);
+                subscription.overlay?.remove();
                 m.off('click', CLUSTERS_LAYER, handleClusterClick);
                 m.off('click', CIRCLES_LAYER, handleCircleClick);
                 m.off('mouseenter', CLUSTERS_LAYER, handleClusterMouseEnter);

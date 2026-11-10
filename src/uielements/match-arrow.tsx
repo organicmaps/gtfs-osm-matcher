@@ -1,6 +1,8 @@
 import { useContext, useEffect } from "preact/hooks";
 import { MapContext } from "../app";
 import { loadSvgWithColors } from "../map/map";
+import type { Overlay, OverlaySpecification } from "../map/layers-controls";
+import type { Feature } from "geojson";
 
 type OsmPoint = {
     lon: number;
@@ -31,7 +33,7 @@ export function MatchArrowLayer({ gtfsLon, gtfsLat, osmPoints, visible }: MatchA
         const points = osmPoints.filter(p => !isNaN(p.lon) && !isNaN(p.lat));
         if (points.length === 0) return;
 
-        const lineFeatures = points.map(p => ({
+        const lineFeatures = points.map((p): Feature => ({
             type: 'Feature',
             geometry: {
                 type: 'LineString',
@@ -40,7 +42,7 @@ export function MatchArrowLayer({ gtfsLon, gtfsLat, osmPoints, visible }: MatchA
             properties: {}
         }));
 
-        const overlay = {
+        const overlay: OverlaySpecification = {
             sources: {
                 [SOURCE_ID]: {
                     type: 'geojson',
@@ -74,7 +76,11 @@ export function MatchArrowLayer({ gtfsLon, gtfsLat, osmPoints, visible }: MatchA
             ]
         };
 
-        const subscription = { canceled: false, promiseFulfiled: false };
+        const subscription = {
+            canceled: false,
+            promiseFulfiled: false,
+            overlay: null as Overlay | null,
+        };
 
         mapLoaded?.then(async m => {
             if (!m.hasImage(ARROW_IMG_ID)) {
@@ -89,15 +95,13 @@ export function MatchArrowLayer({ gtfsLon, gtfsLat, osmPoints, visible }: MatchA
             subscription.promiseFulfiled = true;
             if (subscription.canceled) return;
 
-            // @ts-ignore
-            layerControls.addOverlayImmediate(overlay);
+            subscription.overlay = layerControls.addOverlayImmediate(overlay);
         });
 
         return () => {
             subscription.canceled = true;
             if (subscription.promiseFulfiled) {
-                // @ts-ignore
-                layerControls.removeOverlayImmediate(overlay);
+                subscription.overlay?.remove();
             }
         };
     }, [map, layerControls, mapLoaded, visible, gtfsLon, gtfsLat, osmPoints]);
