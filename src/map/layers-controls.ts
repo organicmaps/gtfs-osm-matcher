@@ -1,4 +1,4 @@
-import type { LayerSpecification, Map, SourceSpecification, StyleSpecification } from "maplibre-gl";
+import type { GeoJSONSource, GeoJSONSourceSpecification, LayerSpecification, Map, SourceSpecification, StyleSpecification } from "maplibre-gl";
 
 export type StyleMap = {
     [key: string]: StyleSpecification | string
@@ -53,6 +53,27 @@ export class LayerControls {
             if (!this.map.getLayer(layer.id)) {
                 this.map.addLayer(layer);
             }
+        }
+    }
+
+    // The one stateful operation an overlay needs: swaps the data of one of its
+    // GeoJSON sources, on the map so it is drawn now, and in the stored spec so
+    // setBaseStyle replays what is on screen rather than the empty collection the
+    // spec was declared with. The source being absent from the map is fine -- a
+    // style switch in flight recreates it from the spec, with this very data.
+    updateOverlaySourceData(overlayStyle: OverlaySpecification, sourceId: string,
+        data: GeoJSONSourceSpecification['data']) {
+
+        const stored = overlayStyle.sources[sourceId];
+        if (!stored || stored.type !== 'geojson') {
+            console.warn(`Overlay has no GeoJSON source "${sourceId}"`);
+            return;
+        }
+        stored.data = data;
+
+        const live = this.map.getSource(sourceId);
+        if (live && live.type === 'geojson') {
+            (live as GeoJSONSource).setData(data);
         }
     }
 
