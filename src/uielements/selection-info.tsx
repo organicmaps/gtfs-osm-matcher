@@ -748,11 +748,14 @@ type TagsTableProps = {
 }
 function TagsTable({ tags, versionWarningKeys, importantTagKeysRegex, importantTagValuesRegex }: TagsTableProps) {
 
-    const rows = Object.entries(tags).map(([k, v]) => <tr key={k}>
-        <td className={importantTagKeysRegex?.test(k) ? 'important' : ''}>{k}</td>
-        <td className={importantTagValuesRegex?.test(v) ? 'important' : ''}>{v}</td>
-        <td>{versionWarningKeys?.has(k) && <TagVersionWarning />}</td>
-    </tr>);
+    const rows = Object.entries(tags).map(([k, v]) => {
+        const versionWarning = versionWarningKeys?.has(k);
+        return <tr key={k} className={versionWarning ? 'version-warning' : undefined}>
+            <td className={importantTagKeysRegex?.test(k) ? 'important' : ''}>{k}</td>
+            <td className={importantTagValuesRegex?.test(v) ? 'important' : ''}>{v}</td>
+            <td>{versionWarning && <TagVersionWarning />}</td>
+        </tr>;
+    });
 
     return <table className={'tags-table'}>
         <tbody>

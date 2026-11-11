@@ -9,8 +9,10 @@
 
 span.osm-tag-version-warning {
     color: #eab308;
+    font-weight: bold;
     cursor: help;
     margin-right: 4px;
+    padding-left: 0.25em;
     position: relative;
     display: inline-block;
 }
@@ -31,6 +33,14 @@ span.osm-tag-version-warning {
     white-space: normal;
     font-size: 13px;
     font-weight: normal;
+}
+
+tr.version-warning td {
+    border-bottom: 2px solid #ffa500;
+}
+
+tr.version-warning .osm-tag-version-warning {
+    color: #000;
 }
 
 .deleted input {

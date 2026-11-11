@@ -131,9 +131,8 @@ export function TagEditor({ tags, tagsOriginal, versionWarningKeys, onChange, ch
 
         if (isDeleted) {
             return (
-                <tr key={id}>
+                <tr key={id} className={entry.versionWarning ? 'version-warning' : undefined}>
                     <td className={'tag-actions'}>
-                        {entry.versionWarning && <TagVersionWarning />}
                         <span className={'osm-tag-restore'} onClick={() => handleRestore(id, k)}>
                             &#x27F3;
                         </span>
@@ -143,15 +142,15 @@ export function TagEditor({ tags, tagsOriginal, versionWarningKeys, onChange, ch
                     </td>
                     <td className={cls('osm-tag-value', 'deleted')}>
                         <input value={v} readOnly={true} />
+                        {entry.versionWarning && <TagVersionWarning />}
                     </td>
                 </tr>
             );
         }
 
         return (
-            <tr key={id}>
+            <tr key={id} className={entry.versionWarning ? 'version-warning' : undefined}>
                 <td className={'tag-actions'}>
-                    {entry.versionWarning && <TagVersionWarning />}
                     {!readonly && <span
                         onClick={() => handleDelete(id)}
                         className={'osm-tag-delete'}
@@ -178,6 +177,7 @@ export function TagEditor({ tags, tagsOriginal, versionWarningKeys, onChange, ch
                         placeholder={tmp ? 'value' : ''}
                         readOnly={readonly}
                         onInput={(e) => handleValueEdit(id, e)} />
+                    {entry.versionWarning && <TagVersionWarning />}
                 </td>
             </tr>
         );
