@@ -2,6 +2,7 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "p
 import { MapContext, SelectionContext, OsmMatchesOptionsContext } from "../app";
 import { loadSvgWithColors } from "../map/map";
 import type { GeoJSONSource, MapGeoJSONFeature, MapMouseEvent } from "maplibre-gl";
+import { Marker } from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
 
 import "./report.css"
@@ -414,6 +415,37 @@ export function MatchReport({ reportRegion, reportData }: MatchReportProps) {
     // keep working while it is on -- which is the point: a category is still the thing you are
     // looking at, and now you are looking at where the matcher put it.
     const selectedCodes = CATEGORY_CODES.filter(c => selectedDatasets[c]);
+
+    // Use a DOM marker so the selection stays visible across base-style changes.
+    // Resolve through the index to follow the same projection as the stop icons.
+    useEffect(() => {
+        if (!map || !selection || selection.reportRegion !== reportRegion) return;
+        const row = rowsById.get(selection.feature.properties?.gtfsStopId);
+        let coordinates: [number, number];
+        if (row) {
+            if (!selectedDatasets[row.code]) return;
+            coordinates = showingOsmMatches && row.anchorLon !== null && row.anchorLat !== null
+                ? [row.anchorLon, row.anchorLat]
+                : [row.lon, row.lat];
+        } else {
+            if (selection.datasetName || !showUnmatchedOsm || selection.feature.geometry.type !== 'Point') return;
+            const [lon, lat] = selection.feature.geometry.coordinates;
+            coordinates = [lon, lat];
+        }
+        if (!coordinates.every(Number.isFinite)) return;
+
+        const element = document.createElement('div');
+        element.className = 'selected-stop-ring';
+        element.style.color = row
+            ? row.dissolutionPlanned && dissolutionApplied
+                ? DISSOLVED_COLOR
+                : CATEGORIES[row.code].color
+            : '#c23b22';
+        element.setAttribute('aria-hidden', 'true');
+        const marker = new Marker({ element, anchor: 'center' })
+            .setLngLat(coordinates).addTo(map);
+        return () => { marker.remove(); };
+    }, [map, selection, reportRegion, rowsById, selectedDatasets, showingOsmMatches, showUnmatchedOsm, dissolutionApplied]);
 
     const anchoredShown = selectedCodes.reduce((sum, c) => sum + (anchoredCounts[c] || 0), 0);
 
