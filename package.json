@@ -6,8 +6,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "deploy": "./scripts/deploy.sh",
-    "serve-data": "http-server ../gtfs-parser/data/match -p 8801 --cors"
+    "serve-data": "http-server \"$(mktemp -d)\" -p 8801 --cors -P https://pt.organicmaps.app/data"
   },
   "dependencies": {
     "maplibre-gl": "^6.4.1",
