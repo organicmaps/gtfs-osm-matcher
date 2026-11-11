@@ -243,3 +243,40 @@ test('encoding only serializes supplied elements and gives edits precedence', ()
     assert.equal((xml.match(/<way /g) || []).length, 1);
     assert.match(xml, /Edited way/);
 });
+
+test('missing data download fills a supplied store recursively and repairs incomplete nodes', async () => {
+    const source = relationFixture();
+    const data = new OSMData();
+    data.addElement({ type: 'node', id: 1, lat: NaN, lon: 20, tags: {} });
+    const originalFetch = globalThis.fetch;
+    const requests: string[] = [];
+    globalThis.fetch = async input => {
+        const url = new URL(String(input));
+        requests.push(url.pathname);
+        const type = url.pathname.split('/').pop()!.replace('s.json', '');
+        const ids = url.searchParams.get(type + 's')!.split(',').map(Number);
+        return new Response(JSON.stringify({ elements: ids.map(id => source.getByTypeAndId(type, id)) }));
+    };
+    try {
+        await OSM_QUERY_QUEUE.queryDataByIds([], [], [5], data);
+        data.setElementTags({ name: 'Export' }, data.getRelationById(5));
+        assert.deepEqual(resolveDependencies(data.listChanges(), data).unresolved, []);
+        assert.equal(data.getNodeById(1).lat, 10);
+        assert.equal(data.elements.length, 5);
+        assert.equal(requests.length, 5);
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
+test('missing data download reports HTTP failures without changing the store', async () => {
+    const data = new OSMData();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response('', { status: 404 });
+    try {
+        await assert.rejects(OSM_QUERY_QUEUE.queryDataByIds([999], [], [], data), /HTTP 404/);
+        assert.equal(data.elements.length, 0);
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});

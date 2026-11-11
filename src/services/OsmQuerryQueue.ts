@@ -1,5 +1,5 @@
 import type { OSMElement } from "./OSMData.types";
-import { OSM_DATA } from "./OSMData";
+import OSMData, { OSM_DATA } from "./OSMData";
 import { getTileBBox, type BBox, type TileXYZ } from "./tile-utils";
 
 const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
@@ -89,7 +89,7 @@ class OSMQueryQueue {
         return queryOverpass(query);
     }
 
-    async queryDataByIds(nodes: (string | number)[], ways: (string | number)[], relations: (string | number)[] = []) {
+    async queryDataByIds(nodes: (string | number)[], ways: (string | number)[], relations: (string | number)[] = [], osmData: OSMData = OSM_DATA) {
         const pending = new Map<string, { type: OSMElement['type'], id: string | number }>();
         const enqueue = (type: OSMElement['type'], id: string | number) => {
             const key = `${type}${id}`;
@@ -106,7 +106,7 @@ class OSMQueryQueue {
         while (batch.length) {
             const loaded: OSMElement[] = [];
             for (const type of ['node', 'way', 'relation'] as const) {
-                const ids = batch.filter(item => item.type === type && !OSM_DATA.getByTypeAndId(type, Number(item.id)))
+                const ids = batch.filter(item => item.type === type && !isComplete(osmData.getByTypeAndId(type, Number(item.id))))
                     .map(item => item.id);
                 // Keep URLs bounded for large relations.
                 for (let offset = 0; offset < ids.length; offset += 200) {
@@ -117,7 +117,7 @@ class OSMQueryQueue {
                 }
             }
             const previousSize = pending.size;
-            const elements = batch.map(({ type, id }) => OSM_DATA.getByTypeAndId(type, Number(id)))
+            const elements = batch.map(({ type, id }) => osmData.getByTypeAndId(type, Number(id)))
                 .filter((element): element is OSMElement => !!element);
             for (const element of [...elements, ...loaded]) {
                 if (element.type === 'way') element.nodes.forEach(id => enqueue('node', id));
@@ -128,7 +128,15 @@ class OSMQueryQueue {
             loaded.forEach(element => fetched.set(`${element.type}${element.id}`, element));
             batch = [...pending.values()].slice(previousSize);
         }
-        OSM_DATA.updateOverpassData({ elements: [...fetched.values()] });
+        // Repair incomplete cached nodes without replacing local edits.
+        for (const element of fetched.values()) {
+            const existing = osmData.getByTypeAndId(element.type, element.id);
+            if (existing && !isComplete(existing)
+                && !osmData.changes.some(change => change.element === existing)) {
+                Object.assign(existing, element);
+            }
+        }
+        osmData.updateOverpassData({ elements: [...fetched.values()] });
     }
 
     getBBOXString(bbox: BBox) {
@@ -139,3 +147,7 @@ class OSMQueryQueue {
 }
 
 export const OSM_QUERY_QUEUE = new OSMQueryQueue();
+
+function isComplete(element: OSMElement | undefined) {
+    return !!element && (element.type !== 'node' || (Number.isFinite(element.lat) && Number.isFinite(element.lon)));
+}

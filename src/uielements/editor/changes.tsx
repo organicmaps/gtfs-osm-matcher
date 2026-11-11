@@ -2,6 +2,7 @@ import { useCallback, useState } from "preact/hooks";
 
 import OSMData, { encodeChanges, resolveDependencies, type OSMDataChange } from "../../services/OSMData";
 import { snapshotChanges, unchangedChanges } from "../../services/osmChangeSnapshot";
+import { OSM_QUERY_QUEUE } from "../../services/OsmQuerryQueue";
 import { loadInJosm } from "../../services/JosmRemote";
 import { LocateMe } from "../locate-me";
 import "./changes.css";
@@ -15,6 +16,7 @@ export function Changes({ osmData, region }: ChangesProps) {
     const [ignoredChanges, setIgnoredChanges] = useState<string[]>([]);
     const [loadingJosm, setLoadingJosm] = useState(false);
     const [josmStatus, setJosmStatus] = useState('');
+    const [loadingMissing, setLoadingMissing] = useState(false);
 
     const ignoreChanges = useCallback((changes: OSMDataChange[]) => {
         const ids = changes.map(ch => `${ch.element.type[0]}${ch.element.id}`);
@@ -34,8 +36,8 @@ export function Changes({ osmData, region }: ChangesProps) {
             try {
                 const { dependencies, unresolved } = resolveDependencies(changes, osmData);
                 if (unresolved.length) {
-                    const { type, ref, referencedBy } = unresolved[0];
-                    throw new Error(`Cannot export ${referencedBy.type} ${referencedBy.id}: ${type} ${ref} is missing. Reload the OSM data and try again.`);
+                    setJosmStatus('Cannot export until the missing OSM data is downloaded.');
+                    return;
                 }
                 data = encodeChanges(changes, region, dependencies);
                 setJosmStatus('');
@@ -68,8 +70,8 @@ export function Changes({ osmData, region }: ChangesProps) {
             try {
                 const { dependencies, unresolved } = resolveDependencies(changes, osmData);
                 if (unresolved.length) {
-                    const { type, ref, referencedBy } = unresolved[0];
-                    throw new Error(`Cannot export ${referencedBy.type} ${referencedBy.id}: ${type} ${ref} is missing. Reload the OSM data and try again.`);
+                    setJosmStatus('Cannot export until the missing OSM data is downloaded.');
+                    return;
                 }
                 data = encodeChanges(changes, region, dependencies);
             } catch (error) {
@@ -92,6 +94,32 @@ export function Changes({ osmData, region }: ChangesProps) {
             setJosmStatus('Could not reach JOSM. Open JOSM, enable Remote Control, or download the OSM file.');
         } finally {
             setLoadingJosm(false);
+        }
+    }
+
+    const unresolved = resolveDependencies(includedChanges() ?? [], osmData).unresolved;
+
+    async function downloadMissing() {
+        if (!osmData) return;
+        setLoadingMissing(true);
+        setJosmStatus('');
+        try {
+            const missing = resolveDependencies(includedChanges() ?? [], osmData).unresolved;
+            await OSM_QUERY_QUEUE.queryDataByIds(
+                missing.filter(d => d.type === 'node').map(d => d.ref),
+                missing.filter(d => d.type === 'way').map(d => d.ref),
+                missing.filter(d => d.type === 'relation').map(d => d.ref),
+                osmData,
+            );
+            const remaining = resolveDependencies(includedChanges() ?? [], osmData).unresolved;
+            setJosmStatus(remaining.length
+                ? 'Some OSM data is still missing. You can retry the download.'
+                : 'Missing OSM data downloaded. You can now export or load the changes in JOSM.');
+        } catch (error) {
+            console.error('Could not download missing OSM data', error);
+            setJosmStatus(error instanceof Error ? error.message : 'Could not download missing OSM data.');
+        } finally {
+            setLoadingMissing(false);
         }
     }
 
@@ -135,7 +163,13 @@ export function Changes({ osmData, region }: ChangesProps) {
                 {loadingJosm ? 'Sending to JOSM…' : 'Load in JOSM'}
             </button>
         </div>
-        {josmStatus && <p role="status">{josmStatus}</p>}
+        <div role="status">
+            {josmStatus && <p>{josmStatus}</p>}
+            {unresolved.length > 0 && <p>Some referenced OSM data is missing. Download it before downloading the changes or loading them in JOSM.</p>}
+        </div>
+        {unresolved.length > 0 && <button onClick={downloadMissing} disabled={loadingMissing}>
+            {loadingMissing ? 'Downloading missing OSM data…' : 'Download missing OSM data'}
+        </button>}
     </>
 }
 
