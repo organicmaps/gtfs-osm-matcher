@@ -217,34 +217,54 @@ export default class OSMData {
 
 }
 
-/**
- * Serializes tracked changes as JOSM-loadable .osm XML.
+export type UnresolvedDependency = {
+    type: OSMElement['type']
+    ref: number
+    referencedBy: OSMElement
+};
+
+/** Collects recursive dependencies without throwing for missing or incomplete data.
+ * Call again after loading unresolved references to discover their dependencies.
  */
-export function encodeChanges(changes: OSMDataChange[], region?: string, osmData?: OSMData) {
+export function resolveDependencies(changes: OSMDataChange[], osmData?: OSMData) {
     const changedElements = new Map(changes.map(({ element }) => [`${element.type}${element.id}`, element]));
     const elements = new Map(changedElements);
+    const unresolved = new Map<string, UnresolvedDependency>();
     const originals = new Map(osmData?.changes.map(({ element, original }) => [
         `${element.type}${element.id}`, original,
     ]));
 
-    // Iterating the map also visits dependencies added along the way. Entries are
-    // deduplicated before traversal, including cyclic relation memberships.
+    // Map iteration visits added dependencies and terminates for cyclic memberships.
     for (const element of elements.values()) {
         const references = element.type === 'way'
             ? element.nodes.map(ref => ({ type: 'node' as const, ref }))
             : element.type === 'relation' ? element.members : [];
         for (const { type, ref } of references) {
             const key = `${type}${ref}`;
-            if (elements.has(key)) continue;
+            if (elements.has(key) || unresolved.has(key)) continue;
             // Included edits win; ignored edits must use their original data.
             const dependency = originals.get(key)
                 ?? osmData?.getByTypeAndId(type, ref);
             if (!dependency || (dependency.type === 'node' && (!Number.isFinite(dependency.lat) || !Number.isFinite(dependency.lon)))) {
-                throw new Error(`Cannot export ${element.type} ${element.id}: ${type} ${ref} is missing. Reload the OSM data and try again.`);
+                unresolved.set(key, { type, ref, referencedBy: element });
+                continue;
             }
             elements.set(key, dependency);
         }
     }
+
+    return {
+        dependencies: [...elements.values()].filter(element => !changedElements.has(`${element.type}${element.id}`)),
+        unresolved: [...unresolved.values()],
+    };
+}
+
+/** Serializes tracked changes and caller-supplied dependencies as JOSM-loadable .osm XML. */
+export function encodeChanges(changes: OSMDataChange[], region?: string, dependencies: OSMElement[] = []) {
+    const changedElements = new Map(changes.map(({ element }) => [`${element.type}${element.id}`, element]));
+    // Included edits take precedence over caller-supplied dependencies.
+    const elements = new Map([...dependencies, ...changedElements.values()]
+        .map(element => [`${element.type}${element.id}`, element]));
 
     const elementOrder = { node: 0, way: 1, relation: 2 };
     const xmlNodes = [...elements.values()]

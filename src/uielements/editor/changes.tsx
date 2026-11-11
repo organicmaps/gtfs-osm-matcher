@@ -1,6 +1,6 @@
 import { useCallback, useState } from "preact/hooks";
 
-import OSMData, { encodeChanges, type OSMDataChange } from "../../services/OSMData";
+import OSMData, { encodeChanges, resolveDependencies, type OSMDataChange } from "../../services/OSMData";
 import { snapshotChanges, unchangedChanges } from "../../services/osmChangeSnapshot";
 import { loadInJosm } from "../../services/JosmRemote";
 import { LocateMe } from "../locate-me";
@@ -32,7 +32,12 @@ export function Changes({ osmData, region }: ChangesProps) {
         if (changes) {
             let data: string;
             try {
-                data = encodeChanges(changes, region, osmData);
+                const { dependencies, unresolved } = resolveDependencies(changes, osmData);
+                if (unresolved.length) {
+                    const { type, ref, referencedBy } = unresolved[0];
+                    throw new Error(`Cannot export ${referencedBy.type} ${referencedBy.id}: ${type} ${ref} is missing. Reload the OSM data and try again.`);
+                }
+                data = encodeChanges(changes, region, dependencies);
                 setJosmStatus('');
             } catch (error) {
                 setJosmStatus(error instanceof Error ? error.message : 'Could not export OSM data.');
@@ -61,7 +66,12 @@ export function Changes({ osmData, region }: ChangesProps) {
         try {
             let data: string;
             try {
-                data = encodeChanges(changes, region, osmData);
+                const { dependencies, unresolved } = resolveDependencies(changes, osmData);
+                if (unresolved.length) {
+                    const { type, ref, referencedBy } = unresolved[0];
+                    throw new Error(`Cannot export ${referencedBy.type} ${referencedBy.id}: ${type} ${ref} is missing. Reload the OSM data and try again.`);
+                }
+                data = encodeChanges(changes, region, dependencies);
             } catch (error) {
                 setJosmStatus(error instanceof Error ? error.message : 'Could not export OSM data.');
                 return;

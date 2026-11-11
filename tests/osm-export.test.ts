@@ -3,7 +3,16 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { OSM_QUERY_QUEUE } from '../src/services/OsmQuerryQueue';
 import { OSM_DATA } from '../src/services/OSMData';
-import OSMData, { encodeChanges } from '../src/services/OSMData';
+import OSMData, { encodeChanges, resolveDependencies, type OSMDataChange } from '../src/services/OSMData';
+
+function exportChanges(changes: OSMDataChange[], region?: string, data?: OSMData) {
+    const { dependencies, unresolved } = resolveDependencies(changes, data);
+    if (unresolved.length) {
+        const { type, ref, referencedBy } = unresolved[0];
+        throw new Error(`${referencedBy.type} ${referencedBy.id}: ${type} ${ref} is missing`);
+    }
+    return encodeChanges(changes, region, dependencies);
+}
 
 function fixture() {
     const data = new OSMData();
@@ -16,7 +25,7 @@ function fixture() {
 
 test('way export includes complete, unique, unmodified child nodes before the way', () => {
     const data = fixture();
-    const xml = encodeChanges(data.listChanges(), undefined, data);
+    const xml = exportChanges(data.listChanges(), undefined, data);
     assert.equal((xml.match(/<node /g) || []).length, 2);
     assert.match(xml, /<node id="1" version="2" lat="10" lon="20">/);
     assert.match(xml, /<node id="2" version="3" lat="11" lon="21">/);
@@ -29,7 +38,7 @@ test('shared nodes are included once across multiple ways', () => {
     const data = fixture();
     data.addElement({ type: 'way', id: 4, version: 1, nodes: [2, 1], tags: {} });
     data.setElementTags({ name: 'Second way' }, data.getWayById(4));
-    const xml = encodeChanges(data.listChanges(), undefined, data);
+    const xml = exportChanges(data.listChanges(), undefined, data);
     assert.equal((xml.match(/<node /g) || []).length, 2);
     assert.equal((xml.match(/<way /g) || []).length, 2);
 });
@@ -37,11 +46,11 @@ test('shared nodes are included once across multiple ways', () => {
 test('included node edits win while ignored node edits use the original', () => {
     const data = fixture();
     data.setElementTags({ name: 'Edited node' }, data.getNodeById(1));
-    const xml = encodeChanges(data.listChanges(), undefined, data);
+    const xml = exportChanges(data.listChanges(), undefined, data);
     assert.equal((xml.match(/<node id="1"/g) || []).length, 1);
     assert.match(xml, /<node id="1" version="2" action="modify"/);
     assert.match(xml, /v="Edited node"/);
-    const ignored = encodeChanges(data.listChanges().filter(c => c.element.type === 'way'), undefined, data);
+    const ignored = exportChanges(data.listChanges().filter(c => c.element.type === 'way'), undefined, data);
     assert.match(ignored, /v="Original"/);
     assert.doesNotMatch(ignored, /Edited node/);
 });
@@ -49,7 +58,7 @@ test('included node edits win while ignored node edits use the original', () => 
 test('missing child nodes fail export', () => {
     const data = fixture();
     data.idMap.delete('node2');
-    assert.throws(() => encodeChanges(data.listChanges(), undefined, data), /way 3: node 2 is missing/);
+    assert.throws(() => exportChanges(data.listChanges(), undefined, data), /way 3: node 2 is missing/);
 });
 
 test('existing and newly created node edits retain coordinates and escaped tags', () => {
@@ -58,7 +67,7 @@ test('existing and newly created node edits retain coordinates and escaped tags'
     data.setElementTags({ name: 'A&B' }, data.getNodeById(1));
     data.setNodeLatLng({ lat: 12, lng: 22 }, data.getNodeById(1));
     data.createNewNode({ lat: 30, lng: 40 }, { name: 'New' });
-    const xml = encodeChanges(data.listChanges(), undefined, data);
+    const xml = exportChanges(data.listChanges(), undefined, data);
     assert.match(xml, /id="1" version="2" action="modify" lat="12" lon="22"/);
     assert.match(xml, /v="A&amp;B"/);
     assert.match(xml, /id="-1" version="0" action="modify" lat="30" lon="40"/);
@@ -81,7 +90,7 @@ function relationFixture() {
 
 test('relations retain member order, types and roles with complete recursive dependencies and cycles', () => {
     const data = relationFixture();
-    const xml = encodeChanges(data.listChanges().filter(c => c.element.type === 'relation'), undefined, data);
+    const xml = exportChanges(data.listChanges().filter(c => c.element.type === 'relation'), undefined, data);
     assert.equal((xml.match(/<node /g) || []).length, 2);
     assert.equal((xml.match(/<way /g) || []).length, 1);
     assert.equal((xml.match(/<relation /g) || []).length, 2);
@@ -96,7 +105,7 @@ test('relations retain member order, types and roles with complete recursive dep
 test('included member edits are exported exactly once', () => {
     const data = relationFixture();
     data.setElementTags({ name: 'Edited child relation' }, data.getRelationById(6));
-    const xml = encodeChanges(data.listChanges(), undefined, data);
+    const xml = exportChanges(data.listChanges(), undefined, data);
     assert.match(xml, /v="Edited way"/);
     assert.match(xml, /v="Edited child relation"/);
     assert.equal((xml.match(/<relation id="6"/g) || []).length, 1);
@@ -108,7 +117,7 @@ test('missing relation members fail export for each element type', () => {
         const data = relationFixture();
         data.idMap.delete(key);
         data.changes = data.changes.filter(c => c.element.type === 'relation');
-        assert.throws(() => encodeChanges(data.listChanges(), undefined, data),
+        assert.throws(() => exportChanges(data.listChanges(), undefined, data),
             new RegExp(`relation 5: ${description} is missing`));
     }
 });
@@ -117,7 +126,7 @@ test('ignored child relation edits use original membership and tags', () => {
     const data = relationFixture();
     data.setElementTags({ name: 'Ignored relation' }, data.getRelationById(6));
     data.getRelationById(6).members = [{ type: 'node', ref: 999 }];
-    const xml = encodeChanges(data.listChanges().filter(c => c.element.id === 5), undefined, data);
+    const xml = exportChanges(data.listChanges().filter(c => c.element.id === 5), undefined, data);
     assert.doesNotMatch(xml, /Ignored relation|ref="999"/);
     assert.match(xml, /<member type="relation" ref="5" role="parent">/);
 });
@@ -134,7 +143,7 @@ test('tag subscribers see applied edits, original snapshots and reverted changes
 });
 
 test('export metadata is contained in an id-less changeset', () => {
-    const xml = encodeChanges([], 'A&B');
+    const xml = exportChanges([], 'A&B');
     assert.match(xml, /<changeset><tag k="created_by"[^]*<tag k="hashtags"[^]*<tag k="data_used" v="A&amp;B"><\/tag><\/changeset>/);
 });
 
@@ -159,7 +168,7 @@ test('editor loads relation candidates with recursive ways, nodes and cyclic rel
         await OSM_QUERY_QUEUE.queryDataByIds([], [], ['5']);
         assert.equal(requests.length, 5);
         OSM_DATA.setElementTags({ name: 'Exported relation' }, OSM_DATA.getRelationById(5));
-        assert.match(encodeChanges(OSM_DATA.listChanges(), undefined, OSM_DATA), /Exported relation/);
+        assert.match(exportChanges(OSM_DATA.listChanges(), undefined, OSM_DATA), /Exported relation/);
         assert.equal(OSM_DATA.elements.length, 5);
     } finally {
         globalThis.fetch = originalFetch;
@@ -203,4 +212,34 @@ test('an edit reverted to the sent values matches the snapshot', () => {
     data.setElementTags({ name: 'Temporary' }, data.getWayById(3));
     data.setElementTags({ name: 'Edited way' }, data.getWayById(3));
     assert.equal(unchangedChanges(data.listChanges(), snapshot).length, 1);
+});
+
+test('resolution collects all missing references once and can be retried after loading', () => {
+    const data = relationFixture();
+    data.idMap.delete('node1');
+    data.idMap.delete('node2');
+    const changes = data.listChanges().filter(c => c.element.type === 'relation');
+    const result = resolveDependencies(changes, data);
+    assert.deepEqual(result.unresolved.map(({ type, ref }) => [type, ref]), [['node', 1], ['node', 2]]);
+    assert.equal(result.dependencies.length, 2);
+    for (const id of [1, 2]) data.addElement({ type: 'node', id, lat: id, lon: id, tags: {} });
+    const resolved = resolveDependencies(changes, data);
+    assert.deepEqual(resolved.unresolved, []);
+    assert.equal(resolved.dependencies.length, 4);
+    assert.match(encodeChanges(changes, undefined, resolved.dependencies), /<node id="2"/);
+});
+
+test('incomplete dependency coordinates are reported without stopping traversal', () => {
+    const data = fixture();
+    data.getNodeById(1).lat = NaN;
+    data.getNodeById(2).lon = Infinity;
+    assert.deepEqual(resolveDependencies(data.listChanges(), data).unresolved.map(d => d.ref), [1, 2]);
+});
+
+test('encoding only serializes supplied elements and gives edits precedence', () => {
+    const data = fixture();
+    assert.doesNotMatch(encodeChanges(data.listChanges()), /<node /);
+    const xml = encodeChanges(data.listChanges(), undefined, [data.changes[0].original]);
+    assert.equal((xml.match(/<way /g) || []).length, 1);
+    assert.match(xml, /Edited way/);
 });
