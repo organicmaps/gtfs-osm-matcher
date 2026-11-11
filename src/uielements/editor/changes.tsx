@@ -29,7 +29,13 @@ export function Changes({ osmData, region }: ChangesProps) {
     const downloadHandler = useCallback(() => {
         const changes = includedChanges();
         if (changes) {
-            const data = encodeChanges(changes, region);
+            let data: string;
+            try {
+                data = encodeChanges(changes, region, osmData);
+            } catch (error) {
+                setJosmStatus(error instanceof Error ? error.message : 'Could not export OSM data.');
+                return;
+            }
             const blob = new Blob([data], { type: 'application/xml' });
             const url = URL.createObjectURL(blob);
 
@@ -39,7 +45,7 @@ export function Changes({ osmData, region }: ChangesProps) {
 
             ignoreChanges(changes);
         }
-    }, [includedChanges, ignoreChanges, region]);
+    }, [includedChanges, ignoreChanges, region, osmData]);
 
     async function sendToJosm() {
         const changes = includedChanges();
@@ -51,7 +57,14 @@ export function Changes({ osmData, region }: ChangesProps) {
         setLoadingJosm(true);
         setJosmStatus('');
         try {
-            const status = await loadInJosm(encodeChanges(changes, region));
+            let data: string;
+            try {
+                data = encodeChanges(changes, region, osmData);
+            } catch (error) {
+                setJosmStatus(error instanceof Error ? error.message : 'Could not export OSM data.');
+                return;
+            }
+            const status = await loadInJosm(data);
 
             if (status >= 400) {
                 setJosmStatus(`JOSM returned HTTP ${status}. You can download the OSM file instead.`);

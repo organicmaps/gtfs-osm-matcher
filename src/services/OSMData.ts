@@ -219,29 +219,52 @@ export default class OSMData {
 /**
  * Serializes tracked changes as JOSM-loadable .osm XML.
  */
-export function encodeChanges(changes: OSMDataChange[], region?: string) {
-    const xmlNodes = changes.map(({ element }) => {
-        const tagElements = Object.entries(element.tags || {})
-            .map(([k, v]) => ({ tag: { _attr: { k, v } } }));
+export function encodeChanges(changes: OSMDataChange[], region?: string, osmData?: OSMData) {
+    const changedElements = new Map(changes.map(({ element }) => [`${element.type}${element.id}`, element]));
+    const elements = new Map(changedElements);
 
-        const attr: Record<string, string | number> = {
-            id: element.id,
-            version: element.version ?? 0,
-            action: 'modify',
-        };
-        if (element.type === 'node') {
-            attr.lat = element.lat;
-            attr.lon = element.lon;
+    // JOSM needs the actual nodes as well as the way's references. Prefer included
+    // edits, but use the original for ignored edits so they are not exported indirectly.
+    for (const { element } of changes) {
+        if (element.type !== 'way') continue;
+        for (const id of element.nodes) {
+            const key = `node${id}`;
+            if (elements.has(key)) continue;
+            const node = osmData?.changes.find(change => change.element.type === 'node' && change.element.id === id)?.original
+                ?? osmData?.getNodeById(id);
+            if (!node || node.type !== 'node' || !Number.isFinite(node.lat) || !Number.isFinite(node.lon)) {
+                throw new Error(`Cannot export way ${element.id}: node ${id} is missing. Reload the OSM data and try again.`);
+            }
+            elements.set(key, node);
         }
+    }
 
-        const children = element.type === 'way'
-            ? [...element.nodes.map(ref => ({ nd: { _attr: { ref } } })), ...tagElements]
-            : tagElements;
+    const xmlNodes = [...elements.values()]
+        .sort((a, b) => Number(a.type !== 'node') - Number(b.type !== 'node'))
+        .map(element => {
+            const tagElements = Object.entries(element.tags || {})
+                .map(([k, v]) => ({ tag: { _attr: { k, v } } }));
 
-        return {
-            [element.type]: [{ _attr: attr }, ...children]
-        }
-    });
+            const attr: Record<string, string | number> = {
+                id: element.id,
+                version: element.version ?? 0,
+            };
+            if (changedElements.has(`${element.type}${element.id}`)) {
+                attr.action = 'modify';
+            }
+            if (element.type === 'node') {
+                attr.lat = element.lat;
+                attr.lon = element.lon;
+            }
+
+            const children = element.type === 'way'
+                ? [...element.nodes.map(ref => ({ nd: { _attr: { ref } } })), ...tagElements]
+                : tagElements;
+
+            return {
+                [element.type]: [{ _attr: attr }, ...children]
+            }
+        });
 
     const changesetTags = [
         { tag: { _attr: { k: 'created_by', v: 'gtfs-osm-matcher.organicmaps.app' } } },
