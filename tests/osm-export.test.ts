@@ -1,3 +1,4 @@
+import { snapshotChanges, unchangedChanges } from '../src/services/osmChangeSnapshot';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { OSM_QUERY_QUEUE } from '../src/services/OsmQuerryQueue';
@@ -167,4 +168,39 @@ test('editor loads relation candidates with recursive ways, nodes and cyclic rel
         OSM_DATA.elements = [];
         OSM_DATA.changes = [];
     }
+});
+
+test('pending JOSM success ignores only sent elements whose data still matches', async () => {
+    const data = relationFixture();
+    data.setElementTags({ name: 'Sent node' }, data.getNodeById(1));
+    const snapshot = snapshotChanges(data.listChanges());
+    let accept!: () => void;
+    const request = new Promise<void>(resolve => { accept = resolve; });
+    const completion = request.then(() => unchangedChanges(data.listChanges(), snapshot));
+
+    data.setElementTags({ name: 'Newer node edit' }, data.getNodeById(1));
+    data.getWayById(3).nodes.push(2);
+    data.getRelationById(5).members[0].role = 'inner';
+    data.createNewNode({ lat: 30, lng: 40 }, { name: 'Created while waiting' });
+    accept();
+    assert.deepEqual(await completion, []);
+});
+
+test('unchanged sent edits match despite tag insertion order and unrelated edits', () => {
+    const data = fixture();
+    data.setElementTags({ name: 'Sent', ref: '1' }, data.getNodeById(1));
+    const snapshot = snapshotChanges(data.listChanges());
+    data.setElementTags({ ref: '1', name: 'Sent' }, data.getNodeById(1));
+    data.createNewNode({ lat: 30, lng: 40 }, {});
+    assert.deepEqual(unchangedChanges(data.listChanges(), snapshot).map(c => c.element.id), [3, 1]);
+    data.setNodeLatLng({ lat: 12, lng: 22 }, data.getNodeById(1));
+    assert.deepEqual(unchangedChanges(data.listChanges(), snapshot).map(c => c.element.id), [3]);
+});
+
+test('an edit reverted to the sent values matches the snapshot', () => {
+    const data = fixture();
+    const snapshot = snapshotChanges(data.listChanges());
+    data.setElementTags({ name: 'Temporary' }, data.getWayById(3));
+    data.setElementTags({ name: 'Edited way' }, data.getWayById(3));
+    assert.equal(unchangedChanges(data.listChanges(), snapshot).length, 1);
 });

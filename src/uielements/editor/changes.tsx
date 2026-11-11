@@ -1,6 +1,7 @@
 import { useCallback, useState } from "preact/hooks";
 
 import OSMData, { encodeChanges, type OSMDataChange } from "../../services/OSMData";
+import { snapshotChanges, unchangedChanges } from "../../services/osmChangeSnapshot";
 import { loadInJosm } from "../../services/JosmRemote";
 import { LocateMe } from "../locate-me";
 import "./changes.css";
@@ -65,6 +66,7 @@ export function Changes({ osmData, region }: ChangesProps) {
                 setJosmStatus(error instanceof Error ? error.message : 'Could not export OSM data.');
                 return;
             }
+            const sentSnapshot = snapshotChanges(changes);
             const status = await loadInJosm(data);
 
             if (status >= 400) {
@@ -72,9 +74,10 @@ export function Changes({ osmData, region }: ChangesProps) {
                 return;
             }
 
-            ignoreChanges(changes);
+            const unchanged = unchangedChanges(osmData?.listChanges() ?? [], sentSnapshot);
+            ignoreChanges(unchanged);
 
-            setJosmStatus('Request accepted. Check JOSM for the GTFS stop edits layer. Loaded changes are now ignored.');
+            setJosmStatus('Request accepted. Check JOSM for the GTFS stop edits layer. Unchanged loaded edits are now ignored; newer edits remain included.');
         } catch {
             setJosmStatus('Could not reach JOSM. Open JOSM, enable Remote Control, or download the OSM file.');
         } finally {
