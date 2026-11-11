@@ -216,6 +216,121 @@ export default class OSMData {
 
 }
 
+/**
+ * Serializes tracked changes as JOSM-loadable .osm XML.
+ */
+export function encodeChanges(changes: OSMDataChange[], region?: string) {
+    const xmlNodes = changes.map(({ element }) => {
+        const tagElements = Object.entries(element.tags || {})
+            .map(([k, v]) => ({ tag: { _attr: { k, v } } }));
+
+        const attr: Record<string, string | number> = {
+            id: element.id,
+            version: element.version ?? 0,
+            action: 'modify',
+        };
+        if (element.type === 'node') {
+            attr.lat = element.lat;
+            attr.lon = element.lon;
+        }
+
+        const children = element.type === 'way'
+            ? [...element.nodes.map(ref => ({ nd: { _attr: { ref } } })), ...tagElements]
+            : tagElements;
+
+        return {
+            [element.type]: [{ _attr: attr }, ...children]
+        }
+    });
+
+    const changesetTags = [
+        { tag: { _attr: { k: 'created_by', v: 'gtfs-osm-matcher.organicmaps.app' } } },
+        { tag: { _attr: { k: 'hashtags', v: '#gtfs;#gtfs-osm-matcher;#organicmaps' } } },
+    ];
+
+    if (region) {
+        changesetTags.push({ tag: { _attr: { k: 'data_used', v: region } } });
+    }
+
+    return xml({ osm: [{ _attr: { version: "0.6", generator: "osm-gtfs" } }, ...changesetTags, ...xmlNodes] }, { declaration: true });
+}
+
+function xml(root: any, options?: { declaration?: boolean }) {
+    let output = '';
+    if (options?.declaration) {
+        output += '<?xml version="1.0" encoding="UTF-8"?>\n';
+    }
+
+    function escape(str: string) {
+        return String(str).replace(/[<>&'"]/g, (c) => {
+            switch (c) {
+                case '<': return '&lt;';
+                case '>': return '&gt;';
+                case '&': return '&amp;';
+                case '\'': return '&apos;';
+                case '"': return '&quot;';
+            }
+            return c;
+        });
+    }
+
+    function renderAttributes(attributes: any) {
+        if (!attributes) return '';
+        return Object.entries(attributes)
+            .map(([k, v]) => ` ${k}="${escape(String(v))}"`)
+            .join('');
+    }
+
+    function render(obj: any): string {
+        if (Array.isArray(obj)) {
+            return obj.map(render).join('');
+        }
+        if (typeof obj !== 'object' || obj === null) {
+            return escape(String(obj));
+        }
+
+        return Object.entries(obj).map(([key, value]) => {
+            let attrs = '';
+            let children: any[] = [];
+
+            if (Array.isArray(value)) {
+                let list = value;
+                // Check for _attr in the first element
+                if (list.length > 0 && list[0] && typeof list[0] === 'object' && (list[0] as any)._attr) {
+                    attrs = renderAttributes((list[0] as any)._attr);
+                    list = list.slice(1);
+                }
+                children = list;
+            } else if (typeof value === 'object' && value !== null) {
+                if ((value as any)._attr) {
+                    attrs = renderAttributes((value as any)._attr);
+                    // Use remaining properties as children
+                    const { _attr, ...rest } = value as any;
+                    if (Object.keys(rest).length > 0) {
+                        children = [rest];
+                    }
+                } else {
+                    children = [value];
+                }
+            } else {
+                children = [value];
+            }
+
+            const content = children.map((c) => {
+                if (typeof c === 'object' && c !== null) {
+                    return render(c);
+                }
+                return escape(String(c));
+            }).join('');
+
+            return `<${key}${attrs}>${content}</${key}>`;
+        }).join('');
+    }
+
+    output += render(root);
+    return output;
+}
+
 function shallowCompare(obj1: OSMElementTags, obj2: OSMElementTags) {
     return Object.keys(obj1).length === Object.keys(obj2).length &&
         Object.keys(obj1).every(key => obj1[key] === obj2[key]);
