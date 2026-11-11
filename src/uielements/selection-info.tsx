@@ -7,6 +7,7 @@ import type { Geometry } from "geojson";
 import { getDistanceLonLat } from "../map/distance";
 import { LocateMe } from "./locate-me";
 import { TagEditor } from "./editor/osm-tags";
+import { TagVersionWarning } from './editor/tag-version-warning';
 
 import { cls } from "./cls";
 import { RouteList } from "./route-list";
@@ -614,6 +615,14 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
         : (f.lon != null && f.lat != null ? [f.lon, f.lat] : [null, null]);
 
     const tags = osmFeature?.tags || f.tags;
+    // Compare the fetched data, before any local edits, with the report snapshot.
+    const fetchedTags = osmFeature && (OSM_DATA.changes.find(change =>
+        change.element.type === osmFeature.type && change.element.id === osmFeature.id
+    )?.original.tags || osmFeature.tags);
+    const versionWarningKeys = new Set(fetchedTags && +idn > 0
+        ? [...new Set([...Object.keys(f.tags), ...Object.keys(fetchedTags)])]
+            .filter(key => f.tags[key] !== fetchedTags[key])
+        : []);
 
     const handleTagsChange = useCallback((tags: { [k: string]: string }) => {
 
@@ -697,11 +706,13 @@ function OsmListElement({ f, editDefault, parentLonLat, tagActions, mouseEvents 
         {
             !(edit && osmFeature) ?
                 <TagsTable tags={tags}
+                    versionWarningKeys={versionWarningKeys}
                     importantTagKeysRegex={importantTagsRg}
                     importantTagValuesRegex={importantTagsRg}
                 /> :
                 <TagEditor key={'tags_' + f.id + '_' + version} tags={tags}
                     tagsOriginal={f.tags} onChange={handleTagsChange}
+                    versionWarningKeys={versionWarningKeys}
                     importantTagKeysRegex={importantTagsRg}
                     importantTagValuesRegex={importantTagsRg} >
 
@@ -728,17 +739,19 @@ function DatasetHelp({ datasetName }: { datasetName?: string }) {
 
 
 type TagsTableProps = {
+    versionWarningKeys?: Set<string>;
     tags: {
         [k: string]: string
     },
     importantTagKeysRegex?: RegExp;
     importantTagValuesRegex?: RegExp;
 }
-function TagsTable({ tags, importantTagKeysRegex, importantTagValuesRegex }: TagsTableProps) {
+function TagsTable({ tags, versionWarningKeys, importantTagKeysRegex, importantTagValuesRegex }: TagsTableProps) {
 
     const rows = Object.entries(tags).map(([k, v]) => <tr key={k}>
         <td className={importantTagKeysRegex?.test(k) ? 'important' : ''}>{k}</td>
         <td className={importantTagValuesRegex?.test(v) ? 'important' : ''}>{v}</td>
+        <td>{versionWarningKeys?.has(k) && <TagVersionWarning />}</td>
     </tr>);
 
     return <table className={'tags-table'}>
