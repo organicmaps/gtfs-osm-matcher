@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 
 import "./osm-tags.css";
+import { TagVersionWarning } from './tag-version-warning';
 
 type TagEntry = {
     id: string;
@@ -12,11 +13,13 @@ type TagEntry = {
     v: string;
     deleted?: boolean;
     tmp?: boolean;
+    versionWarning?: boolean;
 };
 
 export type TagEditorProps = {
     tags: OSMElementTags;
     tagsOriginal?: OSMElementTags;
+    versionWarningKeys?: Set<string>;
     onChange?: (newTags: OSMElementTags) => void;
     protectedKeys?: string[];
     importantTagKeysRegex?: RegExp;
@@ -24,7 +27,7 @@ export type TagEditorProps = {
     children?: ComponentChildren
 };
 
-export function TagEditor({ tags, tagsOriginal, onChange, children, protectedKeys, importantTagKeysRegex, importantTagValuesRegex }: TagEditorProps) {
+export function TagEditor({ tags, tagsOriginal, versionWarningKeys, onChange, children, protectedKeys, importantTagKeysRegex, importantTagValuesRegex }: TagEditorProps) {
 
     // Initial state setup
     // We need to handle the case where props.tags change externally (reset)
@@ -47,7 +50,7 @@ export function TagEditor({ tags, tagsOriginal, onChange, children, protectedKey
             }
         });
 
-        return initialEntries;
+        return initialEntries.map(entry => ({ ...entry, versionWarning: versionWarningKeys?.has(entry.k) }));
     });
 
     const nextIdRef = useRef(entries.length + Object.keys(tagsOriginal || {}).length + 1);
@@ -128,7 +131,7 @@ export function TagEditor({ tags, tagsOriginal, onChange, children, protectedKey
 
         if (isDeleted) {
             return (
-                <tr key={id}>
+                <tr key={id} className={entry.versionWarning ? 'version-warning' : undefined}>
                     <td className={'tag-actions'}>
                         <span className={'osm-tag-restore'} onClick={() => handleRestore(id, k)}>
                             &#x27F3;
@@ -139,13 +142,14 @@ export function TagEditor({ tags, tagsOriginal, onChange, children, protectedKey
                     </td>
                     <td className={cls('osm-tag-value', 'deleted')}>
                         <input value={v} readOnly={true} />
+                        {entry.versionWarning && <TagVersionWarning />}
                     </td>
                 </tr>
             );
         }
 
         return (
-            <tr key={id}>
+            <tr key={id} className={entry.versionWarning ? 'version-warning' : undefined}>
                 <td className={'tag-actions'}>
                     {!readonly && <span
                         onClick={() => handleDelete(id)}
@@ -173,6 +177,7 @@ export function TagEditor({ tags, tagsOriginal, onChange, children, protectedKey
                         placeholder={tmp ? 'value' : ''}
                         readOnly={readonly}
                         onInput={(e) => handleValueEdit(id, e)} />
+                    {entry.versionWarning && <TagVersionWarning />}
                 </td>
             </tr>
         );

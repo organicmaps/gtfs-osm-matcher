@@ -7,6 +7,42 @@
     border: 1px solid #666;
 }
 
+span.osm-tag-version-warning {
+    color: #eab308;
+    font-weight: bold;
+    cursor: help;
+    margin-right: 4px;
+    padding-left: 0.25em;
+    position: relative;
+    display: inline-block;
+}
+
+.osm-tag-version-warning:hover::after,
+.osm-tag-version-warning:focus::after {
+    content: attr(aria-label);
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 10;
+    width: 240px;
+    padding: 8px;
+    color: #222;
+    background: #fff3cd;
+    border: 1px solid #eab308;
+    border-radius: 4px;
+    white-space: normal;
+    font-size: 13px;
+    font-weight: normal;
+}
+
+tr.version-warning td {
+    border-bottom: 2px solid #ffa500;
+}
+
+tr.version-warning .osm-tag-version-warning {
+    color: #000;
+}
+
 .deleted input {
     background-color: #ccc;
     pointer-events: none;
