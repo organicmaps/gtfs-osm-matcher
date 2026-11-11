@@ -58,3 +58,14 @@
     background: rgba(176, 0, 32, 0.08);
     font-size: 0.9em;
 }
+.selected-stop-ring {
+    width: 30px;
+    height: 30px;
+    box-sizing: border-box;
+    border: 3px solid currentColor;
+    border-radius: 50%;
+    background: color-mix(in srgb, currentColor 10%, transparent);
+    box-shadow: 0 0 0 2px white, 0 0 12px 5px color-mix(in srgb, currentColor 45%, transparent);
+    pointer-events: none;
+}
+
