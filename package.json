@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test": "tsc -p tsconfig.tests.json && node tests/run-tests.mjs",
     "preview": "vite preview",
     "serve-data": "http-server \"$(mktemp -d)\" -p 8801 --cors -P https://pt.organicmaps.app/data"
   },
@@ -18,6 +19,7 @@
     "@preact/preset-vite": "^2.10.2",
     "@types/node": "^25.2.0",
     "baseline-browser-mapping": "^2.11.0",
+    "esbuild": "0.28.2",
     "typescript": "~5.9.3",
     "vite": "^7.3.7",
     "wrangler": "^4.61.1"

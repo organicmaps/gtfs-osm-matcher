@@ -89,7 +89,7 @@ export default class OSMData {
         });
     }
 
-    updateOverpassData(overpassData: OSMData) {
+    updateOverpassData(overpassData: Pick<OSMData, 'elements'>) {
         if (overpassData.elements &&
             Array.isArray(overpassData.elements)) {
 
@@ -153,12 +153,13 @@ export default class OSMData {
     }
 
     setElementTags(tags: OSMElementTags, osmElement: OSMElement) {
-        this.commitAction({ 'element': osmElement, action: 'change_tags' });
+        this.commitAction({ 'element': osmElement, action: 'change_tags' }, false);
 
         const validTags = Object.entries(tags)
             .filter(([k, v]) => !isBlank(k) && !isBlank(v));
 
         osmElement.tags = Object.fromEntries(validTags);
+        this.emit();
     }
 
     addElement(element: OSMElement) {
@@ -169,7 +170,7 @@ export default class OSMData {
         this.idMap.set(key, element);
     }
 
-    commitAction({ element, action }: ElementChangeAction) {
+    commitAction({ element, action }: ElementChangeAction, notify = true) {
         const existing = this.changes.find(change =>
             change.element.id === element.id &&
             change.element.type === element.type
@@ -186,7 +187,7 @@ export default class OSMData {
             });
         }
 
-        this.emit();
+        if (notify) this.emit();
     }
 
     getLonLat(element: OSMElement) {
@@ -216,32 +217,84 @@ export default class OSMData {
 
 }
 
-/**
- * Serializes tracked changes as JOSM-loadable .osm XML.
+export type UnresolvedDependency = {
+    type: OSMElement['type']
+    ref: number
+    referencedBy: OSMElement
+};
+
+/** Collects recursive dependencies without throwing for missing or incomplete data.
+ * Call again after loading unresolved references to discover their dependencies.
  */
-export function encodeChanges(changes: OSMDataChange[], region?: string) {
-    const xmlNodes = changes.map(({ element }) => {
-        const tagElements = Object.entries(element.tags || {})
-            .map(([k, v]) => ({ tag: { _attr: { k, v } } }));
+export function resolveDependencies(changes: OSMDataChange[], osmData?: OSMData) {
+    const changedElements = new Map(changes.map(({ element }) => [`${element.type}${element.id}`, element]));
+    const elements = new Map(changedElements);
+    const unresolved = new Map<string, UnresolvedDependency>();
+    const originals = new Map(osmData?.changes.map(({ element, original }) => [
+        `${element.type}${element.id}`, original,
+    ]));
 
-        const attr: Record<string, string | number> = {
-            id: element.id,
-            version: element.version ?? 0,
-            action: 'modify',
-        };
-        if (element.type === 'node') {
-            attr.lat = element.lat;
-            attr.lon = element.lon;
+    // Map iteration visits added dependencies and terminates for cyclic memberships.
+    for (const element of elements.values()) {
+        const references = element.type === 'way'
+            ? element.nodes.map(ref => ({ type: 'node' as const, ref }))
+            : element.type === 'relation' ? element.members : [];
+        for (const { type, ref } of references) {
+            const key = `${type}${ref}`;
+            if (elements.has(key) || unresolved.has(key)) continue;
+            // Included edits win; ignored edits must use their original data.
+            const dependency = originals.get(key)
+                ?? osmData?.getByTypeAndId(type, ref);
+            if (!dependency || (dependency.type === 'node' && (!Number.isFinite(dependency.lat) || !Number.isFinite(dependency.lon)))) {
+                unresolved.set(key, { type, ref, referencedBy: element });
+                continue;
+            }
+            elements.set(key, dependency);
         }
+    }
 
-        const children = element.type === 'way'
-            ? [...element.nodes.map(ref => ({ nd: { _attr: { ref } } })), ...tagElements]
-            : tagElements;
+    return {
+        dependencies: [...elements.values()].filter(element => !changedElements.has(`${element.type}${element.id}`)),
+        unresolved: [...unresolved.values()],
+    };
+}
 
-        return {
-            [element.type]: [{ _attr: attr }, ...children]
-        }
-    });
+/** Serializes tracked changes and caller-supplied dependencies as JOSM-loadable .osm XML. */
+export function encodeChanges(changes: OSMDataChange[], region?: string, dependencies: OSMElement[] = []) {
+    const changedElements = new Map(changes.map(({ element }) => [`${element.type}${element.id}`, element]));
+    // Included edits take precedence over caller-supplied dependencies.
+    const elements = new Map([...dependencies, ...changedElements.values()]
+        .map(element => [`${element.type}${element.id}`, element]));
+
+    const elementOrder = { node: 0, way: 1, relation: 2 };
+    const xmlNodes = [...elements.values()]
+        .sort((a, b) => elementOrder[a.type] - elementOrder[b.type])
+        .map(element => {
+            const tagElements = Object.entries(element.tags || {})
+                .map(([k, v]) => ({ tag: { _attr: { k, v } } }));
+
+            const attr: Record<string, string | number> = {
+                id: element.id,
+                version: element.version ?? 0,
+            };
+            if (changedElements.has(`${element.type}${element.id}`)) {
+                attr.action = 'modify';
+            }
+            if (element.type === 'node') {
+                attr.lat = element.lat;
+                attr.lon = element.lon;
+            }
+
+            const children = element.type === 'way'
+                ? [...element.nodes.map(ref => ({ nd: { _attr: { ref } } })), ...tagElements]
+                : element.type === 'relation'
+                    ? [...element.members.map(({ type, ref, role }) => ({ member: { _attr: { type, ref, role: role ?? '' } } })), ...tagElements]
+                    : tagElements;
+
+            return {
+                [element.type]: [{ _attr: attr }, ...children]
+            }
+        });
 
     const changesetTags = [
         { tag: { _attr: { k: 'created_by', v: 'gtfs-osm-matcher.organicmaps.app' } } },
@@ -252,7 +305,7 @@ export function encodeChanges(changes: OSMDataChange[], region?: string) {
         changesetTags.push({ tag: { _attr: { k: 'data_used', v: region } } });
     }
 
-    return xml({ osm: [{ _attr: { version: "0.6", generator: "osm-gtfs" } }, ...changesetTags, ...xmlNodes] }, { declaration: true });
+    return xml({ osm: [{ _attr: { version: "0.6", generator: "osm-gtfs" } }, { changeset: changesetTags }, ...xmlNodes] }, { declaration: true });
 }
 
 function xml(root: any, options?: { declaration?: boolean }) {

@@ -429,6 +429,8 @@ function OsmElements({ properties, idTags, parentLonLat, setLoading, matched }: 
             const nodes = missingOsmFeatures.filter(f => f.id[0] === 'n').map(f => f.id.substring(1));
             const ways = missingOsmFeatures.filter(f => f.id[0] === 'w').map(f => f.id.substring(1));
 
+            const relations = missingOsmFeatures.filter(f => f.id[0] === 'r').map(f => f.id.substring(1));
+
             (async () => {
                 if (import.meta.env.DEV) {
                     console.log('Loading OSM data');
@@ -436,7 +438,7 @@ function OsmElements({ properties, idTags, parentLonLat, setLoading, matched }: 
 
                 setLoading?.(true);
 
-                await OSM_QUERY_QUEUE.queryDataByIds(nodes, ways);
+                await OSM_QUERY_QUEUE.queryDataByIds(nodes, ways, relations);
 
                 const tiles = missingOsmFeatures
                     .filter(f => f.lat != null && f.lon != null)
