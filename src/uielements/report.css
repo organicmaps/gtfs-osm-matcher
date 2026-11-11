@@ -65,7 +65,7 @@
     border: 3px solid currentColor;
     border-radius: 50%;
     background: color-mix(in srgb, currentColor 10%, transparent);
-    box-shadow: 0 0 0 2px white, 0 0 12px 5px color-mix(in srgb, currentColor 45%, transparent);
+    box-shadow: 0 0 0 2px white;
     pointer-events: none;
 }
 
