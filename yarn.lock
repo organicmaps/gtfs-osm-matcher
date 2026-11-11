@@ -1916,7 +1916,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"esbuild@npm:^0.27.0 || ^0.28.0":
+"esbuild@npm:0.28.2, esbuild@npm:^0.27.0 || ^0.28.0":
   version: 0.28.2
   resolution: "esbuild@npm:0.28.2"
   dependencies:
@@ -3096,6 +3096,7 @@ __metadata:
     "@preact/preset-vite": "npm:^2.10.2"
     "@types/node": "npm:^25.2.0"
     baseline-browser-mapping: "npm:^2.11.0"
+    esbuild: "npm:0.28.2"
     maplibre-gl: "npm:^6.4.1"
     pmtiles: "npm:^4.5.0"
     preact: "npm:^10.27.3"
