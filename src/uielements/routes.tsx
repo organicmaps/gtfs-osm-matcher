@@ -1,7 +1,7 @@
-import { useContext, useEffect, useMemo, useState } from "preact/hooks";
+import { useContext, useEffect, useMemo, useRef } from "preact/hooks";
 import { MapContext } from "../app";
 import { routesStyling } from "./routes-styling";
-import type { GeoJSONSource, GeoJSONSourceSpecification } from "maplibre-gl";
+import type { Overlay } from "../map/layers-controls";
 import type { Feature, FeatureCollection } from "geojson";
 
 export type FullRouteDisplayEntry = {
@@ -18,12 +18,14 @@ export function RoutesMap({ fullRoutes = [] }: RoutesMapProps) {
     const map = useContext(MapContext)?.map;
     const layerControls = useContext(MapContext)?.layerControls;
 
-    const [mapStylesReady, setMapStylesReady] = useState<boolean>(!!map?.getSource('routes'));
+    // The overlay is registered once and stays on the map afterwards: its source and
+    // layers live in the shared routesStyling spec, and opening and closing panels
+    // should not remove and re-add them. Only the data changes.
+    const overlayRef = useRef<Overlay | null>(null);
 
-    // Memoised here rather than at the call sites: this component re-renders
-    // whenever its parent does, and a fresh array identity makes the effect below
-    // wipe the source to an empty FeatureCollection before setting it again --
-    // visible as a flash on every unrelated state change.
+    // Built here and not at the call sites: this component re-renders whenever its
+    // parent does, and a new array identity would make the effect below empty the
+    // source and refill it on every unrelated state change.
     const allFeatures = useMemo(() => fullRoutes.map(({ routeKey, coordinates, kind }): Feature => ({
         type: 'Feature',
         geometry: {
@@ -36,8 +38,20 @@ export function RoutesMap({ fullRoutes = [] }: RoutesMapProps) {
         }
     })), [fullRoutes]);
 
+    const data = useMemo<FeatureCollection>(() => ({
+        type: 'FeatureCollection',
+        features: allFeatures
+    }), [allFeatures]);
+
+    // The data as of the last render, for the moment the overlay is finally
+    // registered: the style may finish loading after the data has changed already.
+    const dataRef = useRef(data);
+    dataRef.current = data;
+
     useEffect(() => {
         if (!map) return;
+
+        let canceled = false;
 
         if (!map.hasImage('route-arrow')) {
             const img = new Image();
@@ -50,61 +64,33 @@ export function RoutesMap({ fullRoutes = [] }: RoutesMapProps) {
         }
 
         const createRouteLayers = () => {
-            // addOverlayImmediate is idempotent, so this does not need to guard on
-            // map.getSource -- which is the wrong registry to ask anyway, and reads
-            // as absent while setStyle rebuilds.
-            layerControls?.addOverlayImmediate(routesStyling);
-            setMapStylesReady(true);
+            if (canceled) return;
+            overlayRef.current = layerControls?.addOverlayImmediate(routesStyling) ?? null;
+            overlayRef.current?.setSourceData('routes', dataRef.current);
         };
 
-        // addSource needs the parsed style, not the first full render. The
-        // stylesheet is set when style.load fires, including after setStyle.
+        // Sources can only be added once the style is parsed. style.load fires for
+        // the first style as well as for every setStyle, so it is also the right
+        // moment after a base-style switch.
         if (map.style?.stylesheet) createRouteLayers();
         else map.once('style.load', createRouteLayers);
 
-    }, [map, layerControls, setMapStylesReady]);
+        return () => {
+            canceled = true;
+            map.off('style.load', createRouteLayers);
+        };
+    }, [map, layerControls]);
 
     useEffect(() => {
-        if (!mapStylesReady) {
-            return;
-        }
+        overlayRef.current?.setSourceData('routes', data);
 
-        if (!map || !allFeatures) {
-            import.meta.env.DEV &&
-                console.warn('Routes: map or route features is not ready');
-
-            return;
-        }
-
-        const data: FeatureCollection = {
+        // Leaving the tab must not leave the route drawn behind it. The overlay
+        // itself stays registered; only its data is emptied.
+        return () => overlayRef.current?.setSourceData('routes', {
             type: 'FeatureCollection',
-            features: allFeatures
-        };
-
-        // Draw the data and mirror it into the stored overlay spec as well:
-        // setBaseStyle rebuilds the style from that spec, so replaying the empty
-        // collection it was declared with would clear the route until the selection
-        // changes. StopsLayer keeps its own spec in step the same way.
-        (routesStyling.sources.routes as GeoJSONSourceSpecification).data = data;
-
-        const source = map.getSource('routes') as GeoJSONSource | undefined;
-        if (source) {
-            source.setData(data);
-        }
-        else {
-            console.warn('Map source routes not ready');
-        }
-
-        return () => {
-            const empty: FeatureCollection = {
-                type: 'FeatureCollection',
-                features: []
-            };
-            (routesStyling.sources.routes as GeoJSONSourceSpecification).data = empty;
-            (map.getSource('routes') as GeoJSONSource | undefined)?.setData(empty);
-        };
-
-    }, [map, allFeatures, mapStylesReady]);
+            features: []
+        });
+    }, [data]);
 
     return <></>
 }

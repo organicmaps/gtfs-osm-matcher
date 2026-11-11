@@ -97,7 +97,7 @@ tab's cache without moving the map or clearing another route's loading indicator
 
 | Context | Provider | Consumers |
 |---|---|---|
-| `MapContext` | `App` | `MatchReport`, `StopsLayer`, `RegionMarkersLayer`, `RoutesTab`, `RoutesMap`, `MatchArrowLayer`, `HtmlMapMarker`, `LocateMe`, `AddOsmStopController`, `MoveController` |
+| `MapContext` | `App` | `MatchReport`, `StopsLayer`, `RoutesTab`, `RoutesMap`, `MatchArrowLayer`, `HtmlMapMarker`, `LocateMe`, `AddOsmStopController`, `MoveController` |
 | `SelectionContext` | `App` | `MatchReport`, `SelectionInfo`, `RoutePill`, `OsmListElement` |
 | `OsmMatchesOptionsContext` | `App` | `MatchReport` (publishes `osmMatchesAvailable`), `OsmMatchesSwitch` (hidden when unavailable) |
 
