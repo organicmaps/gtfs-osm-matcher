@@ -10,14 +10,16 @@ type ChangesProps = {
 };
 export function Changes({ osmData, region }: ChangesProps) {
     const [ignoredChanges, setIgnoredChanges] = useState<string[]>([]);
+    const [loadingJosm, setLoadingJosm] = useState(false);
+    const [josmStatus, setJosmStatus] = useState('');
+
+    const includedChanges = useCallback(() => osmData?.listChanges()
+        .filter(ch => !ignoredChanges.includes(`${ch.element.type[0]}${ch.element.id}`)), [osmData, ignoredChanges]);
 
     const downloadHandler = useCallback(() => {
-        const changes = osmData?.listChanges();
-        const filteredChanges = changes?.filter(ch => !ignoredChanges.includes(`${ch.element.type[0]}${ch.element.id}`));
-
-        if (filteredChanges) {
-            const data = encodeChanges(filteredChanges, region);
-
+        const changes = includedChanges();
+        if (changes) {
+            const data = encodeChanges(changes, region);
             const blob = new Blob([data], { type: 'application/xml' });
             const url = URL.createObjectURL(blob);
 
@@ -25,7 +27,34 @@ export function Changes({ osmData, region }: ChangesProps) {
 
             URL.revokeObjectURL(url);
         }
-    }, [osmData, ignoredChanges, region]);
+    }, [includedChanges, region]);
+
+    async function loadInJosm() {
+        const changes = includedChanges();
+        if (!changes?.length) {
+            setJosmStatus('No included changes to load.');
+            return;
+        }
+
+        setLoadingJosm(true);
+        setJosmStatus('');
+        try {
+            const data = encodeURIComponent(encodeChanges(changes, region));
+            const response = await fetch(
+                `http://127.0.0.1:8111/load_data?new_layer=true&layer_name=GTFS%20stop%20edits&data=${data}`,
+                { cache: 'no-store', redirect: 'error' },
+            );
+            if (!response.ok) {
+                setJosmStatus(`JOSM returned HTTP ${response.status}. You can download the OSM file instead.`);
+                return;
+            }
+            setJosmStatus('Request accepted. Check JOSM for the GTFS stop edits layer.');
+        } catch {
+            setJosmStatus('Could not reach JOSM. Open JOSM, enable Remote Control, or download the OSM file.');
+        } finally {
+            setLoadingJosm(false);
+        }
+    }
 
     const changes = osmData?.listChanges().map(ch => {
         const nwrId = `${ch.element.type[0]}${ch.element.id}`;
@@ -57,6 +86,10 @@ export function Changes({ osmData, region }: ChangesProps) {
             {changes}
         </div>
         <button onClick={downloadHandler}>Download as OSM file</button>
+        <button onClick={loadInJosm} disabled={loadingJosm}>
+            {loadingJosm ? 'Sending to JOSM…' : 'Load in JOSM'}
+        </button>
+        {josmStatus && <p role="status">{josmStatus}</p>}
     </>
 }
 
