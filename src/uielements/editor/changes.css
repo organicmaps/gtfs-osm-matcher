@@ -5,6 +5,19 @@
     margin-bottom: 1em;
 }
 
+.osm-change {
+    display: flex;
+    padding: 0.25em;
+    border-radius: 0.25em;
+    flex-wrap: wrap;
+    align-items: baseline;
+    margin-bottom: 0.5em;
+}
+
+.osm-change:hover {
+    background-color: #f5f5f5;
+}
+
 .osm-change.ignored {
     background-color: #ccc;
 }
@@ -15,21 +28,42 @@
     font-size: 1em;
 }
 
+.osm-change .actions {
+    flex-shrink: 0;
+}
+
+.osm-change .actions button {
+    width: 5em;
+}
+
+
 .change-element-id {
     width: 7em;
-    display: inline-block;
+    flex-shrink: 0;
 }
 
 .change-element-name {
-    width: 15em;
+    flex: 1 1 0;
+    min-width: 5em;
+    overflow: hidden;
+    white-space: nowrap;
     text-overflow: ellipsis;
-    display: inline-block;
 }
 
 .change-element-type {
     width: 3em;
-    display: inline-block;
+    flex-shrink: 0;
 }
-.changes-tab button + button {
-    margin-left: 0.5em;
+
+.change-action {
+    font-style: italic;
+}
+
+.osm-change .change-actions {
+    font-size: 0.75em;
+    flex-basis: 100%;
+}
+.osm-changes-actions {
+    display: flex;
+    gap: 0.5em;
 }
