@@ -1,6 +1,7 @@
-// Run: node_modules/.bin/esbuild tests/osm-export.test.ts --bundle --platform=node --format=esm --outfile=/tmp/osm-export.test.mjs && node --test /tmp/osm-export.test.mjs
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { OSM_QUERY_QUEUE } from '../src/services/OsmQuerryQueue';
+import { OSM_DATA } from '../src/services/OSMData';
 import OSMData, { encodeChanges } from '../src/services/OSMData';
 
 function fixture() {
@@ -118,4 +119,52 @@ test('ignored child relation edits use original membership and tags', () => {
     const xml = encodeChanges(data.listChanges().filter(c => c.element.id === 5), undefined, data);
     assert.doesNotMatch(xml, /Ignored relation|ref="999"/);
     assert.match(xml, /<member type="relation" ref="5" role="parent">/);
+});
+
+test('tag subscribers see applied edits, original snapshots and reverted changes', () => {
+    const data = new OSMData();
+    data.addElement({ type: 'node', id: 1, lat: 1, lon: 2, tags: { name: 'Original' } });
+    const observed: number[] = [];
+    data.subscribe(() => observed.push(data.listChanges().length));
+    data.setElementTags({ name: 'Edited' }, data.getNodeById(1));
+    assert.equal(data.changes[0].original.tags.name, 'Original');
+    data.setElementTags({ name: 'Original' }, data.getNodeById(1));
+    assert.deepEqual(observed, [1, 0]);
+});
+
+test('export metadata is contained in an id-less changeset', () => {
+    const xml = encodeChanges([], 'A&B');
+    assert.match(xml, /<changeset><tag k="created_by"[^]*<tag k="hashtags"[^]*<tag k="data_used" v="A&amp;B"><\/tag><\/changeset>/);
+});
+
+test('editor loads relation candidates with recursive ways, nodes and cyclic relations', async () => {
+    const source = relationFixture();
+    const originalFetch = globalThis.fetch;
+    OSM_DATA.idMap.clear();
+    OSM_DATA.elements = [];
+    OSM_DATA.changes = [];
+    const requests: string[] = [];
+    const unsubscribe = OSM_DATA.subscribe(() => {
+        assert.ok(OSM_DATA.getNodeById(2), 'publish only after dependencies load');
+    });
+    globalThis.fetch = async input => {
+        const url = new URL(String(input));
+        requests.push(url.pathname);
+        const type = url.pathname.split('/').pop()!.replace('s.json', '');
+        const ids = url.searchParams.get(type + 's')!.split(',').map(Number);
+        return new Response(JSON.stringify({ elements: ids.map(id => source.getByTypeAndId(type, id)) }));
+    };
+    try {
+        await OSM_QUERY_QUEUE.queryDataByIds([], [], ['5']);
+        assert.equal(requests.length, 5);
+        OSM_DATA.setElementTags({ name: 'Exported relation' }, OSM_DATA.getRelationById(5));
+        assert.match(encodeChanges(OSM_DATA.listChanges(), undefined, OSM_DATA), /Exported relation/);
+        assert.equal(OSM_DATA.elements.length, 5);
+    } finally {
+        globalThis.fetch = originalFetch;
+        unsubscribe();
+        OSM_DATA.idMap.clear();
+        OSM_DATA.elements = [];
+        OSM_DATA.changes = [];
+    }
 });

@@ -89,7 +89,7 @@ export default class OSMData {
         });
     }
 
-    updateOverpassData(overpassData: OSMData) {
+    updateOverpassData(overpassData: Pick<OSMData, 'elements'>) {
         if (overpassData.elements &&
             Array.isArray(overpassData.elements)) {
 
@@ -153,12 +153,13 @@ export default class OSMData {
     }
 
     setElementTags(tags: OSMElementTags, osmElement: OSMElement) {
-        this.commitAction({ 'element': osmElement, action: 'change_tags' });
+        this.commitAction({ 'element': osmElement, action: 'change_tags' }, false);
 
         const validTags = Object.entries(tags)
             .filter(([k, v]) => !isBlank(k) && !isBlank(v));
 
         osmElement.tags = Object.fromEntries(validTags);
+        this.emit();
     }
 
     addElement(element: OSMElement) {
@@ -169,7 +170,7 @@ export default class OSMData {
         this.idMap.set(key, element);
     }
 
-    commitAction({ element, action }: ElementChangeAction) {
+    commitAction({ element, action }: ElementChangeAction, notify = true) {
         const existing = this.changes.find(change =>
             change.element.id === element.id &&
             change.element.type === element.type
@@ -186,7 +187,7 @@ export default class OSMData {
             });
         }
 
-        this.emit();
+        if (notify) this.emit();
     }
 
     getLonLat(element: OSMElement) {
@@ -222,6 +223,9 @@ export default class OSMData {
 export function encodeChanges(changes: OSMDataChange[], region?: string, osmData?: OSMData) {
     const changedElements = new Map(changes.map(({ element }) => [`${element.type}${element.id}`, element]));
     const elements = new Map(changedElements);
+    const originals = new Map(osmData?.changes.map(({ element, original }) => [
+        `${element.type}${element.id}`, original,
+    ]));
 
     // Iterating the map also visits dependencies added along the way. Entries are
     // deduplicated before traversal, including cyclic relation memberships.
@@ -233,7 +237,7 @@ export function encodeChanges(changes: OSMDataChange[], region?: string, osmData
             const key = `${type}${ref}`;
             if (elements.has(key)) continue;
             // Included edits win; ignored edits must use their original data.
-            const dependency = osmData?.changes.find(change => change.element.type === type && change.element.id === ref)?.original
+            const dependency = originals.get(key)
                 ?? osmData?.getByTypeAndId(type, ref);
             if (!dependency || (dependency.type === 'node' && (!Number.isFinite(dependency.lat) || !Number.isFinite(dependency.lon)))) {
                 throw new Error(`Cannot export ${element.type} ${element.id}: ${type} ${ref} is missing. Reload the OSM data and try again.`);
@@ -281,7 +285,7 @@ export function encodeChanges(changes: OSMDataChange[], region?: string, osmData
         changesetTags.push({ tag: { _attr: { k: 'data_used', v: region } } });
     }
 
-    return xml({ osm: [{ _attr: { version: "0.6", generator: "osm-gtfs" } }, ...changesetTags, ...xmlNodes] }, { declaration: true });
+    return xml({ osm: [{ _attr: { version: "0.6", generator: "osm-gtfs" } }, { changeset: changesetTags }, ...xmlNodes] }, { declaration: true });
 }
 
 function xml(root: any, options?: { declaration?: boolean }) {

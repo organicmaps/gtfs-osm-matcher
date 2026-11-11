@@ -32,6 +32,7 @@ export function Changes({ osmData, region }: ChangesProps) {
             let data: string;
             try {
                 data = encodeChanges(changes, region, osmData);
+                setJosmStatus('');
             } catch (error) {
                 setJosmStatus(error instanceof Error ? error.message : 'Could not export OSM data.');
                 return;

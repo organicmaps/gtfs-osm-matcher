@@ -1,3 +1,4 @@
+import type { OSMElement } from "./OSMData.types";
 import { OSM_DATA } from "./OSMData";
 import { getTileBBox, type BBox, type TileXYZ } from "./tile-utils";
 
@@ -10,21 +11,25 @@ const stopsQ: string = `
 (
   node["public_transport"~"platform|stop_position|station|stop"]({{bbox}});
   way["public_transport"~"platform|stop_position|station|stop"]({{bbox}});
+  relation["public_transport"~"platform|stop_position|station|stop"]({{bbox}});
   
   node["highway"="bus_stop"]({{bbox}});
   node["highway"="platform"]({{bbox}});
 
   node["amenity"~"bus_station|ferry_terminal"]({{bbox}});
   way["amenity"~"bus_station|ferry_terminal"]({{bbox}});
+  relation["amenity"~"bus_station|ferry_terminal"]({{bbox}});
   
   node["aerialway"~"station"]({{bbox}});
   way["aerialway"~"station"]({{bbox}});
+  relation["aerialway"~"station"]({{bbox}});
   
   node["railway"~"tram_stop|halt|subway_entrance|platform|stop|station"]({{bbox}});
   way["railway"~"tram_stop|halt|subway_entrance|platform|stop|station"]({{bbox}});
+  relation["railway"~"tram_stop|halt|subway_entrance|platform|stop|station"]({{bbox}});
 );
 out meta;
->;
+>>;
 out meta qt;
 `;
 
@@ -84,48 +89,46 @@ class OSMQueryQueue {
         return queryOverpass(query);
     }
 
-    async queryDataByIds(nodes: any[], ways: any[]) {
-        if (nodes.length > 0) {
-            await fetch(OSM_ENDPOINT + '/nodes.json?nodes=' + nodes.join(','))
-                .then(response => response.json())
-                .then(data => {
-                    import.meta.env.DEV
-                        && console.log('osm nodes data', data);
-                    OSM_DATA.updateOverpassData(data);
-                });
+    async queryDataByIds(nodes: (string | number)[], ways: (string | number)[], relations: (string | number)[] = []) {
+        const pending = new Map<string, { type: OSMElement['type'], id: string | number }>();
+        const enqueue = (type: OSMElement['type'], id: string | number) => {
+            const key = `${type}${id}`;
+            if (!pending.has(key)) pending.set(key, { type, id });
+        };
+        nodes.forEach(id => enqueue('node', id));
+        ways.forEach(id => enqueue('way', id));
+        relations.forEach(id => enqueue('relation', id));
+
+        // Traverse cached elements too: a previously loaded relation may still
+        // have missing descendants. The visited map also breaks membership cycles.
+        const fetched = new Map<string, OSMElement>();
+        let batch = [...pending.values()];
+        while (batch.length) {
+            const loaded: OSMElement[] = [];
+            for (const type of ['node', 'way', 'relation'] as const) {
+                const ids = batch.filter(item => item.type === type && !OSM_DATA.getByTypeAndId(type, Number(item.id)))
+                    .map(item => item.id);
+                // Keep URLs bounded for large relations.
+                for (let offset = 0; offset < ids.length; offset += 200) {
+                    const response = await fetch(`${OSM_ENDPOINT}/${type}s.json?${type}s=${ids.slice(offset, offset + 200).join(',')}`);
+                    if (!response.ok) throw new Error(`Could not load OSM ${type}s: HTTP ${response.status}`);
+                    const data = await response.json() as { elements: OSMElement[] };
+                    loaded.push(...data.elements);
+                }
+            }
+            const previousSize = pending.size;
+            const elements = batch.map(({ type, id }) => OSM_DATA.getByTypeAndId(type, Number(id)))
+                .filter((element): element is OSMElement => !!element);
+            for (const element of [...elements, ...loaded]) {
+                if (element.type === 'way') element.nodes.forEach(id => enqueue('node', id));
+                if (element.type === 'relation') element.members.forEach(({ type, ref }) => enqueue(type, ref));
+            }
+            // Publish only after the whole dependency graph has loaded, so the
+            // editor cannot offer an incomplete relation for export.
+            loaded.forEach(element => fetched.set(`${element.type}${element.id}`, element));
+            batch = [...pending.values()].slice(previousSize);
         }
-
-        if (ways.length > 0) {
-            await fetch(OSM_ENDPOINT + '/ways.json?ways=' + ways.join(','))
-                .then(response => response.json())
-                .then(data => {
-                    import.meta.env.DEV
-                        && console.log('osm ways data', data);
-                    OSM_DATA.updateOverpassData(data);
-                    return data;
-                })
-                .then(data => {
-                    // Ways reference node IDs but don't include node coordinates.
-                    // Fetch any referenced nodes that are not already in OSM_DATA
-                    // so we can compute way centroids.
-                    const wayNodeIds = (data.elements || [])
-                        .filter((e: any) => e.type === 'way' && Array.isArray(e.nodes))
-                        .flatMap((e: any) => e.nodes)
-                        .filter((nid: number) => !OSM_DATA.getNodeById(nid));
-
-                    const uniqueNodeIds = [...new Set<number>(wayNodeIds)];
-
-                    if (uniqueNodeIds.length > 0) {
-                        return fetch(OSM_ENDPOINT + '/nodes.json?nodes=' + uniqueNodeIds.join(','))
-                            .then(response => response.json())
-                            .then(nodeData => {
-                                import.meta.env.DEV
-                                    && console.log('osm way child nodes data', nodeData);
-                                OSM_DATA.updateOverpassData(nodeData);
-                            });
-                    }
-                });
-        }
+        OSM_DATA.updateOverpassData({ elements: [...fetched.values()] });
     }
 
     getBBOXString(bbox: BBox) {
