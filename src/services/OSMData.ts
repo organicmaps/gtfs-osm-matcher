@@ -223,24 +223,28 @@ export function encodeChanges(changes: OSMDataChange[], region?: string, osmData
     const changedElements = new Map(changes.map(({ element }) => [`${element.type}${element.id}`, element]));
     const elements = new Map(changedElements);
 
-    // JOSM needs the actual nodes as well as the way's references. Prefer included
-    // edits, but use the original for ignored edits so they are not exported indirectly.
-    for (const { element } of changes) {
-        if (element.type !== 'way') continue;
-        for (const id of element.nodes) {
-            const key = `node${id}`;
+    // Iterating the map also visits dependencies added along the way. Entries are
+    // deduplicated before traversal, including cyclic relation memberships.
+    for (const element of elements.values()) {
+        const references = element.type === 'way'
+            ? element.nodes.map(ref => ({ type: 'node' as const, ref }))
+            : element.type === 'relation' ? element.members : [];
+        for (const { type, ref } of references) {
+            const key = `${type}${ref}`;
             if (elements.has(key)) continue;
-            const node = osmData?.changes.find(change => change.element.type === 'node' && change.element.id === id)?.original
-                ?? osmData?.getNodeById(id);
-            if (!node || node.type !== 'node' || !Number.isFinite(node.lat) || !Number.isFinite(node.lon)) {
-                throw new Error(`Cannot export way ${element.id}: node ${id} is missing. Reload the OSM data and try again.`);
+            // Included edits win; ignored edits must use their original data.
+            const dependency = osmData?.changes.find(change => change.element.type === type && change.element.id === ref)?.original
+                ?? osmData?.getByTypeAndId(type, ref);
+            if (!dependency || (dependency.type === 'node' && (!Number.isFinite(dependency.lat) || !Number.isFinite(dependency.lon)))) {
+                throw new Error(`Cannot export ${element.type} ${element.id}: ${type} ${ref} is missing. Reload the OSM data and try again.`);
             }
-            elements.set(key, node);
+            elements.set(key, dependency);
         }
     }
 
+    const elementOrder = { node: 0, way: 1, relation: 2 };
     const xmlNodes = [...elements.values()]
-        .sort((a, b) => Number(a.type !== 'node') - Number(b.type !== 'node'))
+        .sort((a, b) => elementOrder[a.type] - elementOrder[b.type])
         .map(element => {
             const tagElements = Object.entries(element.tags || {})
                 .map(([k, v]) => ({ tag: { _attr: { k, v } } }));
@@ -259,7 +263,9 @@ export function encodeChanges(changes: OSMDataChange[], region?: string, osmData
 
             const children = element.type === 'way'
                 ? [...element.nodes.map(ref => ({ nd: { _attr: { ref } } })), ...tagElements]
-                : tagElements;
+                : element.type === 'relation'
+                    ? [...element.members.map(({ type, ref, role }) => ({ member: { _attr: { type, ref, role: role ?? '' } } })), ...tagElements]
+                    : tagElements;
 
             return {
                 [element.type]: [{ _attr: attr }, ...children]

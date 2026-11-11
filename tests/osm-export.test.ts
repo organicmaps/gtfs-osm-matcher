@@ -61,3 +61,61 @@ test('existing and newly created node edits retain coordinates and escaped tags'
     assert.match(xml, /v="A&amp;B"/);
     assert.match(xml, /id="-1" version="0" action="modify" lat="30" lon="40"/);
 });
+
+function relationFixture() {
+    const data = fixture();
+    data.addElement({ type: 'relation', id: 5, version: 1, tags: {}, members: [
+        { type: 'way', ref: 3, role: 'outer' },
+        { type: 'node', ref: 1, role: 'stop&entry' },
+        { type: 'relation', ref: 6 },
+    ] });
+    data.addElement({ type: 'relation', id: 6, version: 2, tags: {}, members: [
+        { type: 'relation', ref: 5, role: 'parent' },
+        { type: 'node', ref: 2 },
+    ] });
+    data.setElementTags({ name: 'Edited relation' }, data.getRelationById(5));
+    return data;
+}
+
+test('relations retain member order, types and roles with complete recursive dependencies and cycles', () => {
+    const data = relationFixture();
+    const xml = encodeChanges(data.listChanges().filter(c => c.element.type === 'relation'), undefined, data);
+    assert.equal((xml.match(/<node /g) || []).length, 2);
+    assert.equal((xml.match(/<way /g) || []).length, 1);
+    assert.equal((xml.match(/<relation /g) || []).length, 2);
+    assert.equal((xml.match(/action="modify"/g) || []).length, 1);
+    assert.match(xml, /<member type="way" ref="3" role="outer"><\/member><member type="node" ref="1" role="stop&amp;entry"><\/member><member type="relation" ref="6" role=""><\/member>/);
+    assert.match(xml, /<member type="relation" ref="5" role="parent">/);
+    assert.ok(xml.indexOf('<node ') < xml.indexOf('<way '));
+    assert.ok(xml.indexOf('<way ') < xml.indexOf('<relation '));
+    assert.doesNotMatch(xml, /Edited way/);
+});
+
+test('included member edits are exported exactly once', () => {
+    const data = relationFixture();
+    data.setElementTags({ name: 'Edited child relation' }, data.getRelationById(6));
+    const xml = encodeChanges(data.listChanges(), undefined, data);
+    assert.match(xml, /v="Edited way"/);
+    assert.match(xml, /v="Edited child relation"/);
+    assert.equal((xml.match(/<relation id="6"/g) || []).length, 1);
+    assert.equal((xml.match(/action="modify"/g) || []).length, 3);
+});
+
+test('missing relation members fail export for each element type', () => {
+    for (const [key, description] of [['node1', 'node 1'], ['way3', 'way 3'], ['relation6', 'relation 6']]) {
+        const data = relationFixture();
+        data.idMap.delete(key);
+        data.changes = data.changes.filter(c => c.element.type === 'relation');
+        assert.throws(() => encodeChanges(data.listChanges(), undefined, data),
+            new RegExp(`relation 5: ${description} is missing`));
+    }
+});
+
+test('ignored child relation edits use original membership and tags', () => {
+    const data = relationFixture();
+    data.setElementTags({ name: 'Ignored relation' }, data.getRelationById(6));
+    data.getRelationById(6).members = [{ type: 'node', ref: 999 }];
+    const xml = encodeChanges(data.listChanges().filter(c => c.element.id === 5), undefined, data);
+    assert.doesNotMatch(xml, /Ignored relation|ref="999"/);
+    assert.match(xml, /<member type="relation" ref="5" role="parent">/);
+});
